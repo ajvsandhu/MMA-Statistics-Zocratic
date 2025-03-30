@@ -118,101 +118,71 @@ class FighterPredictor:
         Returns:
             bool: True if everything loaded okay, False if something went wrong
         """
-        if not os.path.exists(MODEL_PATH):
-            self.logger.debug("No model file found")
-            return False
-            
         try:
-            # Try to safely load the model while handling version incompatibilities
-            try:
-                model_data = joblib.load(MODEL_PATH)
-            except Exception as e:
-                self.logger.warning(f"Could not load model directly: {str(e)}")
-                self.logger.info("Forcing model retraining with current scikit-learn version")
-                return False  # Return false to trigger retraining
-            
-            if isinstance(model_data, dict):
-                self.model = model_data.get('model')
-                self.scaler = model_data.get('scaler')
-                self.feature_names = model_data.get('feature_names')
-                
-                if 'model_info' in model_data:
-                    self.model_info = model_data['model_info']
-            else:
-                self.model = model_data
-                
-                if os.path.exists(SCALER_PATH):
-                    try:
-                        self.scaler = joblib.load(SCALER_PATH)
-                    except Exception:
-                        with open(SCALER_PATH, 'rb') as f:
-                            self.scaler = pickle.load(f)
-                else:
-                    self.logger.debug("Creating default scaler")
-                    self.scaler = StandardScaler()
-                    dummy_data = np.array([[0] * 28])
-                    self.scaler.fit(dummy_data)
-                    
-                if os.path.exists(FEATURES_PATH):
-                    try:
-                        self.feature_names = joblib.load(FEATURES_PATH)
-                    except Exception:
-                        with open(FEATURES_PATH, 'rb') as f:
-                            self.feature_names = pickle.load(f)
-                else:
-                    self.logger.debug("Creating default feature names")
-                    self.feature_names = [
-                        'slpm', 'str_acc', 'sapm', 'str_def', 'td_avg', 'td_acc', 'td_def', 'sub_avg',
-                        'reach', 'height', 'weight_class_encoded', 'wins', 'losses', 'draws', 'total_fights', 
-                        'win_percentage', 'is_striker', 'is_grappler', 'age', 'striking_differential',
-                        'takedown_differential', 'combat_effectiveness', 'stance_encoded', 
-                        'recent_win_streak', 'recent_loss_streak', 'finish_rate', 'decision_rate', 'experience_factor'
-                    ]
-            
-            if os.path.exists(MODEL_INFO_PATH):
+            # First try to load the model directly
+            if os.path.exists(MODEL_PATH):
                 try:
-                    with open(MODEL_INFO_PATH, 'r') as f:
-                        self.model_info = json.load(f)
-                except:
-                    self.logger.debug("Failed to load model info")
-            
-            if self.model is None:
-                self.logger.error("Model loading failed")
+                    model_data = joblib.load(MODEL_PATH)
+                    self.logger.info("Successfully loaded model file")
+                except Exception as e:
+                    self.logger.warning(f"Could not load model directly: {str(e)}")
+                    return False
+
+                # Extract model components
+                if isinstance(model_data, dict):
+                    self.model = model_data.get('model')
+                    self.scaler = model_data.get('scaler')
+                    self.feature_names = model_data.get('feature_names')
+                    self.model_info = model_data.get('model_info', self.model_info)
+                else:
+                    self.model = model_data
+                    
+                    # Load scaler
+                    if os.path.exists(SCALER_PATH):
+                        try:
+                            self.scaler = joblib.load(SCALER_PATH)
+                        except Exception as e:
+                            self.logger.warning(f"Failed to load scaler: {str(e)}")
+                            return False
+                    
+                    # Load feature names
+                    if os.path.exists(FEATURES_PATH):
+                        try:
+                            self.feature_names = joblib.load(FEATURES_PATH)
+                        except Exception as e:
+                            self.logger.warning(f"Failed to load feature names: {str(e)}")
+                            return False
+
+                # Verify model components
+                if self.model is None:
+                    self.logger.error("Model object is None")
+                    return False
+                
+                if self.scaler is None:
+                    self.logger.error("Scaler object is None")
+                    return False
+                
+                if not self.feature_names:
+                    self.logger.error("Feature names are missing")
+                    return False
+
+                # Test model compatibility
+                try:
+                    dummy_data = np.array([[0] * len(self.feature_names)])
+                    scaled_data = self.scaler.transform(dummy_data)
+                    _ = self.model.predict_proba(scaled_data)
+                    self.logger.info("Model compatibility check passed")
+                    return True
+                except Exception as e:
+                    self.logger.error(f"Model compatibility check failed: {str(e)}")
+                    return False
+            else:
+                self.logger.warning(f"Model file not found at {MODEL_PATH}")
                 return False
-            
-            # Check if model is compatible with current scikit-learn version
-            try:
-                # Try to make a small prediction to check compatibility
-                dummy_data = np.array([[0] * len(self.feature_names)])
-                scaled_data = self.scaler.transform(dummy_data)
-                _ = self.model.predict_proba(scaled_data)
-                self.logger.info("Model compatibility check passed")
-            except Exception as e:
-                self.logger.error(f"Model compatibility check failed: {str(e)}")
-                return False
-            
-            if self.scaler is None:
-                self.logger.debug("Creating default scaler")
-                self.scaler = StandardScaler()
-                dummy_data = np.array([[0] * 28])
-                self.scaler.fit(dummy_data)
-            
-            if not self.feature_names:
-                self.logger.debug("Creating default feature names")
-                self.feature_names = [
-                    'slpm', 'str_acc', 'sapm', 'str_def', 'td_avg', 'td_acc', 'td_def', 'sub_avg',
-                    'reach', 'height', 'weight_class_encoded', 'wins', 'losses', 'draws', 'total_fights', 
-                    'win_percentage', 'is_striker', 'is_grappler', 'age', 'striking_differential',
-                    'takedown_differential', 'combat_effectiveness', 'stance_encoded', 
-                    'recent_win_streak', 'recent_loss_streak', 'finish_rate', 'decision_rate', 'experience_factor'
-                ]
-            
-            self.model_info['status'] = 'Loaded'
-            self.logger.debug("Model loaded successfully")
-            return True
-            
+                
         except Exception as e:
-            self.logger.error(f"Model loading failed: {str(e)}")
+            self.logger.error(f"Unexpected error during model loading: {str(e)}")
+            self.logger.error(traceback.format_exc())
             return False
 
     def _save_model(self) -> bool:
