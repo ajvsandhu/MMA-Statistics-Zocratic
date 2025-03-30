@@ -86,8 +86,6 @@ ENV/
 *.swo
 
 # Model files and data
-backend/ml/models/
-*.joblib
 *.pkl
 *.h5
 
