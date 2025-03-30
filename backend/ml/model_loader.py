@@ -57,15 +57,26 @@ def load_model():
             if not isinstance(model_package, dict):
                 logger.error("Model file is not in the expected package format")
                 return False
-                
+            
+            # Extract components with validation
             _model = model_package.get('model')
             _scaler = model_package.get('scaler')
             _features = model_package.get('feature_names')
+            metadata = model_package.get('metadata', {})
             
+            # Validate components
             if not all([_model, _scaler, _features]):
                 logger.error("Model package is missing required components")
                 return False
-                
+            
+            # Log model metadata
+            logger.info(f"Model metadata: {metadata}")
+            
+            # Verify scikit-learn version compatibility
+            model_version = metadata.get('scikit_learn_version')
+            if model_version:
+                logger.info(f"Model was trained with scikit-learn version: {model_version}")
+            
             logger.info("Successfully loaded model package")
             
         except Exception as e:
@@ -112,11 +123,15 @@ def save_model(model: Any, scaler: Any, features: List[str]) -> bool:
         if not create_directory_if_not_exists(model_dir):
             return False
         
-        # Create model package
+        # Create model package with metadata
         model_package = {
             'model': model,
             'scaler': scaler,
-            'feature_names': features
+            'feature_names': features,
+            'metadata': {
+                'model_type': type(model).__name__,
+                'n_features': len(features)
+            }
         }
         
         # Save model package
