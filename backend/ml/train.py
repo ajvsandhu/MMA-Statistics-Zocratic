@@ -7,11 +7,11 @@ from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import classification_report
 from backend.supabase_client import SupabaseClient
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from typing import List, Dict, Tuple
 
 from backend.constants import MODEL_PATH, SCALER_PATH, FEATURES_PATH
 
@@ -29,8 +29,15 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 logger = logging.getLogger(__name__)
 
 def train_model():
-    """Train the fight prediction model using historical fight data."""
-    logger = logging.getLogger(__name__)
+    """
+    Train the fight prediction model using historical fight data.
+    This model uses a comprehensive set of fighter statistics to predict fight outcomes.
+    Features include:
+    - Striking metrics (SLpM, SApM, accuracy, defense)
+    - Grappling metrics (takedowns, submissions)
+    - Physical attributes (height, reach, weight)
+    - Historical performance (win rate, recent results)
+    """
     logger.info("Starting model training process...")
     
     try:
@@ -40,169 +47,185 @@ def train_model():
             os.getenv("SUPABASE_KEY")
         )
         
-        # Get total count of fighters
-        count_response = supabase.table("fighters").select("*", count="exact").execute()
-        total_fighters = count_response.count
-        logger.info(f"Total fighters in database: {total_fighters}")
-        
-        # Get all fighters using range
-        fighters = []
-        page_size = 1000
-        for offset in range(0, total_fighters, page_size):
-            response = supabase.table("fighters").select("*").range(offset, offset + page_size - 1).execute()
-            if response.data:
-                fighters.extend(response.data)
-                logger.info(f"Retrieved {len(fighters)}/{total_fighters} fighters")
-        
-        logger.info(f"Retrieved all {len(fighters)} fighters")
-        
-        # Get total count of fights
-        count_response = supabase.table("fighter_last_5_fights").select("*", count="exact").execute()
-        total_fights = count_response.count
-        logger.info(f"Total fights in database: {total_fights}")
-        
-        # Get all fights using range
-        fights = []
-        for offset in range(0, total_fights, page_size):
-            response = supabase.table("fighter_last_5_fights").select("*").range(offset, offset + page_size - 1).execute()
-            if response.data:
-                fights.extend(response.data)
-                logger.info(f"Retrieved {len(fights)}/{total_fights} fights")
-        
-        logger.info(f"Retrieved all {len(fights)} fights")
+        # Get all fighters and fights
+        fighters = get_all_fighters(supabase)
+        fights = get_all_fights(supabase)
         
         # Process fights to create training data
-        X = []  # Features
-        y = []  # Labels (win/loss)
+        X, y, feature_names = process_fights(fighters, fights)
         
-        processed_count = 0
-        skipped_count = 0
-        
-        # Create fighter lookup dictionary
-        fighter_dict = {f['fighter_name']: f for f in fighters}
-        
-        # Process each fight
-        for fight in fights:
-            try:
-                fighter_name = fight.get('fighter_name')
-                opponent = fight.get('opponent')
-                result = fight.get('result', '').upper()
-                
-                # Skip if missing essential data
-                if not all([fighter_name, opponent, result]):
-                    skipped_count += 1
-                    continue
-                    
-                # Find fighter data
-                fighter_data = fighter_dict.get(fighter_name)
-                opponent_data = fighter_dict.get(opponent)
-                
-                if not fighter_data or not opponent_data:
-                    skipped_count += 1
-                    continue
-                
-                # Extract features
-                fighter_features = extract_features(fighter_data)
-                opponent_features = extract_features(opponent_data)
-                
-                if not fighter_features or not opponent_features:
-                    skipped_count += 1
-                    continue
-                
-                # Create feature vector (difference between fighters)
-                feature_vector = []
-                for key in sorted(fighter_features.keys()):
-                    feature_vector.append(fighter_features[key] - opponent_features[key])
-                
-                # Create label (1 if fighter won, 0 if lost)
-                if 'W' not in result and 'L' not in result:  # Skip draws and no contests
-                    skipped_count += 1
-                    continue
-                    
-                label = 1 if 'W' in result else 0
-                
-                X.append(feature_vector)
-                y.append(label)
-                processed_count += 1
-                
-            except Exception as e:
-                logger.error(f"Error processing fight: {str(e)}")
-                skipped_count += 1
-                continue
-        
-        logger.info(f"Processed {processed_count} fights, skipped {skipped_count} fights")
-        
-        if processed_count < 50:  # Minimum sample requirement
-            logger.error(f"Insufficient training data: only {processed_count} samples")
+        if len(X) < 50:
+            logger.error(f"Insufficient training data: only {len(X)} samples")
             return
         
-        # Convert to numpy arrays
-        X = np.array(X)
-        y = np.array(y)
-        
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        
-        # Scale features
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_test_scaled = scaler.transform(X_test)
-        
-        # Train model
-        model = GradientBoostingClassifier(
-            n_estimators=100,
-            learning_rate=0.1,
-            max_depth=3,
-            random_state=42
-        )
-        
-        model.fit(X_train_scaled, y_train)
-        
-        # Evaluate model
-        train_accuracy = model.score(X_train_scaled, y_train)
-        test_accuracy = model.score(X_test_scaled, y_test)
-        
-        logger.info(f"Training accuracy: {train_accuracy:.3f}")
-        logger.info(f"Test accuracy: {test_accuracy:.3f}")
-        
-        # Generate classification report
-        y_pred = model.predict(X_test_scaled)
-        logger.info("\nClassification Report:")
-        logger.info(classification_report(y_test, y_pred))
-        
-        # Save model components
-        model_dir = os.path.join('backend', 'ml', 'models')
-        os.makedirs(model_dir, exist_ok=True)
-        
-        # Create model package
-        model_package = {
-            'model': model,
-            'scaler': scaler,
-            'feature_names': sorted(fighter_features.keys())
-        }
-        
-        # Save model package
-        joblib.dump(model_package, os.path.join(model_dir, 'fight_predictor_model.joblib'))
-        
-        # Save model info
-        model_info = {
-            'training_date': datetime.now().isoformat(),
-            'train_accuracy': train_accuracy,
-            'test_accuracy': test_accuracy,
-            'n_samples': len(X),
-            'n_features': len(sorted(fighter_features.keys()))
-        }
-        joblib.dump(model_info, os.path.join(model_dir, 'model_info.joblib'))
-        
-        logger.info("Model training completed successfully!")
+        # Train and evaluate model
+        train_and_evaluate_model(X, y, feature_names)
         
     except Exception as e:
         logger.error(f"Error during model training: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
 
+def get_all_fighters(supabase: Client) -> List[Dict]:
+    """Retrieve all fighters from the database."""
+    count_response = supabase.table("fighters").select("*", count="exact").execute()
+    total_fighters = count_response.count
+    logger.info(f"Total fighters in database: {total_fighters}")
+    
+    fighters = []
+    page_size = 1000
+    for offset in range(0, total_fighters, page_size):
+        response = supabase.table("fighters").select("*").range(offset, offset + page_size - 1).execute()
+        if response.data:
+            fighters.extend(response.data)
+            logger.info(f"Retrieved {len(fighters)}/{total_fighters} fighters")
+    
+    return fighters
+
+def get_all_fights(supabase: Client) -> List[Dict]:
+    """Retrieve all fights from the database."""
+    count_response = supabase.table("fighter_last_5_fights").select("*", count="exact").execute()
+    total_fights = count_response.count
+    logger.info(f"Total fights in database: {total_fights}")
+    
+    fights = []
+    page_size = 1000
+    for offset in range(0, total_fights, page_size):
+        response = supabase.table("fighter_last_5_fights").select("*").range(offset, offset + page_size - 1).execute()
+        if response.data:
+            fights.extend(response.data)
+            logger.info(f"Retrieved {len(fights)}/{total_fights} fights")
+    
+    return fights
+
+def process_fights(fighters: List[Dict], fights: List[Dict]) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """Process fights to create training data."""
+    X = []  # Features
+    y = []  # Labels (win/loss)
+    
+    processed_count = 0
+    skipped_count = 0
+    
+    # Create fighter lookup dictionary
+    fighter_dict = {f['fighter_name']: f for f in fighters}
+    
+    # Process each fight
+    for fight in fights:
+        try:
+            fighter_name = fight.get('fighter_name')
+            opponent = fight.get('opponent')
+            result = fight.get('result', '').upper()
+            
+            # Skip if missing essential data
+            if not all([fighter_name, opponent, result]):
+                skipped_count += 1
+                continue
+                
+            # Find fighter data
+            fighter_data = fighter_dict.get(fighter_name)
+            opponent_data = fighter_dict.get(opponent)
+            
+            if not fighter_data or not opponent_data:
+                skipped_count += 1
+                continue
+            
+            # Extract features
+            fighter_features = extract_features(fighter_data)
+            opponent_features = extract_features(opponent_data)
+            
+            if not fighter_features or not opponent_features:
+                skipped_count += 1
+                continue
+            
+            # Create feature vector (difference between fighters)
+            feature_vector = []
+            for key in sorted(fighter_features.keys()):
+                feature_vector.append(fighter_features[key] - opponent_features[key])
+            
+            # Create label (1 if fighter won, 0 if lost)
+            if 'W' not in result and 'L' not in result:  # Skip draws and no contests
+                skipped_count += 1
+                continue
+                
+            label = 1 if 'W' in result else 0
+            
+            X.append(feature_vector)
+            y.append(label)
+            processed_count += 1
+            
+        except Exception as e:
+            logger.error(f"Error processing fight: {str(e)}")
+            skipped_count += 1
+            continue
+    
+    logger.info(f"Processed {processed_count} fights, skipped {skipped_count} fights")
+    
+    return np.array(X), np.array(y), sorted(fighter_features.keys())
+
+def train_and_evaluate_model(X: np.ndarray, y: np.ndarray, feature_names: List[str]):
+    """Train and evaluate the model."""
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Scale features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Train model with optimized parameters
+    model = GradientBoostingClassifier(
+        n_estimators=200,  # Increased for better performance
+        learning_rate=0.05,  # Reduced for better generalization
+        max_depth=4,  # Increased for more complex patterns
+        min_samples_split=5,  # Added to prevent overfitting
+        min_samples_leaf=2,  # Added to prevent overfitting
+        random_state=42
+    )
+    
+    model.fit(X_train_scaled, y_train)
+    
+    # Evaluate model
+    train_accuracy = model.score(X_train_scaled, y_train)
+    test_accuracy = model.score(X_test_scaled, y_test)
+    
+    logger.info(f"Training accuracy: {train_accuracy:.3f}")
+    logger.info(f"Test accuracy: {test_accuracy:.3f}")
+    
+    # Generate classification report
+    y_pred = model.predict(X_test_scaled)
+    logger.info("\nClassification Report:")
+    logger.info(classification_report(y_test, y_pred))
+    
+    # Save model components
+    save_model_components(model, scaler, feature_names, train_accuracy, test_accuracy, len(X))
+
+def save_model_components(model, scaler, feature_names, train_accuracy, test_accuracy, n_samples):
+    """Save model components and metadata."""
+    model_dir = os.path.join('backend', 'ml', 'models')
+    os.makedirs(model_dir, exist_ok=True)
+    
+    # Create model package with metadata
+    model_package = {
+        'model': model,
+        'scaler': scaler,
+        'feature_names': feature_names,
+        'metadata': {
+            'training_date': datetime.now().isoformat(),
+            'train_accuracy': train_accuracy,
+            'test_accuracy': test_accuracy,
+            'n_samples': n_samples,
+            'n_features': len(feature_names),
+            'model_type': 'GradientBoostingClassifier',
+            'scikit_learn_version': '1.3.2'  # Explicitly specify version
+        }
+    }
+    
+    # Save model package
+    joblib.dump(model_package, os.path.join(model_dir, 'fight_predictor_model.joblib'))
+    logger.info("Model training completed successfully!")
+
 def extract_features(fighter_data):
-    """Extract features from fighter data."""
+    """Extract comprehensive features from fighter data."""
     try:
         features = {}
         
@@ -220,11 +243,13 @@ def extract_features(fighter_data):
             except:
                 return default
         
-        # Use exact field names from database
+        # Striking metrics
         features['slpm'] = safe_float(fighter_data.get('SLpM'))
         features['str_acc'] = safe_float(fighter_data.get('Str. Acc.'))
         features['sapm'] = safe_float(fighter_data.get('SApM'))
         features['str_def'] = safe_float(fighter_data.get('Str. Def'))
+        
+        # Grappling metrics
         features['td_avg'] = safe_float(fighter_data.get('TD Avg.'))
         features['td_acc'] = safe_float(fighter_data.get('TD Acc.'))
         features['td_def'] = safe_float(fighter_data.get('TD Def.'))
@@ -252,61 +277,23 @@ def extract_features(fighter_data):
         
         # Weight class encoding
         weight_str = fighter_data.get('Weight', 'N/A')
-        weight_classes = {
-            '265 lbs.': 5,  # Heavyweight
-            '205 lbs.': 4,  # Light Heavyweight
-            '185 lbs.': 3,  # Middleweight
-            '170 lbs.': 2,  # Welterweight
-            '155 lbs.': 1,  # Lightweight
-            '145 lbs.': 0,  # Featherweight
-            '135 lbs.': -1, # Bantamweight
-            '125 lbs.': -2  # Flyweight
-        }
-        features['weight_class_encoded'] = weight_classes.get(weight_str, 0)
-        
-        # Record stats - handle NC (No Contest)
-        record_str = fighter_data.get('Record', '0-0-0')
         try:
-            # Remove any NC or other annotations
-            record_str = record_str.split('(')[0].strip()
-            wins, losses, draws = map(int, record_str.split('-'))
+            if weight_str != 'N/A':
+                weight = float(weight_str.split()[0])
+                features['weight'] = weight
+            else:
+                features['weight'] = 0
         except:
-            wins, losses, draws = 0, 0, 0
+            features['weight'] = 0
         
-        features['wins'] = wins
-        features['losses'] = losses
-        features['draws'] = draws
-        features['total_fights'] = wins + losses + draws
-        features['win_percentage'] = wins / features['total_fights'] if features['total_fights'] > 0 else 0
-        
-        # Fighting style
-        features['is_striker'] = 1 if features['slpm'] > 3.0 and features['str_acc'] > 0.4 else 0
-        features['is_grappler'] = 1 if features['td_avg'] > 2.0 or features['sub_avg'] > 0.5 else 0
-        
-        # Age - skip for now as DOB is N/A
-        features['age'] = 30  # default age
-        
-        # Derived metrics
-        features['striking_differential'] = features['slpm'] - features['sapm']
-        features['takedown_differential'] = features['td_avg'] * features['td_acc'] - features['td_avg'] * (1 - features['td_def'])
-        features['combat_effectiveness'] = (features['slpm'] * features['str_acc']) + (features['td_avg'] * features['td_acc']) + features['sub_avg']
-        
-        # Stance encoding
-        stance = fighter_data.get('STANCE', 'Orthodox')
-        stance_encoding = {'Orthodox': 0, 'Southpaw': 1, 'Switch': 2, 'N/A': 3}
-        features['stance_encoded'] = stance_encoding.get(stance, 3)
-        
-        # Recent performance - skip for now as we don't have recent fights
-        features['recent_win_streak'] = 0
-        features['recent_loss_streak'] = 0
-        features['finish_rate'] = 0
-        features['decision_rate'] = 0
-        
-        # Experience factor
-        features['experience_factor'] = features['total_fights'] * features['win_percentage']
-        
-        # Ensure all features are float type
-        features = {k: float(v) for k, v in features.items()}
+        # Win rate calculation
+        record = fighter_data.get('Record', '0-0-0')
+        try:
+            wins, losses, draws = map(int, record.split('-'))
+            total = wins + losses + draws
+            features['win_rate'] = wins / total if total > 0 else 0
+        except:
+            features['win_rate'] = 0
         
         return features
         
