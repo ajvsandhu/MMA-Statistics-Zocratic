@@ -4,6 +4,8 @@ import joblib
 import traceback
 import numpy as np
 import pickle
+import warnings
+import sklearn
 from typing import Any, Dict, List, Tuple, Optional
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
@@ -12,6 +14,10 @@ from backend.constants import MODEL_PATH, SCALER_PATH, FEATURES_PATH
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Suppress specific warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='sklearn')
 
 # Global model variables
 _model = None
@@ -40,6 +46,9 @@ def load_model():
     global _model, _scaler, _features
     
     try:
+        # Log scikit-learn version
+        logger.info(f"Loading model with scikit-learn version: {sklearn.__version__}")
+        
         # Ensure model directory exists
         model_dir = os.path.dirname(MODEL_PATH)
         if not create_directory_if_not_exists(model_dir):
@@ -57,8 +66,15 @@ def load_model():
                 model_data = joblib.load(MODEL_PATH)
                 logger.info("Successfully loaded model data")
             except Exception as joblib_e:
-                logger.error(f"Failed to load model with joblib: {str(joblib_e)}")
-                return False
+                logger.debug(f"Joblib loading failed: {str(joblib_e)}")
+                # Try alternative loading method
+                try:
+                    with open(MODEL_PATH, 'rb') as f:
+                        model_data = pickle.load(f)
+                    logger.info("Successfully loaded model data using pickle")
+                except Exception as pickle_e:
+                    logger.error(f"Failed to load model with both joblib and pickle: {str(pickle_e)}")
+                    return False
                     
             # Handle either package or direct model format
             if isinstance(model_data, dict):
@@ -76,8 +92,15 @@ def load_model():
                     _scaler = joblib.load(SCALER_PATH)
                     logger.info("Loaded scaler")
                 except Exception as scaler_e:
-                    logger.error(f"Error loading scaler: {str(scaler_e)}")
-                    return False
+                    logger.debug(f"Joblib scaler loading failed: {str(scaler_e)}")
+                    # Try alternative loading method for scaler
+                    try:
+                        with open(SCALER_PATH, 'rb') as f:
+                            _scaler = pickle.load(f)
+                        logger.info("Successfully loaded scaler using pickle")
+                    except Exception as pickle_e:
+                        logger.error(f"Failed to load scaler with both joblib and pickle: {str(pickle_e)}")
+                        return False
             
             # Load features if available and not already loaded
             if _features is None and os.path.exists(FEATURES_PATH):
@@ -85,8 +108,15 @@ def load_model():
                     _features = joblib.load(FEATURES_PATH)
                     logger.info("Loaded feature names")
                 except Exception as feature_e:
-                    logger.error(f"Error loading features: {str(feature_e)}")
-                    return False
+                    logger.debug(f"Joblib features loading failed: {str(feature_e)}")
+                    # Try alternative loading method for features
+                    try:
+                        with open(FEATURES_PATH, 'rb') as f:
+                            _features = pickle.load(f)
+                        logger.info("Successfully loaded features using pickle")
+                    except Exception as pickle_e:
+                        logger.error(f"Failed to load features with both joblib and pickle: {str(pickle_e)}")
+                        return False
             
             # Test if model is usable
             if _model is not None:
@@ -99,6 +129,7 @@ def load_model():
                     return True
                 except Exception as predict_e:
                     logger.error(f"Model compatibility check failed: {str(predict_e)}")
+                    logger.error("This might be due to a scikit-learn version mismatch. Please ensure you're using scikit-learn 1.2.2")
                     return False
             else:
                 logger.error("Model is None after loading")
