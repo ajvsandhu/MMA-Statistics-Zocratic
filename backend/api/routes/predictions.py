@@ -31,11 +31,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=f"{API_V1_STR}/prediction", tags=["Predictions"])
 
 # Create predictor instance and ensure model is loaded
-predictor = FighterPredictor()  # Explicitly set train=False to only load the model
+predictor = FighterPredictor(train=False)  # Explicitly set train=False to only load the model
 if not predictor.model:
     logger.warning("Model not loaded, attempting to load...")
     if not predictor._load_model():
         logger.error("Failed to load model")
+        raise RuntimeError("Failed to load prediction model")
 
 class FighterInput(BaseModel):
     fighter1_name: str
@@ -59,9 +60,9 @@ async def predict_fight(fight_data: FighterInput):
         # Get database connection
         db = get_db_connection()
         
-        # Get fighter data from database
-        fighter1_data = db.table("fighters").select("*").eq("fighter_name", fight_data.fighter1_name).execute()
-        fighter2_data = db.table("fighters").select("*").eq("fighter_name", fight_data.fighter2_name).execute()
+        # Get fighter data from database with case-insensitive search
+        fighter1_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter1_name).execute()
+        fighter2_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter2_name).execute()
         
         if not fighter1_data.data:
             raise HTTPException(status_code=404, detail=f"Fighter not found: {fight_data.fighter1_name}")
@@ -71,28 +72,49 @@ async def predict_fight(fight_data: FighterInput):
         fighter1 = fighter1_data.data[0]
         fighter2 = fighter2_data.data[0]
         
+        # Log fighter data for debugging
+        logger.info(f"Fighter 1 data: {fighter1}")
+        logger.info(f"Fighter 2 data: {fighter2}")
+        
         # Make prediction
         prediction = predictor.predict_winner(fighter1, fighter2)
         
-        if not prediction:
-            raise HTTPException(status_code=500, detail="Failed to make prediction")
+        if not prediction or 'error' in prediction:
+            error_msg = prediction.get('error', 'Failed to make prediction') if prediction else 'Failed to make prediction'
+            raise HTTPException(status_code=500, detail=error_msg)
             
-        # Format response
+        # Format response using exact field names from your database
         response = {
-            "fighter1": fight_data.fighter1_name,
-            "fighter2": fight_data.fighter2_name,
-            "predicted_winner": prediction["winner"],
-            "confidence": prediction["confidence"],
-            "analysis": prediction["analysis"]
+            "fighter1": {
+                "name": fighter1.get("fighter_name"),
+                "record": fighter1.get("Record"),
+                "image_url": fighter1.get("image_url"),
+                "probability": prediction.get("winner_probability" if prediction["winner"] == fighter1.get("fighter_name") else "loser_probability", 0.5),
+                "win_probability": f"{int(round(prediction.get('winner_probability' if prediction['winner'] == fighter1.get('fighter_name') else 'loser_probability', 0.5) * 100))}%"
+            },
+            "fighter2": {
+                "name": fighter2.get("fighter_name"),
+                "record": fighter2.get("Record"),
+                "image_url": fighter2.get("image_url"),
+                "probability": prediction.get("winner_probability" if prediction["winner"] == fighter2.get("fighter_name") else "loser_probability", 0.5),
+                "win_probability": f"{int(round(prediction.get('winner_probability' if prediction['winner'] == fighter2.get('fighter_name') else 'loser_probability', 0.5) * 100))}%"
+            },
+            "winner": prediction["winner"],
+            "loser": prediction["loser"],
+            "winner_probability": prediction["winner_probability"],
+            "loser_probability": prediction["loser_probability"],
+            "prediction_confidence": prediction["prediction_confidence"],
+            "model_version": prediction.get("model_version", "1.0")
         }
         
         logger.info(f"Prediction made successfully: {response}")
-        return response
+        return JSONResponse(content=response)
         
     except HTTPException as e:
         raise e
     except Exception as e:
         logger.error(f"Error making prediction: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/model-info")

@@ -43,7 +43,7 @@ CORS_CREDENTIALS = True
 
 # Query Limits and Pagination
 MAX_FIGHTS_DISPLAY = 5
-MAX_SEARCH_RESULTS = 100
+MAX_SEARCH_RESULTS = 50
 PAGINATION_PAGE_SIZE = int(os.getenv('PAGINATION_PAGE_SIZE', 20))
 
 # Fighter Constants
@@ -64,7 +64,7 @@ FEATURES_PATH = os.path.join(MODEL_DIR, "feature_names.joblib")
 FEATURE_NAMES_PATH = FEATURES_PATH
 MODEL_INFO_FILENAME = "model_info.json"
 MODEL_INFO_PATH = MODELS_DIR / MODEL_INFO_FILENAME
-MODEL_VERSION = os.getenv("MODEL_VERSION", APP_VERSION)
+MODEL_VERSION = "v1"
 
 # Web Scraping Configuration
 REQUEST_HEADERS = {
@@ -92,6 +92,31 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 IMPORTANT_FEATURES = [
     "Win", "Loss", "Draw", "Height", "Weight", "Reach", "SLPM", 
     "StrAcc", "SApM", "StrDef", "TD", "TDA", "TDD", "SUB"
+]
+
+# Fighter Stats Fields
+FIGHTER_NUMERIC_FIELDS = [
+    "SLpM",      # Significant strikes landed per minute
+    "SApM",      # Significant strikes absorbed per minute
+    "TD Avg.",   # Takedown average
+    "Sub. Avg."  # Submission average
+]
+
+FIGHTER_PERCENTAGE_FIELDS = [
+    "Str. Acc.",  # Strike accuracy
+    "Str. Def",   # Strike defense
+    "TD Acc.",    # Takedown accuracy
+    "TD Def."     # Takedown defense
+]
+
+FIGHTER_STRING_FIELDS = [
+    "fighter_name",  # Fighter's full name
+    "Record",        # Fight record (W-L-D)
+    "Height",        # Fighter's height
+    "Weight",        # Fighter's weight
+    "Reach",         # Fighter's reach
+    "STANCE",        # Fighter's stance
+    "DOB"           # Date of birth
 ]
 
 # Create required directories

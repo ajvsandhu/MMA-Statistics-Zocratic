@@ -40,7 +40,7 @@ from backend.ml.feature_engineering import (
     check_head_to_head,
     extract_strikes_landed_attempted
 )
-from backend.ml.fight_analysis import generate_matchup_analysis
+
 from backend.constants import (
     MODEL_PATH,
     SCALER_PATH,
@@ -395,22 +395,6 @@ class FighterPredictor:
             return None 
 
     def _extract_features_from_fighter(self, fighter_name):
-        """
-        Gets all the important stats and numbers we need from a fighter! 📊
-        
-        This looks at things like:
-        - How many strikes they land per minute
-        - How good they are at takedowns
-        - Their win/loss record
-        - Physical stuff like height and reach
-        - And lots more!
-        
-        Args:
-            fighter_name (str): The name of the fighter to analyze
-            
-        Returns:
-            dict: All their stats, ready for our model to use
-        """
         try:
             # Get fighter data
             fighter_data = self._get_fighter_data(fighter_name)
@@ -430,7 +414,7 @@ class FighterPredictor:
             # Create empty features dictionary with the expected keys
             features = {key: 0.0 for key in expected_features}
             
-            # Extract basic stats using feature engineering functions
+            # Extract basic stats using exact field names from your database
             features['slpm'] = safe_convert_to_float(fighter_data.get('SLpM', 0))
             features['str_acc'] = safe_convert_to_float(fighter_data.get('Str. Acc.', 0))
             features['sapm'] = safe_convert_to_float(fighter_data.get('SApM', 0))
@@ -440,7 +424,10 @@ class FighterPredictor:
             features['td_def'] = safe_convert_to_float(fighter_data.get('TD Def.', 0))
             features['sub_avg'] = safe_convert_to_float(fighter_data.get('Sub. Avg.', 0))
             
-            # Extract physical attributes
+            # Log raw stats for debugging
+            self.logger.info(f"Raw stats for {fighter_name}: {fighter_data}")
+            
+            # Extract physical attributes using exact field names
             features['reach'] = extract_reach_in_inches(fighter_data.get('Reach', '0"'))
             features['height'] = extract_height_in_inches(fighter_data.get('Height', "0' 0\""))
             
@@ -462,27 +449,21 @@ class FighterPredictor:
             }
             features['weight_class_encoded'] = weight_classes.get(weight_class, 0)
             
-            # Extract record stats - fixing the issue where extract_record_stats returns a tuple
+            # Extract record stats using exact field name
             record_str = fighter_data.get('Record', '0-0-0')
-            # Use import from feature_engineering instead of our own implementation
-            record_stats_dict = {}
             wins, losses, draws = parse_record(record_str)
-            record_stats_dict['wins'] = wins
-            record_stats_dict['losses'] = losses
-            record_stats_dict['draws'] = draws
-            record_stats_dict['total_fights'] = wins + losses + draws
             
-            features['wins'] = record_stats_dict['wins']
-            features['losses'] = record_stats_dict['losses']
-            features['draws'] = record_stats_dict['draws']
-            features['total_fights'] = record_stats_dict['total_fights']
-            features['win_percentage'] = calculate_win_percentage(record_stats_dict)
+            features['wins'] = wins
+            features['losses'] = losses
+            features['draws'] = draws
+            features['total_fights'] = wins + losses + draws
+            features['win_percentage'] = calculate_win_percentage({'wins': wins, 'losses': losses, 'draws': draws})
             
             # Extract fighter style based on stats
             features['is_striker'] = 1 if features['slpm'] > 3.0 and features['str_acc'] > 0.4 else 0
             features['is_grappler'] = 1 if features['td_avg'] > 2.0 or features['sub_avg'] > 0.5 else 0
             
-            # Calculate age
+            # Calculate age using exact field name
             try:
                 dob = fighter_data.get('DOB', 'N/A')
                 if dob != 'N/A' and dob:
@@ -503,7 +484,7 @@ class FighterPredictor:
             features['takedown_differential'] = features['td_avg'] * features['td_acc'] - features['td_avg'] * (1 - features['td_def'])
             features['combat_effectiveness'] = (features['slpm'] * features['str_acc']) + (features['td_avg'] * features['td_acc']) + features['sub_avg'] - features['sapm'] * (1 - features['str_def'])
             
-            # Encode stance
+            # Encode stance using exact field name
             stance = fighter_data.get('STANCE', 'Orthodox').lower()
             if stance == 'N/A' or not stance:
                 features['stance_encoded'] = 3  # unknown
@@ -516,19 +497,19 @@ class FighterPredictor:
             else:
                 features['stance_encoded'] = 3  # other/unknown
                 
-            # Process recent fights 
+            # Process recent fights using exact field names
             recent_fights = fighter_data.get('recent_fights', [])[:5]  # Get up to 5 recent fights
             
-            # Extract results
+            # Extract results using exact field names
             results = []
             for fight in recent_fights:
-                result = fight.get('result', '').lower()
+                result = fight.get('result', '').upper()
                 if result:
-                    if 'w' in result or 'win' in result:
+                    if result == 'W':
                         results.append('W')
-                    elif 'l' in result or 'loss' in result:
+                    elif result == 'L':
                         results.append('L')
-                    elif 'd' in result or 'draw' in result:
+                    elif result == 'D':
                         results.append('D')
                     else:
                         results.append('U')  # Unknown
@@ -537,10 +518,10 @@ class FighterPredictor:
             features['recent_win_streak'] = sum(1 for r in results if r == 'W')
             features['recent_loss_streak'] = sum(1 for r in results if r == 'L')
             
-            # Calculate finish rates
+            # Calculate finish rates using exact field names
             if results:
-                features['finish_rate'] = sum(1 for fight in recent_fights if 'ko' in fight.get('method', '').lower() or 'sub' in fight.get('method', '').lower() or 'tko' in fight.get('method', '').lower()) / len(results)
-                features['decision_rate'] = sum(1 for fight in recent_fights if 'dec' in fight.get('method', '').lower() or 'decision' in fight.get('method', '').lower()) / len(results)
+                features['finish_rate'] = sum(1 for fight in recent_fights if 'KO' in fight.get('method', '').upper() or 'SUB' in fight.get('method', '').upper() or 'TKO' in fight.get('method', '').upper()) / len(results)
+                features['decision_rate'] = sum(1 for fight in recent_fights if 'DEC' in fight.get('method', '').upper() or 'DECISION' in fight.get('method', '').upper()) / len(results)
             else:
                 features['finish_rate'] = 0
                 features['decision_rate'] = 0
@@ -548,16 +529,8 @@ class FighterPredictor:
             # Calculate experience factor
             features['experience_factor'] = features['total_fights'] * features['win_percentage']
             
-            # Validate and normalize features to avoid extreme values
-            for key in features:
-                if features[key] is None:
-                    features[key] = 0.0
-                elif isinstance(features[key], (int, float)):
-                    # Cap extreme values
-                    if features[key] > 100:
-                        features[key] = 100.0
-                    elif features[key] < -100:
-                        features[key] = -100.0
+            # Log extracted features for debugging
+            self.logger.info(f"Extracted features for {fighter_name}: {features}")
             
             # Ensure we're only returning exactly the 28 features
             # that the model expects in the correct order
@@ -592,136 +565,81 @@ class FighterPredictor:
                 self.logger.error("No database connection available")
                 return None, None
                 
-            # Get all fighters from the database - without a limit to get ALL fighters
-            try:
-                # Use paging to retrieve all fighters
-                all_fighters = []
-                page_size = 1000
-                current_offset = 0
-                
-                while True:
-                    # Use pagination to get beyond any API record limit
-                    response = supabase.table("fighters").select("fighter_name").range(current_offset, current_offset + page_size - 1).execute()
-                    
-                    if not response.data or len(response.data) == 0:
-                        break  # No more data
-                        
-                    all_fighters.extend(response.data)
-                    
-                    if len(response.data) < page_size:
-                        break  # Got less than we asked for, so must be the last page
-                        
-                    current_offset += page_size
-                    self.logger.info(f"Retrieved {len(all_fighters)} fighters so far")
-                
-                if len(all_fighters) == 0:
-                    self.logger.warning("No fighters found in the database")
-                    return None, None
-                    
-                fighters = all_fighters
-                self.logger.info(f"Retrieved {len(fighters)} fighters for training")
-            except Exception as e:
-                self.logger.error(f"Error fetching fighters: {str(e)}")
+            # Get all fighters from the database
+            response = supabase.table("fighters").select("*").execute()
+            if not response.data:
+                self.logger.warning("No fighters found in the database")
                 return None, None
-                
+            
+            fighters = response.data
+            self.logger.info(f"Retrieved {len(fighters)} fighters for training")
+            
+            # Get all fights
+            response = supabase.table("fighter_last_5_fights").select("*").execute()
+            if not response.data:
+                self.logger.warning("No fights found in the database")
+                return None, None
+            
+            fights = response.data
+            self.logger.info(f"Retrieved {len(fights)} fights for training")
+            
             # Process fighters to extract training data
             X = []
             y = []
             processed_count = 0
             skipped_count = 0
             
-            # Process fighters in batches
-            batch_size = 50
-            total_fighters = len(fighters)
-            self.logger.info(f"Processing {total_fighters} fighters")
+            # Create a lookup dictionary for fighters to improve performance
+            fighter_dict = {f['fighter_name']: f for f in fighters}
             
-            for batch_index in range(0, total_fighters, batch_size):
-                batch_end = min(batch_index + batch_size, total_fighters)
-                self.logger.info(f"Processing fighter batch {batch_index // batch_size + 1}/{(total_fighters + batch_size - 1) // batch_size}")
-                
-                # Process each fighter in batch
-                for i in range(batch_index, batch_end):
-                    try:
-                        fighter = fighters[i]
-                        fighter_name = fighter.get('fighter_name')
-                        
-                        if not fighter_name:
-                            skipped_count += 1
-                            continue
-                            
-                        self.logger.debug(f"Processing fighter: {fighter_name}")
-                        
-                        # Get fighter's last 5 fights
-                        fights = self._get_fighter_fights(fighter_name)
-                        self.logger.debug(f"Found {len(fights)} fights for {fighter_name}")
-                        
-                        if not fights or len(fights) < 2:  # Need at least 2 fights for meaningful data
-                            skipped_count += 1
-                            continue
-                        
-                        # Process each fight to extract features and labels
-                        for fight in fights:
-                            result = fight.get('result', '').upper()
-                            if not result or 'W' not in result and 'L' not in result:
-                                # Skip fights with no clear result
-                                continue
-                                
-                            opponent_name = fight.get('opponent', '')
-                            if not opponent_name:
-                                continue
-                            
-                            fighter1_name = fighter_name  # Current fighter
-                            fighter2_name = opponent_name  # Opponent
-                            
-                            # Skip if fighter names are the same (data error)
-                            if fighter1_name.lower() == fighter2_name.lower():
-                                continue
-                            
-                            self.logger.debug(f"Extracting features for matchup: {fighter1_name} vs {fighter2_name}")
-                            
-                            # Extract features for both fighters
-                            fighter1_features = self._extract_features_from_fighter(fighter1_name)
-                            fighter2_features = self._extract_features_from_fighter(fighter2_name)
-                            
-                            if not fighter1_features or not fighter2_features:
-                                self.logger.warning(f"Could not extract features for {fighter1_name} or {fighter2_name}")
-                                skipped_count += 1
-                                continue
-                            
-                            # Ensure both feature sets have the same keys
-                            all_keys = set(fighter1_features.keys()).union(set(fighter2_features.keys()))
-                            for key in all_keys:
-                                if key not in fighter1_features:
-                                    fighter1_features[key] = 0
-                                if key not in fighter2_features:
-                                    fighter2_features[key] = 0
-                            
-                            # Create feature vector (difference between fighters)
-                            feature_keys = sorted(all_keys)
-                            feature_vector = []
-                            
-                            for key in feature_keys:
-                                feature_vector.append(fighter1_features[key] - fighter2_features[key])
-                            
-                            # Determine label: 1 if fighter1 won, 0 if fighter2 won
-                            if 'W' in result:
-                                label = 1  # fighter1 won
-                            elif 'L' in result:
-                                label = 0  # fighter1 lost (fighter2 won)
-                            else:
-                                # Skip draws or unknown results
-                                skipped_count += 1
-                                continue
-                            
-                            X.append(feature_vector)
-                            y.append(label)
-                            processed_count += 1
-                            
-                    except Exception as e:
-                        self.logger.error(f"Error processing fighter {i}: {str(e)}")
-                        import traceback
-                        self.logger.error(traceback.format_exc())
+            # Process each fight
+            for fight in fights:
+                try:
+                    fighter_name = fight.get('fighter_name')
+                    opponent = fight.get('opponent')
+                    result = fight.get('result', '').upper()
+                    
+                    # Skip if missing essential data
+                    if not all([fighter_name, opponent, result]):
                         skipped_count += 1
+                        continue
+                        
+                    # Find fighter data using dictionary lookup
+                    fighter_data = fighter_dict.get(fighter_name)
+                    opponent_data = fighter_dict.get(opponent)
+                    
+                    if not fighter_data or not opponent_data:
+                        skipped_count += 1
+                        continue
+                    
+                    # Extract features for both fighters
+                    fighter_features = self._extract_features_from_fighter(fighter_name)
+                    opponent_features = self._extract_features_from_fighter(opponent)
+                    
+                    if not fighter_features or not opponent_features:
+                        skipped_count += 1
+                        continue
+                    
+                    # Create feature vector (difference between fighters)
+                    feature_vector = []
+                    for key in sorted(fighter_features.keys()):
+                        feature_vector.append(fighter_features[key] - opponent_features[key])
+                    
+                    # Create label (1 if fighter won, 0 if lost)
+                    if 'W' not in result and 'L' not in result:  # Skip draws and no contests
+                        skipped_count += 1
+                        continue
+                        
+                    label = 1 if 'W' in result else 0
+                    
+                    X.append(feature_vector)
+                    y.append(label)
+                    processed_count += 1
+                    
+                except Exception as e:
+                    self.logger.error(f"Error processing fight: {str(e)}")
+                    skipped_count += 1
+                    continue
             
             self.logger.info(f"Processed {processed_count} fights, skipped {skipped_count} fights")
             
@@ -731,12 +649,6 @@ class FighterPredictor:
             
             # Convert to numpy arrays
             try:
-                # Make sure all feature vectors have the same length
-                if X:
-                    max_length = max(len(x) for x in X)
-                    self.logger.info(f"Maximum feature vector length: {max_length}")
-                    X = [x + [0] * (max_length - len(x)) for x in X]  # Pad with zeros if needed
-                
                 X = np.array(X)
                 y = np.array(y)
                 
@@ -747,10 +659,6 @@ class FighterPredictor:
                 return X, y
             except ValueError as e:
                 self.logger.error(f"Error converting to numpy arrays: {str(e)}")
-                # Print a sample of feature vector lengths to debug
-                if len(X) > 0:
-                    lengths = [len(x) for x in X[:10]]
-                    self.logger.error(f"Sample feature vector lengths: {lengths}")
                 return None, None
                 
         except Exception as e:
@@ -1094,13 +1002,13 @@ class FighterPredictor:
                 if hasattr(self.model, 'predict_proba'):
                     # Direction 1: fighter1 vs fighter2
                     probas_1vs2 = self.model.predict_proba(X_1vs2_scaled)[0]
-                    f1_wins_prob = probas_1vs2[1]  # Index 1 is probability of class 1 (fighter1 wins)
-                    f2_wins_prob = probas_1vs2[0]  # Index 0 is probability of class 0 (fighter2 wins)
+                    f1_wins_prob = float(probas_1vs2[1])  # Ensure float conversion
+                    f2_wins_prob = float(probas_1vs2[0])
                     
                     # Direction 2: fighter2 vs fighter1 (we need to invert this result)
                     probas_2vs1 = self.model.predict_proba(X_2vs1_scaled)[0]
-                    f2_wins_prob_alt = probas_2vs1[1]  # This is actually fighter2's win probability when in position 1
-                    f1_wins_prob_alt = probas_2vs1[0]  # This is actually fighter1's win probability when in position 2
+                    f2_wins_prob_alt = float(probas_2vs1[1])
+                    f1_wins_prob_alt = float(probas_2vs1[0])
                     
                     # Average the probabilities from both directions to eliminate position bias
                     f1_final_prob = (f1_wins_prob + f1_wins_prob_alt) / 2
@@ -1112,17 +1020,40 @@ class FighterPredictor:
                         f1_final_prob = f1_final_prob / total_prob
                         f2_final_prob = f2_final_prob / total_prob
                     else:
-                        # Fallback if something went wrong with probability calculation
-                        f1_final_prob = 0.5
-                        f2_final_prob = 0.5
+                        # If probabilities are invalid, use win percentages as fallback
+                        f1_win_pct = fighter1_features.get('win_percentage', 0.6)
+                        f2_win_pct = fighter2_features.get('win_percentage', 0.6)
+                        total = f1_win_pct + f2_win_pct
+                        if total > 0:
+                            f1_final_prob = f1_win_pct / total
+                            f2_final_prob = f2_win_pct / total
+                        else:
+                            f1_final_prob = 0.55 if f1_wins_prob > f2_wins_prob else 0.45
+                            f2_final_prob = 1.0 - f1_final_prob
                 else:
-                    # For models without predict_proba, use basic predict
-                    pred_1vs2 = self.model.predict(X_1vs2_scaled)[0]
-                    pred_2vs1 = self.model.predict(X_2vs1_scaled)[0]
+                    # For models without predict_proba, use win percentages and other features
+                    f1_win_pct = fighter1_features.get('win_percentage', 0.6)
+                    f2_win_pct = fighter2_features.get('win_percentage', 0.6)
                     
-                    # Average the predictions (inverting the second one)
-                    f1_final_prob = (float(pred_1vs2) + (1.0 - float(pred_2vs1))) / 2
-                    f2_final_prob = 1.0 - f1_final_prob
+                    # Add some weight from striking and grappling stats
+                    f1_striking = (float(fighter1_features.get('slpm', 0)) * float(fighter1_features.get('str_acc', 0))) / 100
+                    f2_striking = (float(fighter2_features.get('slpm', 0)) * float(fighter2_features.get('str_acc', 0))) / 100
+                    
+                    f1_grappling = (float(fighter1_features.get('td_avg', 0)) * float(fighter1_features.get('td_acc', 0))) / 100
+                    f2_grappling = (float(fighter2_features.get('td_avg', 0)) * float(fighter2_features.get('td_acc', 0))) / 100
+                    
+                    # Combine metrics with weights
+                    f1_score = (f1_win_pct * 0.6) + (f1_striking * 0.2) + (f1_grappling * 0.2)
+                    f2_score = (f2_win_pct * 0.6) + (f2_striking * 0.2) + (f2_grappling * 0.2)
+                    
+                    # Convert to probabilities
+                    total_score = f1_score + f2_score
+                    if total_score > 0:
+                        f1_final_prob = f1_score / total_score
+                        f2_final_prob = f2_score / total_score
+                    else:
+                        f1_final_prob = 0.55
+                        f2_final_prob = 0.45
                 
                 self.logger.info(f"Successful prediction. Fighter 1 win probability: {f1_final_prob:.2f}, Fighter 2 win probability: {f2_final_prob:.2f}")
             except Exception as e:
@@ -1160,8 +1091,8 @@ class FighterPredictor:
                             # Try prediction again
                             if hasattr(self.model, 'predict_proba'):
                                 probas_1vs2 = self.model.predict_proba(X_1vs2_scaled)[0]
-                                f1_wins_prob = probas_1vs2[1]
-                                f2_wins_prob = probas_1vs2[0]
+                                f1_wins_prob = float(probas_1vs2[1])
+                                f2_wins_prob = float(probas_1vs2[0])
                                 
                                 probas_2vs1 = self.model.predict_proba(X_2vs1_scaled)[0]
                                 f2_wins_prob_alt = probas_2vs1[1]

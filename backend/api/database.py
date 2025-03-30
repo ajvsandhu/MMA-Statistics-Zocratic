@@ -5,6 +5,7 @@ import requests
 from functools import lru_cache
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 # Load environment variables
 load_dotenv()
@@ -12,6 +13,13 @@ load_dotenv()
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Get Supabase credentials from environment variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# Global connection instance
+_supabase_client: Optional[Client] = None
 
 class SimpleSupabaseClient:
     """A simplified client for Supabase that uses direct HTTP requests instead of SDK."""
@@ -164,42 +172,52 @@ class QueryBuilder:
             logger.error(f"Error upserting data: {str(e)}")
             return None
 
-@lru_cache(maxsize=1)
-def get_db_connection():
-    """Get a connection to the Supabase database. Uses caching to reuse the connection."""
+def get_db_connection() -> Optional[Client]:
+    """
+    Get a connection to the Supabase database.
+    
+    Returns:
+        Optional[Client]: A Supabase client instance or None if connection fails
+    """
+    global _supabase_client
+    
     try:
-        # Get Supabase credentials
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        
-        if not url or not key:
-            logger.error("Supabase credentials not found in environment variables")
+        # Return existing connection if available
+        if _supabase_client is not None:
+            return _supabase_client
+            
+        # Check if credentials are available
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            logger.error("Missing Supabase credentials. Please check environment variables.")
             return None
+            
+        # Create new connection
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        logger.info("Successfully connected to Supabase")
+        return _supabase_client
         
-        client = SimpleSupabaseClient(url, key)
-        logger.info("Successfully created Supabase client")
-        return client
     except Exception as e:
-        logger.error(f"Error creating Supabase client: {str(e)}")
+        logger.error(f"Failed to connect to Supabase: {str(e)}")
         return None
 
-def check_database_connection():
-    """Test the connection to the Supabase database."""
+def test_connection() -> bool:
+    """
+    Test the database connection.
+    
+    Returns:
+        bool: True if connection is successful, False otherwise
+    """
     try:
         client = get_db_connection()
-        if not client:
-            logger.error("No database connection available")
+        if client is None:
             return False
+            
+        # Try a simple query to verify connection
+        response = client.table('fighters').select('id').limit(1).execute()
+        return response is not None and hasattr(response, 'data')
         
-        success = client.test_connection()
-        if success:
-            logger.info("Database connection test successful")
-        else:
-            logger.error("Database connection test failed")
-        
-        return success
     except Exception as e:
-        logger.error(f"Error checking database connection: {str(e)}")
+        logger.error(f"Connection test failed: {str(e)}")
         return False
 
 # Alias for get_db_connection to maintain compatibility

@@ -58,6 +58,66 @@ class SupabaseClient:
             logger.error(f"Failed to connect to Supabase: {e}")
             return False
 
+    def get_fighter_data(self, fighter_name: str) -> Optional[Dict]:
+        """
+        Get fighter data from Supabase database.
+        
+        Args:
+            fighter_name (str): Name of the fighter
+            
+        Returns:
+            Optional[Dict]: Fighter data if found, None otherwise
+        """
+        try:
+            # Log the search
+            logger.info(f"Searching for fighter: {fighter_name}")
+            
+            # Use ilike for case-insensitive search
+            response = self.table('fighters').select('*').ilike('name', f"%{fighter_name}%").execute()
+            
+            # Log the raw response
+            logger.info(f"Raw Supabase response: {response}")
+            
+            if not response.data:
+                logger.warning(f"No data found for fighter: {fighter_name}")
+                return None
+                
+            # Get the first matching fighter
+            fighter_data = response.data[0]
+            
+            # Log the retrieved data
+            logger.info(f"Retrieved fighter data: {fighter_data}")
+            
+            # Ensure all required fields are present with proper casing
+            standardized_data = {
+                'name': fighter_data.get('name', fighter_name),
+                'record': fighter_data.get('Record') or fighter_data.get('record', '0-0-0'),
+                'height': fighter_data.get('Height') or fighter_data.get('height', "0' 0\""),
+                'weight': fighter_data.get('Weight') or fighter_data.get('weight', 'Unknown'),
+                'reach': fighter_data.get('Reach') or fighter_data.get('reach', '0"'),
+                'stance': fighter_data.get('STANCE') or fighter_data.get('stance', 'Orthodox'),
+                'dob': fighter_data.get('DOB') or fighter_data.get('dob', 'N/A'),
+                'slpm': fighter_data.get('SLpM') or fighter_data.get('slpm', 0),
+                'str_acc': fighter_data.get('Str. Acc.') or fighter_data.get('str_acc', 0),
+                'sapm': fighter_data.get('SApM') or fighter_data.get('sapm', 0),
+                'str_def': fighter_data.get('Str. Def') or fighter_data.get('str_def', 0),
+                'td_avg': fighter_data.get('TD Avg.') or fighter_data.get('td_avg', 0),
+                'td_acc': fighter_data.get('TD Acc.') or fighter_data.get('td_acc', 0),
+                'td_def': fighter_data.get('TD Def.') or fighter_data.get('td_def', 0),
+                'sub_avg': fighter_data.get('Sub. Avg.') or fighter_data.get('sub_avg', 0),
+                'recent_fights': fighter_data.get('recent_fights', [])
+            }
+            
+            # Log the standardized data
+            logger.info(f"Standardized fighter data: {standardized_data}")
+            
+            return standardized_data
+            
+        except Exception as e:
+            logger.error(f"Error getting fighter data: {str(e)}")
+            logger.error(traceback.format_exc())
+            return None
+
 class TableQuery:
     def __init__(self, client, table_name):
         self.client = client

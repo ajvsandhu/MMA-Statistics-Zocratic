@@ -22,6 +22,7 @@ import {
 import { ErrorBoundary } from "react-error-boundary"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { FighterStats, FightHistory } from "@/types/fighter"
+import { formatDate } from "@/lib/utils"
 
 // Constants
 const DEFAULT_PLACEHOLDER_IMAGE = '/placeholder-fighter.png'
@@ -77,6 +78,32 @@ interface FightStatCategory {
   stats: FightStat[];
 }
 
+interface Fight {
+  id?: string;
+  fighter_name: string;
+  fight_url: string;
+  opponent: string;
+  date: string;
+  fight_date: string;
+  opponent_name: string;
+  opponent_display_name: string;
+  result: string;
+  method: string;
+  round: number;
+  time: string;
+  event: string;
+  kd: string;
+  sig_str: string;
+  sig_str_pct: string;
+  total_str: string;
+  head_str: string;
+  body_str: string;
+  leg_str: string;
+  takedowns: string;
+  td_pct: string;
+  ctrl: string;
+}
+
 // Error Fallback Component
 function ChartErrorFallback({ error }: { error: Error }) {
   return (
@@ -94,6 +121,48 @@ const RESULT_COLORS: Record<FightResult, string> = {
   nc: 'text-gray-500',
   dq: 'text-gray-500'
 }
+
+// Add method emoji mapping
+const METHOD_ICONS: Record<string, string> = {
+  'KO/TKO': '💥',
+  'Submission': '🔒',
+  'Decision - Unanimous': '📋',
+  'Decision - Split': '⚖️',
+  'Decision - Majority': '✌️',
+  'No Contest': '⚠️',
+  'DQ': '🚫',
+};
+
+const getMethodIcon = (method: string): string => {
+  const cleanMethod = method.trim().toLowerCase();
+  if (cleanMethod.includes('ko') || cleanMethod.includes('tko')) return '💥';
+  if (cleanMethod.includes('submission')) return '🔒';
+  if (cleanMethod.includes('unanimous')) return '📋';
+  if (cleanMethod.includes('split')) return '⚖️';
+  if (cleanMethod.includes('majority')) return '✌️';
+  if (cleanMethod.includes('no contest')) return '⚠️';
+  if (cleanMethod.includes('dq')) return '🚫';
+  return '';
+};
+
+// Add result emoji mapping
+const RESULT_EMOJI: Record<string, string> = {
+  'win': '🏆',
+  'loss': '❌',
+  'draw': '🤝',
+  'nc': '⚠️',
+  'dq': '🚫',
+};
+
+const getResultEmoji = (result: string): string => {
+  const lowerResult = result.toLowerCase().trim();
+  if (lowerResult.includes('win') || lowerResult === 'w') return RESULT_EMOJI['win'];
+  if (lowerResult.includes('loss') || lowerResult === 'l') return RESULT_EMOJI['loss'];
+  if (lowerResult.includes('draw') || lowerResult === 'd') return RESULT_EMOJI['draw'];
+  if (lowerResult.includes('dq')) return RESULT_EMOJI['dq'];
+  if (lowerResult.includes('nc') || lowerResult.includes('no contest')) return RESULT_EMOJI['nc'];
+  return RESULT_EMOJI['nc'];
+};
 
 // Modified calculateChartData function with proper type handling
 function calculateChartData(stats: FighterStats | null): ChartDataSet {
@@ -149,6 +218,59 @@ function calculateChartData(stats: FighterStats | null): ChartDataSet {
   }
 }
 
+// Add this before the FightHistoryView component
+const getResultStyles = (result: string) => {
+  const lowerResult = result.toLowerCase().trim();
+  
+  // Win conditions (including variations)
+  if (lowerResult.includes('win') || lowerResult === 'w' || lowerResult === 'winner') {
+    return {
+      bg: 'bg-emerald-500/5',
+      ring: 'ring-1 ring-emerald-500/30',
+      text: 'text-emerald-500/90 font-medium',
+      hover: 'hover:bg-emerald-500/10 hover:ring-emerald-500/50'
+    };
+  }
+  
+  // Loss conditions (including variations)
+  if (lowerResult.includes('loss') || lowerResult === 'l' || lowerResult.includes('loser')) {
+    return {
+      bg: 'bg-red-500/5',
+      ring: 'ring-1 ring-red-500/30',
+      text: 'text-red-500/90 font-medium',
+      hover: 'hover:bg-red-500/10 hover:ring-red-500/50'
+    };
+  }
+  
+  // Draw conditions
+  if (lowerResult.includes('draw') || lowerResult === 'd') {
+    return {
+      bg: 'bg-amber-500/5',
+      ring: 'ring-1 ring-amber-500/30',
+      text: 'text-amber-500/90 font-medium',
+      hover: 'hover:bg-amber-500/10 hover:ring-amber-500/50'
+    };
+  }
+  
+  // DQ conditions
+  if (lowerResult.includes('dq') || lowerResult.includes('disqualification')) {
+    return {
+      bg: 'bg-purple-500/5',
+      ring: 'ring-1 ring-purple-500/30',
+      text: 'text-purple-500/90 font-medium',
+      hover: 'hover:bg-purple-500/10 hover:ring-purple-500/50'
+    };
+  }
+  
+  // No Contest and other conditions
+  return {
+    bg: 'bg-zinc-500/5',
+    ring: 'ring-1 ring-zinc-500/30',
+    text: 'text-zinc-500/90 font-medium',
+    hover: 'hover:bg-zinc-500/10 hover:ring-zinc-500/50'
+  };
+};
+
 export function FighterDetails({ fighterName }: FighterDetailsProps) {
   const [stats, setStats] = React.useState<FighterStats | null>(null)
   const [fightHistory, setFightHistory] = React.useState<FightHistory[]>([])
@@ -157,27 +279,6 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
   const [imageError, setImageError] = React.useState(false)
   const [expandedFight, setExpandedFight] = React.useState<number | null>(null)
 
-  // Create a global style to prevent content jumps on expansion
-  React.useEffect(() => {
-    // Add a class to the body when a fight is expanded to prevent content jumps
-    if (expandedFight !== null) {
-      document.body.style.overflowAnchor = 'none';
-      // Scroll the expanded card into view with smooth behavior
-      setTimeout(() => {
-        const expandedCard = document.querySelector(`[data-expanded="true"]`);
-        if (expandedCard) {
-          expandedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }, 100);
-    } else {
-      document.body.style.overflowAnchor = 'auto';
-    }
-    
-    return () => {
-      document.body.style.overflowAnchor = 'auto';
-    };
-  }, [expandedFight]);
-
   // Fetch fighter data and fight history
   React.useEffect(() => {
     const fetchFighterData = async () => {
@@ -185,83 +286,54 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
       setError('');
 
       try {
-        console.log(`Fetching fighter data for: ${fighterName}`);
-        console.log(`Using endpoint: ${ENDPOINTS.FIGHTER(fighterName)}`);
-        
         const response = await fetch(ENDPOINTS.FIGHTER(fighterName));
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'Fighter not found' : 'Failed to fetch fighter data');
         }
 
         const data = await response.json();
-        console.log("Raw fighter data received:", data);
-        console.log("Raw fighter data type:", typeof data);
-        
-        // Log all keys in the response to help debugging
-        console.log("Response data keys:", Object.keys(data));
         
         // Check for fight history data
-        if (data.last_5_fights) {
-          console.log(`Found ${data.last_5_fights.length} fights in the response:`, data.last_5_fights);
-        } else {
-          console.warn("No last_5_fights found in the response");
-          
+        if (!data.last_5_fights) {
           // Try looking for fights under other keys
           const possibleKeys = ['last_5_fights', 'fights', 'fight_history', 'fightHistory'];
-          let foundFights = false;
-          
           for (const key of possibleKeys) {
             if (data[key] && Array.isArray(data[key]) && data[key].length > 0) {
-              console.log(`Found fights under key: ${key}`);
               data.last_5_fights = data[key];
-              foundFights = true;
               break;
             }
-          }
-          
-          if (!foundFights) {
-            console.warn("Could not find fights under any expected keys");
           }
         }
         
         // Map and sanitize fight history data if available
         const processedFightHistory = Array.isArray(data.last_5_fights) 
-          ? data.last_5_fights.map((fight: any) => {
-              console.log("Processing fight:", fight);
-              // Use direct database fields primarily, with fallbacks for compatibility
-              return {
-                id: fight?.id,
-                fighter_name: String(fight?.fighter_name || ''),
-                fight_url: String(fight?.fight_url || ''),
-                opponent: String(fight?.opponent || ''),
-                // Use fight_date if available, otherwise use date
-                date: String(fight?.date || fight?.fight_date || 'Unknown Date'),
-                fight_date: String(fight?.fight_date || fight?.date || 'Unknown Date'),
-                // Ensure all fields that might be used have fallbacks
-                opponent_name: String(fight?.opponent_name || fight?.opponent || 'Unknown Opponent'),
-                opponent_display_name: String(fight?.opponent_display_name || fight?.opponent || 'Unknown Opponent'),
-                result: String(fight?.result || 'NC'),
-                method: String(fight?.method || 'N/A'),
-                round: Number(fight?.round || 0),
-                time: String(fight?.time || '0:00'),
-                event: String(fight?.event || 'Unknown Event'),
-                kd: String(fight?.kd || '0'),
-                sig_str: String(fight?.sig_str || '0/0'),
-                sig_str_pct: String(fight?.sig_str_pct || '0%'),
-                total_str: String(fight?.total_str || '0/0'),
-                head_str: String(fight?.head_str || '0/0'),
-                body_str: String(fight?.body_str || '0/0'),
-                leg_str: String(fight?.leg_str || '0/0'),
-                takedowns: String(fight?.takedowns || '0/0'),
-                td_pct: String(fight?.td_pct || '0%'),
-                ctrl: String(fight?.ctrl || '0:00'),
-              };
-            })
+          ? data.last_5_fights.map((fight: Fight) => ({
+              id: fight.id,
+              fighter_name: String(fight.fighter_name || ''),
+              fight_url: String(fight.fight_url || ''),
+              opponent: String(fight.opponent || ''),
+              date: String(fight.date || fight.fight_date || 'Unknown Date'),
+              fight_date: String(fight.fight_date || fight.date || 'Unknown Date'),
+              opponent_name: String(fight.opponent_name || fight.opponent || 'Unknown Opponent'),
+              opponent_display_name: String(fight.opponent_display_name || fight.opponent || 'Unknown Opponent'),
+              result: String(fight.result || 'NC'),
+              method: String(fight.method || 'N/A'),
+              round: Number(fight.round || 0),
+              time: String(fight.time || '0:00'),
+              event: String(fight.event || 'Unknown Event'),
+              kd: String(fight.kd || '0'),
+              sig_str: String(fight.sig_str || '0/0'),
+              sig_str_pct: String(fight.sig_str_pct || '0%'),
+              total_str: String(fight.total_str || '0/0'),
+              head_str: String(fight.head_str || '0/0'),
+              body_str: String(fight.body_str || '0/0'),
+              leg_str: String(fight.leg_str || '0/0'),
+              takedowns: String(fight.takedowns || '0/0'),
+              td_pct: String(fight.td_pct || '0%'),
+              ctrl: String(fight.ctrl || '0:00'),
+            }))
           : [];
-          
-        console.log("Processed fight history:", processedFightHistory);
-        console.log("Processed fight history length:", processedFightHistory.length);
-        
+
         // Properly map API fields to our expected structure
         const sanitizedData: Record<string, any> = {
           name: data?.fighter_name || data?.name || fighterName || '',
@@ -286,15 +358,6 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
           ranking: data?.ranking || UNRANKED_VALUE,
           tap_link: data?.tap_link || '',
         };
-        
-        console.log("Mapped fighter data:", sanitizedData);
-        
-        // Ensure string values for all fields that might be used with string methods
-        Object.keys(sanitizedData).forEach(key => {
-          if (key !== 'last_5_fights' && key !== 'ranking' && sanitizedData[key] === null) {
-            sanitizedData[key] = typeof sanitizedData[key] === 'number' ? String(sanitizedData[key]) : '';
-          }
-        });
         
         setStats(sanitizedData as FighterStats);
         setFightHistory(processedFightHistory);
@@ -398,143 +461,159 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
     return <div className="p-8 text-center">No fighter data available</div>
   }
 
-  const getResultColor = (result: string) => {
-    return RESULT_COLORS[result.toLowerCase() as FightResult] || RESULT_COLORS.nc
-  }
+  const getFightResultColor = (result: string): string => {
+    const lowerResult = result.toLowerCase().trim();
+    
+    // Win conditions (including variations)
+    if (lowerResult.includes('win') || lowerResult === 'w') {
+      return 'bg-emerald-500/90 border-emerald-500';
+    }
+    
+    // Loss conditions (including DQ and variations)
+    if (lowerResult.includes('loss') || lowerResult.includes('dq') || lowerResult === 'l') {
+      return 'bg-red-500/90 border-red-500';
+    }
+    
+    // No Contest (including variations)
+    if (lowerResult.includes('nc') || lowerResult.includes('no contest') || lowerResult === 'n/a') {
+      return 'bg-zinc-500/90 border-zinc-500';
+    }
+    
+    // Draw (including variations)
+    if (lowerResult.includes('draw') || lowerResult === 'd') {
+      return 'bg-amber-500/90 border-amber-500';
+    }
+    
+    // Default case
+    return 'bg-zinc-500/90 border-zinc-500';
+  };
 
   // Fight history tab content
   const FightHistoryView = () => {
-    console.log("FightHistoryView rendering, fightHistory:", fightHistory);
-    console.log("FightHistoryView fightHistory length:", fightHistory.length);
-    
     return (
-      <div className="space-y-8 py-4 animate-in slide-in-from-bottom duration-700">
-        <h4 className="text-xl font-semibold">Last {fightHistory.length} Fights</h4>
+      <div className="space-y-4 overflow-hidden">
+        <h4 className="text-xl font-medium tracking-tight mb-6">
+          Fight History
+        </h4>
         
         {!fightHistory || fightHistory.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <p>No fight history available</p>
-            <p className="text-sm mt-2">If you believe this fighter should have fight data, please check back later.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {fightHistory.map((fight, index) => {
-              // Ensure fight object is valid
               if (!fight) return null;
               
-              // Use database field names with fallbacks for display
               const displayName = fight.opponent_display_name || fight.opponent || fight.opponent_name || "Unknown Opponent";
               const fightDate = fight.fight_date || fight.date || "Unknown Date";
               const fightResult = fight.result || "NC";
+              const methodIcon = getMethodIcon(fight.method || '');
+              
+              const styles = getResultStyles(fightResult);
               
               return (
-                <Card 
-                  key={`${displayName}-${fightDate}-${index}`} 
-                  className="overflow-hidden"
+                <div 
+                  key={`${displayName}-${fightDate}-${index}`}
                   data-expanded={expandedFight === index}
+                  className={`group relative overflow-hidden rounded-xl transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${styles.bg} ${styles.ring} ${styles.hover} hover:shadow-sm`}
                 >
-                  <CardContent className="p-0">
+                  <div 
+                    className="px-6 py-4 cursor-pointer"
+                    onClick={() => setExpandedFight(expandedFight === index ? null : index)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium truncate group-hover:text-foreground/90">{displayName}</span>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{formatDate(fightDate)}</span>
+                            <span className={`text-sm ${styles.text}`}>
+                              • {fightResult}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <span role="img" aria-label={fight.method} className="text-base">{methodIcon}</span>
+                          <span className="text-sm text-muted-foreground">{fight.method || "N/A"}</span>
+                        </div>
+                      </div>
+                      
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] text-muted-foreground group-hover:text-foreground/70 ${
+                          expandedFight === index ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </div>
+
                     <div 
-                      className={`p-4 cursor-pointer hover:bg-accent/10 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                        expandedFight === index ? 'bg-accent/10' : ''
+                      className={`grid transition-[grid-template-rows,opacity,transform] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                        expandedFight === index ? 'grid-rows-[1fr] opacity-100 translate-y-0' : 'grid-rows-[0fr] opacity-0 -translate-y-2'
                       }`}
-                      onClick={() => setExpandedFight(expandedFight === index ? null : index)}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded-full ${
-                          fightResult.toLowerCase().includes('win') ? 'bg-green-500' : 
-                          fightResult.toLowerCase().includes('loss') || fightResult.toLowerCase().includes('dq') ? 'bg-red-500' : 
-                          'bg-gray-500'
-                        }`} />
-                        <div>
-                          <p className="font-medium">{displayName}</p>
-                          <p className="text-sm text-muted-foreground">{fightDate}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div>
-                          <p className="text-sm">Method</p>
-                          <p className="font-medium">{fight.method || "N/A"}</p>
-                        </div>
-                        <div>
-                          <ChevronDown
-                            className={`h-5 w-5 transition-transform ${
-                              expandedFight === index ? 'rotate-180' : ''
-                            }`}
-                          />
+                      <div className="overflow-hidden">
+                        <div className={`pt-4 mt-4 border-t border-border/5`}>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {[
+                              { label: "Knockdowns", value: fight.kd },
+                              { label: "Significant Strikes", value: fight.sig_str, subValue: fight.sig_str_pct },
+                              { label: "Total Strikes", value: fight.total_str },
+                              { label: "Takedowns", value: fight.takedowns, subValue: fight.td_pct }
+                            ].map((stat, statIndex) => (
+                              <div 
+                                key={stat.label}
+                                className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60"
+                              >
+                                <div className="text-sm text-muted-foreground mb-1">{stat.label}</div>
+                                <div className="text-xl font-medium">{stat.value}</div>
+                                {stat.subValue && (
+                                  <div className="text-sm text-muted-foreground mt-1">{stat.subValue}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {(fight.head_str || fight.body_str || fight.leg_str) && (
+                            <div className="mt-4">
+                              <div className="text-sm text-muted-foreground mb-3">Strike Distribution</div>
+                              <div className="grid grid-cols-3 gap-4">
+                                {[
+                                  { label: "Head", value: fight.head_str },
+                                  { label: "Body", value: fight.body_str },
+                                  { label: "Leg", value: fight.leg_str }
+                                ].map((stat) => (
+                                  <div 
+                                    key={stat.label}
+                                    className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60"
+                                  >
+                                    <div className="text-sm text-muted-foreground mb-1">{stat.label}</div>
+                                    <div className="text-xl font-medium">{stat.value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {fight.ctrl && fight.ctrl !== '0:00' && (
+                              <div className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60">
+                                <div className="text-sm text-muted-foreground mb-1">Control Time</div>
+                                <div className="text-xl font-medium">{fight.ctrl}</div>
+                              </div>
+                            )}
+                            {fight.event && (
+                              <div className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60">
+                                <div className="text-sm text-muted-foreground mb-1">Event</div>
+                                <div className="text-lg font-medium leading-tight">{fight.event}</div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </CardContent>
-                  
-                  {/* Expanded fight stats */}
-                  {expandedFight === index && (
-                    <div className="px-4 py-6 border-t border-border bg-accent/5 min-h-[200px]">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        {fight.kd && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Knockdowns</p>
-                            <p className="font-medium">{fight.kd}</p>
-                          </div>
-                        )}
-                        {fight.sig_str && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Sig. Strikes</p>
-                            <p className="font-medium">{fight.sig_str} {fight.sig_str_pct ? `(${fight.sig_str_pct})` : ''}</p>
-                          </div>
-                        )}
-                        {fight.total_str && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Total Strikes</p>
-                            <p className="font-medium">{fight.total_str}</p>
-                          </div>
-                        )}
-                        {fight.takedowns && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Takedowns</p>
-                            <p className="font-medium">{fight.takedowns} {fight.td_pct ? `(${fight.td_pct})` : ''}</p>
-                          </div>
-                        )}
-                      </div>
-                      {(fight.head_str || fight.body_str || fight.leg_str) && (
-                        <div className="mt-4 border-t border-border/50 pt-4">
-                          <h5 className="font-medium mb-2">Strike Distribution</h5>
-                          <div className="grid grid-cols-3 gap-4">
-                            {fight.head_str && (
-                              <div>
-                                <p className="text-sm text-muted-foreground">Head</p>
-                                <p className="font-medium">{fight.head_str}</p>
-                              </div>
-                            )}
-                            {fight.body_str && (
-                              <div>
-                                <p className="text-sm text-muted-foreground">Body</p>
-                                <p className="font-medium">{fight.body_str}</p>
-                              </div>
-                            )}
-                            {fight.leg_str && (
-                              <div>
-                                <p className="text-sm text-muted-foreground">Leg</p>
-                                <p className="font-medium">{fight.leg_str}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {fight.ctrl && fight.ctrl !== '0:00' && (
-                        <div className="mt-4 border-t border-border/50 pt-4">
-                          <p className="text-sm text-muted-foreground">Control Time</p>
-                          <p className="font-medium">{fight.ctrl}</p>
-                        </div>
-                      )}
-                      {fight.event && (
-                        <div className="mt-4 border-t border-border/50 pt-4 text-sm text-muted-foreground">
-                          <p>{fight.event}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -653,10 +732,10 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl animate-in fade-in duration-700">
+    <div className="container mx-auto px-4 py-8 max-w-5xl overflow-x-hidden">
       <div className="space-y-8 flex flex-col items-center">
-        {/* Fighter Header */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8 bg-accent/50 p-6 rounded-lg transition-all duration-300 hover:bg-accent/60">
+        {/* Fighter Header with staggered animations */}
+        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8 bg-accent/50 p-6 rounded-lg transition-all duration-500 hover:bg-accent/60 animate-in fade-in slide-in-from-top-4 duration-700">
           <div className="relative aspect-square md:col-span-1">
             {!imageError ? (
               stats.tap_link ? (
@@ -728,249 +807,260 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
         </div>
 
         {/* Stats and History Tabs */}
-        <div className="w-full">
+        <div className="w-full animate-in fade-in duration-1000 delay-300">
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 animate-in fade-in duration-700 delay-500">
-              <TabsTrigger value="overview" className="transition-all duration-300 data-[state=active]:animate-in data-[state=active]:zoom-in-95">Overview</TabsTrigger>
-              <TabsTrigger value="stats" className="transition-all duration-300 data-[state=active]:animate-in data-[state=active]:zoom-in-95">Detailed Stats</TabsTrigger>
-              <TabsTrigger value="history" className="transition-all duration-300 data-[state=active]:animate-in data-[state=active]:zoom-in-95">Fight History</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="stats">Detailed Stats</TabsTrigger>
+              <TabsTrigger value="history">Fight History</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="animate-in slide-in-from-bottom duration-500">
-              <OverviewView />
-            </TabsContent>
+            <div className="relative min-h-[500px] overflow-hidden">
+              <TabsContent 
+                value="overview" 
+                className="animate-in fade-in scale-100 duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:scale-95 data-[state=inactive]:duration-300 absolute inset-0 data-[state=active]:relative"
+              >
+                <OverviewView />
+              </TabsContent>
 
-            <TabsContent value="stats" className="space-y-6 animate-in slide-in-from-bottom duration-500">
-              {/* Striking Stats */}
-              <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Striking Statistics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Strikes Landed per min</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.slpm).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Striking Output</p>
+              <TabsContent 
+                value="stats" 
+                className="animate-in fade-in scale-100 duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:scale-95 data-[state=inactive]:duration-300 absolute inset-0 data-[state=active]:relative"
+              >
+                {/* Striking Stats */}
+                <ErrorBoundary FallbackComponent={ChartErrorFallback}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Striking Statistics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Strikes Landed per min</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.slpm).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Striking Output</p>
+                        </div>
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Strike Accuracy</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.str_acc).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Strike Success Rate</p>
+                        </div>
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Strikes Absorbed per min</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.sapm).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Strikes Received</p>
+                        </div>
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Strike Defense</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.str_def).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Strike Evasion Rate</p>
+                        </div>
                       </div>
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Strike Accuracy</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.str_acc).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Strike Success Rate</p>
-                      </div>
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Strikes Absorbed per min</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.sapm).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Strikes Received</p>
-                      </div>
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Strike Defense</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.str_def).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Strike Evasion Rate</p>
-                      </div>
-                    </div>
-                    <div className="space-y-6">
-                      {/* Strike Output Chart */}
-                      <div className="h-[200px]">
-                        <h4 className="text-sm font-medium mb-2">Strike Output</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.strikeData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                            <XAxis 
-                              dataKey="name" 
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                            />
-                            <YAxis 
-                              domain={[0, 'dataMax + 2']}
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                            />
-                            <Tooltip
-                              content={({ payload, label }) => {
-                                if (payload && payload.length && payload[0].value != null) {
-                                  const value = Number(payload[0].value);
-                                  return (
-                                    <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                      <p className="font-medium">{label}</p>
-                                      <p className="text-sm">{`${value.toFixed(1)} strikes/min`}</p>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                              {chartData.strikeData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
+                      <div className="space-y-6">
+                        {/* Strike Output Chart */}
+                        <div className="h-[200px]">
+                          <h4 className="text-sm font-medium mb-2">Strike Output</h4>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData.strikeData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                              <XAxis 
+                                dataKey="name" 
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                              />
+                              <YAxis 
+                                domain={[0, 'dataMax + 2']}
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                              />
+                              <Tooltip
+                                content={({ payload, label }) => {
+                                  if (payload && payload.length && payload[0].value != null) {
+                                    const value = Number(payload[0].value);
+                                    return (
+                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                        <p className="font-medium">{label}</p>
+                                        <p className="text-sm">{`${value.toFixed(1)} strikes/min`}</p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                {chartData.strikeData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
 
-                      {/* Strike Accuracy Chart */}
-                      <div className="h-[200px]">
-                        <h4 className="text-sm font-medium mb-2">Strike Accuracy</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.strikeAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                            <XAxis 
-                              dataKey="name" 
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                            />
-                            <YAxis 
-                              domain={[0, 100]}
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              tickFormatter={(value) => `${value}%`}
-                            />
-                            <Tooltip
-                              content={({ payload, label }) => {
-                                if (payload && payload.length && payload[0].value != null) {
-                                  const value = Number(payload[0].value);
-                                  return (
-                                    <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                      <p className="font-medium">{label}</p>
-                                      <p className="text-sm">{`${value}%`}</p>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                              {chartData.strikeAccuracyData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {/* Strike Accuracy Chart */}
+                        <div className="h-[200px]">
+                          <h4 className="text-sm font-medium mb-2">Strike Accuracy</h4>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData.strikeAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                              <XAxis 
+                                dataKey="name" 
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                              />
+                              <YAxis 
+                                domain={[0, 100]}
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                tickFormatter={(value) => `${value}%`}
+                              />
+                              <Tooltip
+                                content={({ payload, label }) => {
+                                  if (payload && payload.length && payload[0].value != null) {
+                                    const value = Number(payload[0].value);
+                                    return (
+                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                        <p className="font-medium">{label}</p>
+                                        <p className="text-sm">{`${value}%`}</p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                {chartData.strikeAccuracyData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </ErrorBoundary>
+                    </CardContent>
+                  </Card>
+                </ErrorBoundary>
 
-              {/* Grappling Stats */}
-              <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Grappling Statistics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Takedowns per 15 min</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.td_avg).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Grappling Frequency</p>
+                {/* Grappling Stats */}
+                <ErrorBoundary FallbackComponent={ChartErrorFallback}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Grappling Statistics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Takedowns per 15 min</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.td_avg).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Grappling Frequency</p>
+                        </div>
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Takedown Accuracy</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.td_acc).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Takedown Success Rate</p>
+                        </div>
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Takedown Defense</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.td_def).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Takedown Prevention</p>
+                        </div>
+                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Submissions per 15 min</p>
+                          <p className="text-3xl font-bold">{safeParseFloat(stats.sub_avg).toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Submission Threat</p>
+                        </div>
                       </div>
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Takedown Accuracy</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.td_acc).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Takedown Success Rate</p>
-                      </div>
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Takedown Defense</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.td_def).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Takedown Prevention</p>
-                      </div>
-                      <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                        <p className="text-sm text-muted-foreground">Submissions per 15 min</p>
-                        <p className="text-3xl font-bold">{safeParseFloat(stats.sub_avg).toFixed(1)}</p>
-                        <p className="text-sm text-muted-foreground">Submission Threat</p>
-                      </div>
-                    </div>
-                    <div className="space-y-6">
-                      {/* Grappling Output Chart */}
-                      <div className="h-[200px]">
-                        <h4 className="text-sm font-medium mb-2">Grappling Output</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.grappleData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                            <XAxis 
-                              dataKey="name" 
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                            />
-                            <YAxis 
-                              domain={[0, 5]}
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                            />
-                            <Tooltip
-                              content={({ payload, label }) => {
-                                if (payload && payload.length && payload[0].value != null) {
-                                  const value = Number(payload[0].value);
-                                  return (
-                                    <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                      <p className="font-medium">{label}</p>
-                                      <p className="text-sm">{`${value.toFixed(1)} per 15min`}</p>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                              {chartData.grappleData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
+                      <div className="space-y-6">
+                        {/* Grappling Output Chart */}
+                        <div className="h-[200px]">
+                          <h4 className="text-sm font-medium mb-2">Grappling Output</h4>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData.grappleData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                              <XAxis 
+                                dataKey="name" 
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                              />
+                              <YAxis 
+                                domain={[0, 5]}
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                              />
+                              <Tooltip
+                                content={({ payload, label }) => {
+                                  if (payload && payload.length && payload[0].value != null) {
+                                    const value = Number(payload[0].value);
+                                    return (
+                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                        <p className="font-medium">{label}</p>
+                                        <p className="text-sm">{`${value.toFixed(1)} per 15min`}</p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                {chartData.grappleData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
 
-                      {/* Grappling Accuracy Chart */}
-                      <div className="h-[200px]">
-                        <h4 className="text-sm font-medium mb-2">Grappling Accuracy</h4>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData.grappleAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                            <XAxis 
-                              dataKey="name" 
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                            />
-                            <YAxis 
-                              domain={[0, 100]}
-                              tick={{ fill: 'currentColor', fontSize: 12 }}
-                              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              tickFormatter={(value) => `${value}%`}
-                            />
-                            <Tooltip
-                              content={({ payload, label }) => {
-                                if (payload && payload.length && payload[0].value != null) {
-                                  const value = Number(payload[0].value);
-                                  return (
-                                    <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                      <p className="font-medium">{label}</p>
-                                      <p className="text-sm">{`${value}%`}</p>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                              {chartData.grappleAccuracyData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {/* Grappling Accuracy Chart */}
+                        <div className="h-[200px]">
+                          <h4 className="text-sm font-medium mb-2">Grappling Accuracy</h4>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData.grappleAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                              <XAxis 
+                                dataKey="name" 
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                              />
+                              <YAxis 
+                                domain={[0, 100]}
+                                tick={{ fill: 'currentColor', fontSize: 12 }}
+                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                tickFormatter={(value) => `${value}%`}
+                              />
+                              <Tooltip
+                                content={({ payload, label }) => {
+                                  if (payload && payload.length && payload[0].value != null) {
+                                    const value = Number(payload[0].value);
+                                    return (
+                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                        <p className="font-medium">{label}</p>
+                                        <p className="text-sm">{`${value}%`}</p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                {chartData.grappleAccuracyData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </ErrorBoundary>
-            </TabsContent>
+                    </CardContent>
+                  </Card>
+                </ErrorBoundary>
+              </TabsContent>
 
-            <TabsContent value="history" className="animate-in slide-in-from-bottom duration-500">
-              <FightHistoryView />
-            </TabsContent>
+              <TabsContent 
+                value="history" 
+                className="animate-in fade-in scale-100 duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:scale-95 data-[state=inactive]:duration-300 absolute inset-0 data-[state=active]:relative"
+              >
+                <FightHistoryView />
+              </TabsContent>
+            </div>
           </Tabs>
         </div>
       </div>

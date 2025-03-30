@@ -10,7 +10,7 @@ import json
 import time
 from fastapi.exceptions import RequestValidationError
 from starlette.responses import RedirectResponse
-from typing import Callable
+from typing import Callable, Any, Dict, Union
 from mangum import Mangum
 
 from backend.constants import (
@@ -21,11 +21,13 @@ from backend.constants import (
     CORS_ORIGINS,
     CORS_METHODS,
     CORS_HEADERS,
-    CORS_CREDENTIALS
+    CORS_CREDENTIALS,
+    DEBUG_MODE
 )
 from backend.utils import sanitize_json
-from backend.api.database import get_db_connection, check_database_connection
+from backend.api.database import get_db_connection, test_connection
 from backend.ml.model_loader import load_model, get_loaded_model
+from backend.api.routes import fighters, predictions
 
 # Configure logging
 logging.basicConfig(
@@ -82,12 +84,12 @@ async def setup_dependencies():
         logger.error(f"Unexpected error loading model on startup: {str(e)}")
         logger.error(traceback.format_exc())
     
-    # Check database connection with retry
+    # Test database connection
     db_connected = False
     try:
         for attempt in range(3):  # Try up to 3 times
             logger.info(f"Checking database connection attempt {attempt+1}/3...")
-            if check_database_connection():
+            if test_connection():
                 logger.info("Database connection successful!")
                 db_connected = True
                 break
@@ -125,55 +127,85 @@ app.add_middleware(
 # Log CORS configuration
 logger.info(f"CORS configured with origins: {CORS_ORIGINS}")
 
-# Add middleware to sanitize all JSON responses
+def sanitize_value(value: Any) -> Union[str, int, float, bool, Dict, list, None]:
+    """Sanitize a single value."""
+    if value is None:
+        return ""
+    elif isinstance(value, (int, float, bool)):
+        return value
+    elif isinstance(value, dict):
+        return {k: sanitize_value(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [sanitize_value(v) for v in v if v is not None]
+    else:
+        # Convert to string and handle special cases
+        str_value = str(value).strip()
+        if str_value.lower() in ["null", "undefined", "none"]:
+            return ""
+        return str_value
+
 @app.middleware("http")
-async def sanitize_json_response(request: Request, call_next: Callable):
+async def sanitize_json_response(request: Request, call_next) -> Response:
     """Middleware to sanitize all JSON responses."""
     response = await call_next(request)
     
     # Only process JSON responses
-    if response.headers.get("content-type") == "application/json":
+    if response.headers.get("content-type", "").startswith("application/json"):
         try:
-            # Get the original response body
-            original_response = [chunk async for chunk in response.body_iterator]
-            response.body_iterator = iter([original_response[0]])
-            
-            # Parse and sanitize the JSON
-            response_body = json.loads(original_response[0].decode())
-            sanitized_body = sanitize_json(response_body)
-            
-            # Create a new response with sanitized data
-            return JSONResponse(
-                content=sanitized_body,
-                status_code=response.status_code,
-                headers=dict(response.headers)
-            )
+            # Handle different response types
+            if hasattr(response, "body"):
+                # Standard response with body
+                body = await response.body()
+                if body:
+                    data = json.loads(body)
+                    sanitized_data = sanitize_value(data)
+                    return JSONResponse(
+                        content=sanitized_data,
+                        status_code=response.status_code,
+                        headers=dict(response.headers),
+                        media_type=response.media_type
+                    )
+            elif hasattr(response, "raw"):
+                # Streaming response
+                body = b""
+                async for chunk in response.raw:
+                    body += chunk
+                if body:
+                    data = json.loads(body)
+                    sanitized_data = sanitize_value(data)
+                    return JSONResponse(
+                        content=sanitized_data,
+                        status_code=response.status_code,
+                        headers=dict(response.headers),
+                        media_type=response.media_type
+                    )
         except Exception as e:
             logger.error(f"Error sanitizing response: {str(e)}")
+            logger.error(traceback.format_exc())
     
-    # Return the original response for non-JSON responses or if sanitization fails
     return response
 
-# Import route modules directly to avoid circular imports
-from backend.api.routes.fighters import router as fighters_router
-from backend.api.routes.predictions import router as predictions_router
-
 # Include routers
-app.include_router(fighters_router)
-app.include_router(predictions_router)
+app.include_router(fighters.router)
+app.include_router(predictions.router)
 
 @app.get("/")
 def read_root():
-    """Root endpoint - API health check"""
-    response_data = {"message": "UFC Fighter Prediction API is running!"}
-    return sanitize_json(response_data)
+    """Root endpoint that checks database connection."""
+    try:
+        supabase = get_db_connection()
+        if supabase:
+            return {"status": "ok", "message": "Database connection successful"}
+        return {"status": "error", "message": "Database connection failed"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/health")
 def health_check():
     """Health check endpoint - returns status of model and database"""
     # Do basic checks
     model = get_loaded_model()
-    db_connected = check_database_connection()
+    db_connected = test_connection()
     
     response_data = {
         "status": "healthy" if model and db_connected else "degraded",

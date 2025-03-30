@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException
 from backend.api.database import get_db_connection
 import re
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
 from urllib.parse import unquote
 from backend.constants import (
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=API_V1_STR, tags=["Fighters"])
 
 @router.get("/fighters")
-def get_fighters(query: str = Query("", min_length=0)):
+def get_fighters(query: str = Query("", min_length=0)) -> Dict[str, List[str]]:
     """Get all fighters or search for fighters by name."""
     try:
         supabase = get_db_connection()
@@ -28,29 +28,24 @@ def get_fighters(query: str = Query("", min_length=0)):
             logger.error("No database connection available")
             raise HTTPException(status_code=500, detail="Database connection error")
 
-        # Initialize an empty fighters list as fallback
         fighters_list = []
 
         try:
             # Fetch fighters data from Supabase
             if not query:
-                # If no query, return all fighters
                 try:
-                    # First try with nulls_last parameter
                     response = supabase.table('fighters')\
                         .select('fighter_name,Record,ranking,id')\
                         .order('ranking', desc=False, nulls_last=True)\
                         .limit(MAX_SEARCH_RESULTS)\
                         .execute()
                 except Exception:
-                    # Fall back to simpler ordering if the above fails
                     response = supabase.table('fighters')\
                         .select('fighter_name,Record,ranking,id')\
                         .order('ranking')\
                         .limit(MAX_SEARCH_RESULTS)\
                         .execute()
             else:
-                # If query exists, use ilike for case-insensitive search
                 response = supabase.table('fighters')\
                     .select('fighter_name,Record,ranking,id')\
                     .ilike('fighter_name', f'%{query}%')\
@@ -58,80 +53,42 @@ def get_fighters(query: str = Query("", min_length=0)):
                     .limit(MAX_SEARCH_RESULTS)\
                     .execute()
             
-            # Handle case where response or data is None
             if not response or not hasattr(response, 'data') or not response.data:
                 logger.info(f"No fighters found for query: {query}")
-                return sanitize_json({"fighters": []})
+                return {"fighters": []}
             
             fighter_data = response.data
             logger.info(f"Found {len(fighter_data)} fighters matching query: {query}")
         except Exception as e:
             logger.error(f"Error fetching fighters: {str(e)}")
-            return sanitize_json({"fighters": []})  # Return empty array instead of raising error
-        
-        fighters_list = []
+            return {"fighters": []}
         
         if not query:
             # Return all fighters with record and ranking info
             for fighter in fighter_data:
-                # Set parent keys for important fields for enhanced sanitization
-                set_parent_key("fighter_name")
-                set_parent_key("Record")
+                fighter_name = fighter.get('fighter_name', '')
+                record = fighter.get('Record', DEFAULT_RECORD)
                 
-                # Sanitize fighter data
-                sanitized_fighter = sanitize_json(fighter)
-                
-                # Explicitly ensure fighter_name and record are valid strings
-                fighter_name = sanitized_fighter.get('fighter_name', '')
-                if fighter_name is None or not isinstance(fighter_name, str):
-                    fighter_name = ''  # Double-check fighter_name is a valid string
-                
-                record = sanitized_fighter.get('Record', DEFAULT_RECORD) 
-                if record is None or not isinstance(record, str):
-                    record = DEFAULT_RECORD  # Double-check record is a valid string
-                
-                # Always return as a valid string
-                formatted_name = f"{fighter_name} ({record})"
-                fighters_list.append(formatted_name)
+                if fighter_name:
+                    formatted_name = f"{fighter_name} ({record})"
+                    fighters_list.append(formatted_name)
         else:
             # Improved search logic
             query_parts = query.lower().split()
             
             for fighter in fighter_data:
-                # Set parent keys for important fields for enhanced sanitization
-                set_parent_key("fighter_name")
-                set_parent_key("Record")
+                fighter_name = fighter.get('fighter_name', '')
+                record = fighter.get('Record', DEFAULT_RECORD)
                 
-                # Sanitize fighter data
-                sanitized_fighter = sanitize_json(fighter)
-                
-                # Explicitly ensure fighter_name and record are valid strings
-                fighter_name = sanitized_fighter.get('fighter_name', '')
-                if fighter_name is None or not isinstance(fighter_name, str):
-                    fighter_name = ''  # Double-check fighter_name is a valid string
-                
-                record = sanitized_fighter.get('Record', DEFAULT_RECORD)
-                if record is None or not isinstance(record, str):
-                    record = DEFAULT_RECORD  # Double-check record is a valid string
-                
-                # Only process if fighter_name is not empty
-                if fighter_name:
-                    ranking = sanitized_fighter.get('ranking')
-                
-                # Split fighter name into parts for matching
+                if not fighter_name:
+                    continue
+                    
                 name_parts = fighter_name.lower().split()
-                
-                # Check for matches:
-                # 1. Full name contains query
-                # 2. Any part of name starts with any query part
-                # 3. Any part of name contains any query part
                 matches = False
                 
-                # Full name contains entire query
                 if query.lower() in fighter_name.lower():
                     matches = True
                 else:
-                    # Check if any query part matches start of any name part
                     for q_part in query_parts:
                         for name_part in name_parts:
                             if name_part.startswith(q_part):
@@ -141,20 +98,14 @@ def get_fighters(query: str = Query("", min_length=0)):
                             break
                             
                 if matches:
-                    # Format name with record and add to results
                     formatted_name = f"{fighter_name} ({record})"
                     fighters_list.append(formatted_name)
-            
-        # Final safety check - ensure all items are strings
-        fighters_list = [str(name) for name in fighters_list if name]
         
-        # Return result in expected format
         logger.info(f"Returning {len(fighters_list)} fighters")
-        return sanitize_json({"fighters": fighters_list[:MAX_SEARCH_RESULTS]})
+        return {"fighters": fighters_list[:MAX_SEARCH_RESULTS]}
     except Exception as e:
         logger.error(f"Unexpected error in get_fighters: {str(e)}")
-        # Return empty list instead of error to avoid breaking frontend
-        return sanitize_json({"fighters": []})
+        return {"fighters": []}
 
 @router.get("/fighter-stats/{fighter_name}")
 def get_fighter_stats(fighter_name: str):
@@ -264,10 +215,9 @@ def _sanitize_fighter_data(fighter_data):
     return sanitized
 
 @router.get("/fighter/{fighter_name}")
-def get_fighter(fighter_name: str):
-    """Get fighter by name - alias for frontend compatibility."""
+def get_fighter(fighter_name: str) -> Dict:
+    """Get fighter by name."""
     try:
-        # URL decode the fighter name and ensure it's a string
         if fighter_name is None:
             logger.warning("Fighter name is None")
             raise HTTPException(status_code=400, detail="Fighter name is required")
@@ -276,24 +226,19 @@ def get_fighter(fighter_name: str):
             fighter_name = unquote(fighter_name)
         except Exception as e:
             logger.error(f"Error decoding fighter name: {str(e)}")
-            # Continue with the original name if decoding fails
         
-        # Log the requested fighter name to help with debugging
         logger.info(f"Fighter lookup requested for: {fighter_name}")
         
         supabase = get_db_connection()
         if not supabase:
             logger.error("No database connection available")
-            # Return empty fighter with defaults instead of error
-            return sanitize_json(_get_default_fighter(fighter_name))
+            return _get_default_fighter(fighter_name)
         
-        # Clean fighter name - remove record if present
         clean_name = fighter_name
         if "(" in fighter_name:
             clean_name = fighter_name.split("(")[0].strip()
             logger.info(f"Extracted clean name: {clean_name}")
         
-        # Try multiple search methods to maximize chances of finding the fighter
         fighter_data = None
         
         # Method 1: Direct match
@@ -329,19 +274,15 @@ def get_fighter(fighter_name: str):
                 fighter_data = response.data[0]
                 logger.info(f"Found fighter via partial match: {clean_name}")
         
-        # If all methods failed, return a default fighter object instead of 404
         if not fighter_data:
             logger.warning(f"Fighter not found with any method: {clean_name}")
-            return sanitize_json(_get_default_fighter(clean_name))
+            return _get_default_fighter(clean_name)
         
-        # FIXED: Simplify the query to directly match on fighter_name
+        fighter_name_from_db = fighter_data.get('fighter_name', '')
+        logger.info(f"Fetching fights using exact fighter name from database: '{fighter_name_from_db}'")
+        
         last_5_fights = []
         try:
-            # Get exact fighter name from the fighter record
-            fighter_name_from_db = fighter_data.get('fighter_name', '')
-            logger.info(f"Fetching fights using exact fighter name from database: '{fighter_name_from_db}'")
-            
-            # First try a direct match using the exact fighter name from the database
             if fighter_name_from_db:
                 fights_response = supabase.table('fighter_last_5_fights')\
                     .select('*')\
@@ -353,200 +294,20 @@ def get_fighter(fighter_name: str):
                 if fights_response and hasattr(fights_response, 'data') and fights_response.data:
                     last_5_fights = fights_response.data
                     logger.info(f"SUCCESS! Found {len(last_5_fights)} fights for fighter '{fighter_name_from_db}'")
-            
-            # If no fights found with exact match, try case-insensitive
-            if not last_5_fights and fighter_name_from_db:
-                logger.warning(f"No exact matches found, trying case-insensitive search for '{fighter_name_from_db}'")
-                
-                # Try a case-insensitive match
-                fights_response = supabase.table('fighter_last_5_fights')\
-                    .select('*')\
-                    .ilike('fighter_name', fighter_name_from_db)\
-                    .order('id', desc=False)\
-                    .limit(MAX_FIGHTS_DISPLAY)\
-                    .execute()
-                
-                if fights_response and hasattr(fights_response, 'data') and fights_response.data:
-                    last_5_fights = fights_response.data
-                    logger.info(f"SUCCESS! Found {len(last_5_fights)} fights using case-insensitive match for '{fighter_name_from_db}'")
-            
-            # If still no fights, try a more fuzzy match
-            if not last_5_fights and fighter_name_from_db:
-                logger.warning(f"No case-insensitive matches, trying fuzzy search for '{fighter_name_from_db}'")
-                
-                # Try a more fuzzy match using partial text
-                fights_response = supabase.table('fighter_last_5_fights')\
-                    .select('*')\
-                    .ilike('fighter_name', f'%{fighter_name_from_db}%')\
-                    .order('id', desc=False)\
-                    .limit(MAX_FIGHTS_DISPLAY)\
-                    .execute()
-                
-                if fights_response and hasattr(fights_response, 'data') and fights_response.data:
-                    last_5_fights = fights_response.data
-                    logger.info(f"SUCCESS! Found {len(last_5_fights)} fights using fuzzy match for '{fighter_name_from_db}'")
-            
-            # If still no matches, try with the original clean_name
-            if not last_5_fights:
-                logger.warning(f"No matches with database name, trying with original clean_name: '{clean_name}'")
-                
-                fights_response = supabase.table('fighter_last_5_fights')\
-                    .select('*')\
-                    .ilike('fighter_name', f'%{clean_name}%')\
-                    .order('id', desc=False)\
-                    .limit(MAX_FIGHTS_DISPLAY)\
-                    .execute()
-                
-                if fights_response and hasattr(fights_response, 'data') and fights_response.data:
-                    last_5_fights = fights_response.data
-                    logger.info(f"SUCCESS! Found {len(last_5_fights)} fights using original clean_name: '{clean_name}'")
-                else:
-                    logger.warning(f"FAILED: No fights found with any method for fighter '{fighter_name_from_db}'")
-                    
-                    # For testing and development, add synthetic fight history
-                    logger.info("Adding synthetic fight history for testing")
-                    last_5_fights = [
-                        {
-                            "id": f"1{fighter_data['id']}" if 'id' in fighter_data else "100",
-                            "fighter_name": fighter_name_from_db,
-                            "fight_url": "http://example.com/fight1",
-                            "kd": "1",
-                            "sig_str": "45 of 97",
-                            "sig_str_pct": "46%",
-                            "total_str": "68 of 123",
-                            "head_str": "35 of 80",
-                            "body_str": "7 of 11",
-                            "leg_str": "3 of 6",
-                            "takedowns": "0 of 0",
-                            "td_pct": "0%",
-                            "ctrl": "0:00",
-                            "result": "Win",
-                            "method": "KO/TKO",
-                            "opponent": "Robert Whittaker",
-                            "opponent_display_name": "Robert Whittaker",
-                            "fight_date": "2023-10-21",
-                            "round": "2",
-                            "time": "3:45",
-                            "event": "UFC 243",
-                            "opponent_stats": None
-                        },
-                        {
-                            "id": f"2{fighter_data['id']}" if 'id' in fighter_data else "200",
-                            "fighter_name": fighter_name_from_db,
-                            "fight_url": "http://example.com/fight2",
-                            "kd": "0",
-                            "sig_str": "92 of 231",
-                            "sig_str_pct": "39%",
-                            "total_str": "117 of 270",
-                            "head_str": "73 of 201",
-                            "body_str": "12 of 18",
-                            "leg_str": "7 of 12",
-                            "takedowns": "0 of 0",
-                            "td_pct": "0%",
-                            "ctrl": "0:00",
-                            "result": "Loss",
-                            "method": "Decision",
-                            "opponent": "Jan Blachowicz",
-                            "opponent_display_name": "Jan Blachowicz",
-                            "fight_date": "2023-03-05",
-                            "round": "5",
-                            "time": "5:00",
-                            "event": "UFC 259",
-                            "opponent_stats": None
-                        },
-                        {
-                            "id": f"3{fighter_data['id']}" if 'id' in fighter_data else "300",
-                            "fighter_name": fighter_name_from_db,
-                            "fight_url": "http://example.com/fight3",
-                            "kd": "1",
-                            "sig_str": "99 of 176",
-                            "sig_str_pct": "56%",
-                            "total_str": "112 of 196",
-                            "head_str": "88 of 151",
-                            "body_str": "8 of 19",
-                            "leg_str": "3 of 6",
-                            "takedowns": "0 of 0",
-                            "td_pct": "0%",
-                            "ctrl": "0:00",
-                            "result": "Win",
-                            "method": "KO/TKO",
-                            "opponent": "Paulo Costa",
-                            "opponent_display_name": "Paulo Costa",
-                            "fight_date": "2022-09-26",
-                            "round": "2",
-                            "time": "3:59",
-                            "event": "UFC 253",
-                            "opponent_stats": None
-                        },
-                        {
-                            "id": f"4{fighter_data['id']}" if 'id' in fighter_data else "400",
-                            "fighter_name": fighter_name_from_db,
-                            "fight_url": "http://example.com/fight4",
-                            "kd": "0",
-                            "sig_str": "48 of 123",
-                            "sig_str_pct": "39%",
-                            "total_str": "65 of 154",
-                            "head_str": "38 of 101",
-                            "body_str": "6 of 14",
-                            "leg_str": "4 of 8",
-                            "takedowns": "0 of 0",
-                            "td_pct": "0%",
-                            "ctrl": "0:00",
-                            "result": "Win",
-                            "method": "Decision",
-                            "opponent": "Yoel Romero",
-                            "opponent_display_name": "Yoel Romero",
-                            "fight_date": "2022-03-07",
-                            "round": "5",
-                            "time": "5:00",
-                            "event": "UFC 248",
-                            "opponent_stats": None
-                        },
-                        {
-                            "id": f"5{fighter_data['id']}" if 'id' in fighter_data else "500",
-                            "fighter_name": fighter_name_from_db,
-                            "fight_url": "http://example.com/fight5",
-                            "kd": "1",
-                            "sig_str": "57 of 132",
-                            "sig_str_pct": "43%",
-                            "total_str": "84 of 163",
-                            "head_str": "42 of 110",
-                            "body_str": "9 of 15",
-                            "leg_str": "6 of 7",
-                            "takedowns": "0 of 0",
-                            "td_pct": "0%",
-                            "ctrl": "0:00",
-                            "result": "Win",
-                            "method": "KO/TKO",
-                            "opponent": "Robert Whittaker",
-                            "opponent_display_name": "Robert Whittaker",
-                            "fight_date": "2021-10-05",
-                            "round": "2",
-                            "time": "3:33",
-                            "event": "UFC 243",
-                            "opponent_stats": None
-                        }
-                    ]
         except Exception as e:
             logger.error(f"Error fetching fights for fighter {clean_name}: {str(e)}")
             logger.error(traceback.format_exc())
-            # Continue even if we can't get fights
         
-        # Add the last 5 fights to the fighter data
         fighter_data['last_5_fights'] = last_5_fights
         
-        # Sanitize all fields to ensure proper string values
-        sanitized_data = _sanitize_fighter_data(fighter_data)
-        
         logger.info(f"Successfully retrieved fighter: {clean_name} with {len(last_5_fights)} fights")
-        return sanitize_json(sanitized_data)
+        return fighter_data
     except Exception as e:
         logger.error(f"Error in get_fighter: {str(e)}")
         logger.error(traceback.format_exc())
-        # Return a default fighter object rather than an error
-        return sanitize_json(_get_default_fighter(fighter_name if fighter_name else "Unknown Fighter"))
+        return _get_default_fighter(fighter_name if fighter_name else "Unknown Fighter")
 
-def _get_default_fighter(name):
+def _get_default_fighter(name: str) -> Dict:
     """Return a default fighter object with the given name."""
     return {
         "fighter_name": name,
@@ -565,7 +326,7 @@ def _get_default_fighter(name):
         "TD Def.": "0%",
         "Sub. Avg.": 0.0,
         "image_url": "",
-        "ranking": 0,
+        "ranking": UNRANKED_VALUE,
         "is_champion": False
     }
 
