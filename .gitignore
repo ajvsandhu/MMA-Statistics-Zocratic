@@ -88,6 +88,10 @@ ENV/
 # Model files and data
 *.pkl
 *.h5
+!backend/ml/models/*.joblib
+!backend/ml/models/model_info.joblib
+!backend/ml/models/feature_names.joblib
+!backend/ml/models/scaler.joblib
 
 # Environment variables
 .env
