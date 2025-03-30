@@ -64,29 +64,55 @@ async def predict_fight(fight_data: FighterInput):
                 status_code=503,
                 content={
                     "error": "Prediction service temporarily unavailable",
-                    "message": "The ML model is not currently loaded. Basic fighter information is still available.",
+                    "message": "The prediction service is currently unavailable. Basic fighter information is still accessible.",
+                    "status": "model_not_loaded",
                     "fighter1": {
                         "name": fight_data.fighter1_name,
-                        "status": "Model unavailable"
+                        "status": "Model unavailable",
+                        "message": "Fighter data can still be viewed"
                     },
                     "fighter2": {
                         "name": fight_data.fighter2_name,
-                        "status": "Model unavailable"
+                        "status": "Model unavailable",
+                        "message": "Fighter data can still be viewed"
                     }
                 }
             )
         
         # Get database connection
         db = get_db_connection()
+        if not db:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Database connection error",
+                    "message": "Unable to connect to the database. Please try again later.",
+                    "status": "database_error"
+                }
+            )
         
         # Get fighter data from database with case-insensitive search
         fighter1_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter1_name).execute()
         fighter2_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter2_name).execute()
         
         if not fighter1_data.data:
-            raise HTTPException(status_code=404, detail=f"Fighter not found: {fight_data.fighter1_name}")
+            raise HTTPException(
+                status_code=404, 
+                detail={
+                    "error": "Fighter not found",
+                    "message": f"Could not find fighter: {fight_data.fighter1_name}",
+                    "status": "fighter_not_found"
+                }
+            )
         if not fighter2_data.data:
-            raise HTTPException(status_code=404, detail=f"Fighter not found: {fight_data.fighter2_name}")
+            raise HTTPException(
+                status_code=404, 
+                detail={
+                    "error": "Fighter not found",
+                    "message": f"Could not find fighter: {fight_data.fighter2_name}",
+                    "status": "fighter_not_found"
+                }
+            )
             
         fighter1 = fighter1_data.data[0]
         fighter2 = fighter2_data.data[0]
@@ -98,9 +124,25 @@ async def predict_fight(fight_data: FighterInput):
         # Make prediction
         prediction = predictor.predict_winner(fighter1, fighter2)
         
-        if not prediction or 'error' in prediction:
-            error_msg = prediction.get('error', 'Failed to make prediction') if prediction else 'Failed to make prediction'
-            raise HTTPException(status_code=500, detail=error_msg)
+        if not prediction:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Prediction failed",
+                    "message": "Failed to generate prediction. Please try again.",
+                    "status": "prediction_error"
+                }
+            )
+            
+        if 'error' in prediction:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Prediction error",
+                    "message": prediction.get('error', 'Unknown prediction error'),
+                    "status": "prediction_error"
+                }
+            )
             
         # Format response using exact field names from your database
         response = {
@@ -123,7 +165,8 @@ async def predict_fight(fight_data: FighterInput):
             "winner_probability": prediction["winner_probability"],
             "loser_probability": prediction["loser_probability"],
             "prediction_confidence": prediction["prediction_confidence"],
-            "model_version": prediction.get("model_version", "1.0")
+            "model_version": prediction.get("model_version", "1.0"),
+            "status": "success"
         }
         
         logger.info(f"Prediction made successfully: {response}")
@@ -134,7 +177,14 @@ async def predict_fight(fight_data: FighterInput):
     except Exception as e:
         logger.error(f"Error making prediction: {str(e)}")
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Internal server error",
+                "message": f"An unexpected error occurred: {str(e)}",
+                "status": "internal_error"
+            }
+        )
 
 @router.get("/model-info")
 async def get_model_info():

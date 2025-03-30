@@ -228,22 +228,36 @@ export default function FightPredictionsPage() {
       const predictionEndpoint = ENDPOINTS.PREDICTION(cleanFighter1, cleanFighter2);
       const response = await fetch(predictionEndpoint.url, predictionEndpoint.options);
 
-      if (!response.ok) {
-        throw new Error('Failed to get prediction');
-      }
-
       const data = await response.json();
+
+      // Handle 503 Service Unavailable or other error responses
+      if (!response.ok) {
+        if (response.status === 503) {
+          toast({
+            title: 'Service Temporarily Unavailable',
+            description: data.message || 'The prediction service is temporarily unavailable. Please try again later.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: data.detail || 'Failed to get prediction. Please try again.',
+            variant: 'destructive',
+          });
+        }
+        return;
+      }
       
       const validatedPrediction: Prediction = {
         winner: data.winner || "Unknown",
         loser: data.loser || "Unknown",
-        winner_probability: data.winner_probability || 0.5,
-        loser_probability: data.loser_probability || 0.5,
-        prediction_confidence: data.prediction_confidence || 0.5,
+        winner_probability: safeParseNumber(data.winner_probability, 0.5),
+        loser_probability: safeParseNumber(data.loser_probability, 0.5),
+        prediction_confidence: safeParseNumber(data.prediction_confidence, 0.5),
         model_version: data.model_version || "1.0.0",
         head_to_head: {
-          fighter1_wins: data.head_to_head?.fighter1_wins || 0,
-          fighter2_wins: data.head_to_head?.fighter2_wins || 0,
+          fighter1_wins: safeParseNumber(data.head_to_head?.fighter1_wins, 0),
+          fighter2_wins: safeParseNumber(data.head_to_head?.fighter2_wins, 0),
           last_winner: data.head_to_head?.last_winner || "N/A",
           last_method: data.head_to_head?.last_method || "N/A",
         },
@@ -251,21 +265,22 @@ export default function FightPredictionsPage() {
           name: cleanFighter1,
           record: data.fighter1?.record || fighter1?.record || "0-0-0",
           image_url: data.fighter1?.image_url || fighter1?.image_url || "",
-          probability: data.fighter1?.name === data.winner ? data.winner_probability : data.loser_probability,
-          win_probability: `${Math.round((data.fighter1?.name === data.winner ? data.winner_probability : data.loser_probability) * 100)}%`
+          probability: safeParseNumber(data.fighter1?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5),
+          win_probability: `${Math.round(safeParseNumber(data.fighter1?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5) * 100)}%`
         },
         fighter2: {
           name: cleanFighter2,
           record: data.fighter2?.record || fighter2?.record || "0-0-0",
           image_url: data.fighter2?.image_url || fighter2?.image_url || "",
-          probability: data.fighter2?.name === data.winner ? data.winner_probability : data.loser_probability,
-          win_probability: `${Math.round((data.fighter2?.name === data.winner ? data.winner_probability : data.loser_probability) * 100)}%`
+          probability: safeParseNumber(data.fighter2?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5),
+          win_probability: `${Math.round(safeParseNumber(data.fighter2?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5) * 100)}%`
         },
       };
       
       setPrediction(validatedPrediction);
       setShowPredictionModal(true);
     } catch (error) {
+      console.error('Prediction error:', error);
       toast({
         title: 'Error',
         description: 'Failed to get prediction. Please try again.',
