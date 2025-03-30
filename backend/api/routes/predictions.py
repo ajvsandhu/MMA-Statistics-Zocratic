@@ -34,9 +34,11 @@ router = APIRouter(prefix=f"{API_V1_STR}/prediction", tags=["Predictions"])
 predictor = FighterPredictor(train=False)  # Explicitly set train=False to only load the model
 if not predictor.model:
     logger.warning("Model not loaded, attempting to load...")
-    if not predictor._load_model():
-        logger.error("Failed to load model")
-        raise RuntimeError("Failed to load prediction model")
+    try:
+        predictor._load_model()
+    except Exception as e:
+        logger.error(f"Failed to load model: {str(e)}")
+        logger.warning("Application will continue running without prediction capabilities")
 
 class FighterInput(BaseModel):
     fighter1_name: str
@@ -56,6 +58,23 @@ class ModelInfoResponse(BaseModel):
 async def predict_fight(fight_data: FighterInput):
     try:
         logger.info(f"Received prediction request for {fight_data.fighter1_name} vs {fight_data.fighter2_name}")
+        
+        if not predictor.model:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "Prediction service temporarily unavailable",
+                    "message": "The ML model is not currently loaded. Basic fighter information is still available.",
+                    "fighter1": {
+                        "name": fight_data.fighter1_name,
+                        "status": "Model unavailable"
+                    },
+                    "fighter2": {
+                        "name": fight_data.fighter2_name,
+                        "status": "Model unavailable"
+                    }
+                }
+            )
         
         # Get database connection
         db = get_db_connection()
