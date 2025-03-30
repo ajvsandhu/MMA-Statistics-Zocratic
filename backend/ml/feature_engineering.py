@@ -850,4 +850,69 @@ def analyze_opponent_quality(fighter_fights: List[Dict[str, Any]], opponent_data
             'wins_against_grapplers': 0,
             'losses_against_grapplers': 0,
             'quality_score': 0
-        } 
+        }
+
+def extract_features(fighter_data: Dict[str, Any], all_fights: Optional[List[Dict[str, Any]]] = None) -> Dict[str, float]:
+    """
+    Main feature extraction function that combines all feature engineering utilities.
+    
+    Args:
+        fighter_data: Dictionary containing fighter information
+        all_fights: Optional list of all fights for career progression analysis
+        
+    Returns:
+        Dict[str, float]: Dictionary of extracted features
+    """
+    features = {}
+    
+    try:
+        # Extract basic record stats
+        wins, losses, draws = extract_record_stats(fighter_data.get('record', '0-0-0'))
+        features['wins'] = wins
+        features['losses'] = losses
+        features['draws'] = draws
+        features['win_percentage'] = calculate_win_percentage(fighter_data.get('record', '0-0-0'))
+        
+        # Extract physical attributes
+        features['height_inches'] = extract_height_in_inches(str(fighter_data.get('height', "0'0\"")))
+        features['reach_inches'] = extract_reach_in_inches(str(fighter_data.get('reach', '0"')))
+        
+        # Extract striking stats
+        features['slpm'] = safe_convert_to_float(fighter_data.get('slpm', 0))
+        features['str_acc'] = safe_convert_to_float(fighter_data.get('str_acc', 0))
+        features['sapm'] = safe_convert_to_float(fighter_data.get('sapm', 0))
+        features['str_def'] = safe_convert_to_float(fighter_data.get('str_def', 0))
+        
+        # Extract grappling stats
+        features['td_avg'] = safe_convert_to_float(fighter_data.get('td_avg', 0))
+        features['td_acc'] = safe_convert_to_float(fighter_data.get('td_acc', 0))
+        features['td_def'] = safe_convert_to_float(fighter_data.get('td_def', 0))
+        features['sub_avg'] = safe_convert_to_float(fighter_data.get('sub_avg', 0))
+        
+        # Extract advanced profile features
+        advanced_profile = extract_advanced_fighter_profile(fighter_data, all_fights)
+        features.update(advanced_profile)
+        
+        # Extract style features
+        style_features = extract_style_features(fighter_data)
+        features.update(style_features)
+        
+        # Extract recent fight stats if available
+        if all_fights:
+            recent_stats = extract_recent_fight_stats(all_fights)
+            features.update(recent_stats)
+        
+        # Ensure all features are floats
+        features = {k: float(v) for k, v in features.items()}
+        
+    except Exception as e:
+        logger.error(f"Error extracting features: {str(e)}")
+        # Return default values if extraction fails
+        features = {
+            'wins': 0, 'losses': 0, 'draws': 0, 'win_percentage': 0,
+            'height_inches': 0, 'reach_inches': 0,
+            'slpm': 0, 'str_acc': 0, 'sapm': 0, 'str_def': 0,
+            'td_avg': 0, 'td_acc': 0, 'td_def': 0, 'sub_avg': 0
+        }
+    
+    return features 

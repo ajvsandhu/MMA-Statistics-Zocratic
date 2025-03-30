@@ -5,6 +5,7 @@ import { Check, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { ENDPOINTS } from "@/lib/api-config"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Command,
   CommandEmpty,
@@ -48,6 +49,8 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
 
   // Fetch fighters when search term changes
   React.useEffect(() => {
+    const controller = new AbortController();
+    
     if (!searchTerm.trim()) {
       setFighters([]);
       setShowSuggestions(false);
@@ -63,7 +66,8 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-          }
+          },
+          signal: controller.signal
         });
         
         if (!response.ok) {
@@ -84,7 +88,8 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
         // Limit to 5 suggestions
         setFighters(fightersList.slice(0, 5));
         setShowSuggestions(true);
-      } catch (err) {
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
         console.error('Search error:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch fighters');
         setFighters([]);
@@ -94,27 +99,19 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
     }
 
     const debounceTimer = setTimeout(fetchFighters, 300);
-    return () => clearTimeout(debounceTimer);
+    return () => {
+      clearTimeout(debounceTimer);
+      controller.abort();
+    };
   }, [searchTerm]);
 
   const formatFighterDisplay = (fighter: string) => {
-    // Add safety check for fighter being undefined or null
     if (!fighter) return '';
-    
     if (!fighter.includes('(')) return fighter;
-
-    try {
-      const [baseName, ...rest] = fighter.split('(');
-      return fighter; // Return the full fighter string, let the display handle the formatting
-    } catch (err) {
-      // If any error occurs, return the fighter name as-is
-      console.error('Error formatting fighter name:', err);
-      return fighter;
-    }
+    return fighter;
   }
   
   const getFighterDisplayElement = (fighter: string) => {
-    // Add safety check for fighter being undefined or null
     if (!fighter) return <span>No name</span>;
     
     if (!fighter.includes('(')) return <span>{fighter}</span>;
@@ -123,49 +120,49 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
       const [baseName, ...rest] = fighter.split('(');
       const info = '(' + rest.join('(');
       return (
-        <div className="flex flex-col">
+        <motion.div 
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col"
+        >
           <span className="font-medium">{baseName.trim()}</span>
           <span className="text-sm text-muted-foreground">{info}</span>
-        </div>
+        </motion.div>
       );
     } catch (err) {
-      // If any error occurs, return the fighter name as-is
       console.error('Error creating fighter display element:', err);
       return <span>{fighter}</span>;
     }
   }
 
-  // Fixed version of onSelect that consistently handles fighter names 
   const handleFighterSelect = (currentValue: string) => {
-    // Safety check to ensure we're not passing undefined/null to the parent
     if (!currentValue) {
       console.error('Invalid fighter value:', currentValue);
       return;
     }
     
     try {
-      // Standardize the fighter name format
       let cleanValue = String(currentValue).trim();
-      
-      // Pass the cleaned value to the parent
       onSelectFighter(cleanValue);
-      
-      // Clear the search UI
       setShowSuggestions(false);
-      setSearchTerm(""); // Clear search term after selection
+      setSearchTerm(""); 
     } catch (err) {
       console.error('Error processing fighter selection:', err);
     }
   };
   
-  // Only display fighters that have valid string values
   const validFighters = fighters.filter(fighter => 
     fighter !== undefined && fighter !== null && typeof fighter === 'string'
   );
 
   return (
     <div ref={wrapperRef} className="relative w-full">
-      <div className="relative">
+      <motion.div 
+        initial={false}
+        animate={{ scale: isLoading ? 0.99 : 1 }}
+        transition={{ duration: 0.2 }}
+        className="relative"
+      >
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search fighters..."
@@ -174,40 +171,72 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
           className="pl-9 pr-4"
           onFocus={() => setShowSuggestions(true)}
         />
-      </div>
-      {showSuggestions && (searchTerm.trim() || isLoading || error) && (
-        <div className="absolute top-full w-full z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md">
-          <Command className="rounded-md" shouldFilter={false}>
-            {error && (
-              <p className="p-2 text-sm text-destructive">{error}</p>
-            )}
-            {isLoading ? (
-              <p className="p-2 text-sm text-muted-foreground">Loading...</p>
-            ) : validFighters.length === 0 ? (
-              <CommandEmpty>No fighters found.</CommandEmpty>
-            ) : (
-              <CommandGroup>
-                {validFighters.map((fighter, index) => (
-                  <CommandItem
-                    key={`${fighter}-${index}`}
-                    value={fighter}
-                    onSelect={handleFighterSelect}
-                    className="cursor-pointer"
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        searchTerm === fighter ? "opacity-100" : "opacity-0"
-                      )}
+      </motion.div>
+      <AnimatePresence mode="wait">
+        {showSuggestions && (searchTerm.trim() || isLoading || error) && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute top-full w-full z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md overflow-hidden"
+          >
+            <Command className="rounded-md" shouldFilter={false}>
+              {error && (
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="p-2 text-sm text-destructive"
+                >
+                  {error}
+                </motion.p>
+              )}
+              {isLoading ? (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="p-2"
+                >
+                  <div className="flex items-center justify-center py-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
                     />
-                    {getFighterDisplayElement(fighter)}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </Command>
-        </div>
-      )}
+                  </div>
+                </motion.div>
+              ) : validFighters.length === 0 ? (
+                <CommandEmpty>No fighters found.</CommandEmpty>
+              ) : (
+                <CommandGroup>
+                  {validFighters.map((fighter, index) => (
+                    <motion.div
+                      key={`${fighter}-${index}`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                    >
+                      <CommandItem
+                        value={fighter}
+                        onSelect={handleFighterSelect}
+                        className="cursor-pointer transition-colors"
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4 transition-opacity",
+                            searchTerm === fighter ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {getFighterDisplayElement(fighter)}
+                      </CommandItem>
+                    </motion.div>
+                  ))}
+                </CommandGroup>
+              )}
+            </Command>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 } 
