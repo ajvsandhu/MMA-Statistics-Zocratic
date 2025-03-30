@@ -60,88 +60,81 @@ def load_model():
             return False
         
         logger.info(f"Loading model from {MODEL_PATH}")
+        
+        # Try loading with joblib first
         try:
-            # Try loading with joblib first
+            model_data = joblib.load(MODEL_PATH)
+            logger.info("Successfully loaded model data with joblib")
+        except Exception as joblib_e:
+            logger.debug(f"Joblib loading failed: {str(joblib_e)}")
+            # Try alternative loading method
             try:
-                model_data = joblib.load(MODEL_PATH)
-                logger.info("Successfully loaded model data")
-            except Exception as joblib_e:
-                logger.debug(f"Joblib loading failed: {str(joblib_e)}")
-                # Try alternative loading method
-                try:
-                    with open(MODEL_PATH, 'rb') as f:
-                        model_data = pickle.load(f)
-                    logger.info("Successfully loaded model data using pickle")
-                except Exception as pickle_e:
-                    logger.error(f"Failed to load model with both joblib and pickle: {str(pickle_e)}")
-                    return False
-                    
-            # Handle either package or direct model format
-            if isinstance(model_data, dict):
-                _model = model_data.get('model')
-                _scaler = model_data.get('scaler')
-                _features = model_data.get('feature_names')
-                logger.info("Loaded model package format")
-            else:
-                _model = model_data
-                logger.info("Loaded direct model format")
-            
-            # Load scaler if available and not already loaded
-            if _scaler is None and os.path.exists(SCALER_PATH):
-                try:
-                    _scaler = joblib.load(SCALER_PATH)
-                    logger.info("Loaded scaler")
-                except Exception as scaler_e:
-                    logger.debug(f"Joblib scaler loading failed: {str(scaler_e)}")
-                    # Try alternative loading method for scaler
-                    try:
-                        with open(SCALER_PATH, 'rb') as f:
-                            _scaler = pickle.load(f)
-                        logger.info("Successfully loaded scaler using pickle")
-                    except Exception as pickle_e:
-                        logger.error(f"Failed to load scaler with both joblib and pickle: {str(pickle_e)}")
-                        return False
-            
-            # Load features if available and not already loaded
-            if _features is None and os.path.exists(FEATURES_PATH):
-                try:
-                    _features = joblib.load(FEATURES_PATH)
-                    logger.info("Loaded feature names")
-                except Exception as feature_e:
-                    logger.debug(f"Joblib features loading failed: {str(feature_e)}")
-                    # Try alternative loading method for features
-                    try:
-                        with open(FEATURES_PATH, 'rb') as f:
-                            _features = pickle.load(f)
-                        logger.info("Successfully loaded features using pickle")
-                    except Exception as pickle_e:
-                        logger.error(f"Failed to load features with both joblib and pickle: {str(pickle_e)}")
-                        return False
-            
-            # Test if model is usable
-            if _model is not None:
-                try:
-                    # Try to make a small prediction to check compatibility
-                    dummy_data = np.array([[0.0] * len(_features)])
-                    test_data = _scaler.transform(dummy_data)
-                    _ = _model.predict_proba(test_data)
-                    logger.info("Model compatibility check passed")
-                    return True
-                except Exception as predict_e:
-                    logger.error(f"Model compatibility check failed: {str(predict_e)}")
-                    logger.error("This might be due to a scikit-learn version mismatch. Please ensure you're using scikit-learn 1.2.2")
-                    return False
-            else:
-                logger.error("Model is None after loading")
+                with open(MODEL_PATH, 'rb') as f:
+                    model_data = pickle.load(f)
+                logger.info("Successfully loaded model data using pickle")
+            except Exception as pickle_e:
+                logger.error(f"Failed to load model with both joblib and pickle: {str(pickle_e)}")
                 return False
-                
-        except Exception as e:
-            logger.error(f"Error loading model: {str(e)}")
-            logger.error(traceback.format_exc())
+        
+        # Handle either package or direct model format
+        if isinstance(model_data, dict):
+            _model = model_data.get('model')
+            _scaler = model_data.get('scaler')
+            _features = model_data.get('feature_names')
+            logger.info("Loaded model package format")
+        else:
+            _model = model_data
+            logger.info("Loaded direct model format")
+        
+        # Load scaler if available and not already loaded
+        if _scaler is None and os.path.exists(SCALER_PATH):
+            try:
+                _scaler = joblib.load(SCALER_PATH)
+                logger.info("Loaded scaler")
+            except Exception as scaler_e:
+                logger.debug(f"Joblib scaler loading failed: {str(scaler_e)}")
+                try:
+                    with open(SCALER_PATH, 'rb') as f:
+                        _scaler = pickle.load(f)
+                    logger.info("Successfully loaded scaler using pickle")
+                except Exception as pickle_e:
+                    logger.error(f"Failed to load scaler with both joblib and pickle: {str(pickle_e)}")
+                    return False
+        
+        # Load features if available and not already loaded
+        if _features is None and os.path.exists(FEATURES_PATH):
+            try:
+                _features = joblib.load(FEATURES_PATH)
+                logger.info("Loaded feature names")
+            except Exception as feature_e:
+                logger.debug(f"Joblib features loading failed: {str(feature_e)}")
+                try:
+                    with open(FEATURES_PATH, 'rb') as f:
+                        _features = pickle.load(f)
+                    logger.info("Successfully loaded features using pickle")
+                except Exception as pickle_e:
+                    logger.error(f"Failed to load features with both joblib and pickle: {str(pickle_e)}")
+                    return False
+        
+        # Test if model is usable
+        if _model is not None:
+            try:
+                # Try to make a small prediction to check compatibility
+                dummy_data = np.array([[0.0] * len(_features)])
+                test_data = _scaler.transform(dummy_data)
+                _ = _model.predict_proba(test_data)
+                logger.info("Model compatibility check passed")
+                return True
+            except Exception as predict_e:
+                logger.error(f"Model compatibility check failed: {str(predict_e)}")
+                logger.error(f"Current scikit-learn version: {sklearn.__version__}")
+                return False
+        else:
+            logger.error("Model is None after loading")
             return False
-    
+            
     except Exception as e:
-        logger.error(f"Unexpected error in load_model: {str(e)}")
+        logger.error(f"Error loading model: {str(e)}")
         logger.error(traceback.format_exc())
         return False
 
