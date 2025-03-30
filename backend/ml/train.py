@@ -174,12 +174,15 @@ def train_model():
         model_dir = os.path.join('backend', 'ml', 'models')
         os.makedirs(model_dir, exist_ok=True)
         
-        joblib.dump(model, os.path.join(model_dir, 'fight_predictor_model.joblib'))
-        joblib.dump(scaler, os.path.join(model_dir, 'scaler.joblib'))
+        # Create model package
+        model_package = {
+            'model': model,
+            'scaler': scaler,
+            'feature_names': sorted(fighter_features.keys())
+        }
         
-        # Save feature names
-        feature_names = sorted(fighter_features.keys())
-        joblib.dump(feature_names, os.path.join(model_dir, 'feature_names.joblib'))
+        # Save model package
+        joblib.dump(model_package, os.path.join(model_dir, 'fight_predictor_model.joblib'))
         
         # Save model info
         model_info = {
@@ -187,7 +190,7 @@ def train_model():
             'train_accuracy': train_accuracy,
             'test_accuracy': test_accuracy,
             'n_samples': len(X),
-            'n_features': len(feature_names)
+            'n_features': len(sorted(fighter_features.keys()))
         }
         joblib.dump(model_info, os.path.join(model_dir, 'model_info.joblib'))
         
