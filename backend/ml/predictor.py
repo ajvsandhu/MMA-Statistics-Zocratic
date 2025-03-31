@@ -154,24 +154,27 @@ class FighterPredictor:
             bool: True if everything loaded okay, False if something went wrong
         """
         try:
-            if not os.path.exists(MODEL_PATH):
-                self.logger.error(f"Model file not found at {MODEL_PATH}")
+            # Log the absolute path being used
+            abs_model_path = os.path.abspath(MODEL_PATH)
+            self.logger.info(f"Attempting to load model from: {abs_model_path}")
+            
+            if not os.path.exists(abs_model_path):
+                self.logger.error(f"Model file not found at {abs_model_path}")
+                # Log the current working directory and contents
+                cwd = os.getcwd()
+                self.logger.error(f"Current working directory: {cwd}")
+                if os.path.exists(os.path.dirname(abs_model_path)):
+                    self.logger.info(f"Contents of model directory: {os.listdir(os.path.dirname(abs_model_path))}")
                 return False
 
             # Load the model package
             try:
-                model_data = joblib.load(MODEL_PATH)
+                model_data = joblib.load(abs_model_path)
                 self.logger.info("Successfully loaded model file")
             except Exception as e:
                 self.logger.error(f"Failed to load model: {str(e)}")
-                # Try loading with pickle as fallback
-                try:
-                    with open(MODEL_PATH, 'rb') as f:
-                        model_data = pickle.load(f)
-                    self.logger.info("Successfully loaded model with pickle")
-                except Exception as e2:
-                    self.logger.error(f"Failed to load model with pickle: {str(e2)}")
-                    return False
+                self.logger.error(f"Full error: {traceback.format_exc()}")
+                return False
 
             # Extract model components
             if isinstance(model_data, dict):
@@ -186,7 +189,7 @@ class FighterPredictor:
 
             # Verify model is loaded
             if self.model is None:
-                self.logger.error("Failed to load model")
+                self.logger.error("Failed to load model - model object is None")
                 return False
 
             # Ensure model is properly initialized
@@ -199,7 +202,7 @@ class FighterPredictor:
 
         except Exception as e:
             self.logger.error(f"Error loading model: {str(e)}")
-            traceback.print_exc()  # Print full traceback for debugging
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
             return False
 
     def _save_model(self) -> bool:
