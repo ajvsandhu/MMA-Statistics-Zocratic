@@ -31,11 +31,11 @@ except ImportError as e:
     raise
 
 # Verify scikit-learn version
-if sklearn.__version__ != '1.6.1':
-    raise ImportError(f"This application requires scikit-learn version 1.6.1, but found version {sklearn.__version__}")
+if not sklearn.__version__.startswith('1.3.0'):
+    raise ImportError(f"This application requires scikit-learn version 1.3.0, but found version {sklearn.__version__}")
 
 # Verify numpy version
-if np.__version__ != '1.24.3':
+if not np.__version__.startswith('1.24.3'):
     raise ImportError(f"This application requires numpy version 1.24.3, but found version {np.__version__}")
 
 from backend.api.database import get_db_connection
