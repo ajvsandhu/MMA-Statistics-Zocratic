@@ -49,7 +49,8 @@ from backend.constants import (
     LOG_DATE_FORMAT,
     DB_PATH,
     IMPORTANT_FEATURES,
-    DEFAULT_CONFIDENCE
+    DEFAULT_CONFIDENCE,
+    DEFAULT_MODEL_FILE
 )
 
 logging.basicConfig(
@@ -158,13 +159,39 @@ class FighterPredictor:
             abs_model_path = os.path.abspath(MODEL_PATH)
             self.logger.info(f"Attempting to load model from: {abs_model_path}")
             
+            # Check if we're on Render
+            if os.getenv('RENDER'):
+                self.logger.info("Running on Render environment")
+                # Try both potential paths on Render
+                potential_paths = [
+                    abs_model_path,
+                    os.path.join('/opt/render/project/src/backend/ml/models', DEFAULT_MODEL_FILE),
+                    os.path.join('/opt/render/project/src/ml/models', DEFAULT_MODEL_FILE)
+                ]
+                
+                for path in potential_paths:
+                    self.logger.info(f"Trying path: {path}")
+                    if os.path.exists(path):
+                        abs_model_path = path
+                        self.logger.info(f"Found model at: {path}")
+                        break
+            
             if not os.path.exists(abs_model_path):
                 self.logger.error(f"Model file not found at {abs_model_path}")
                 # Log the current working directory and contents
                 cwd = os.getcwd()
                 self.logger.error(f"Current working directory: {cwd}")
-                if os.path.exists(os.path.dirname(abs_model_path)):
-                    self.logger.info(f"Contents of model directory: {os.listdir(os.path.dirname(abs_model_path))}")
+                model_dir = os.path.dirname(abs_model_path)
+                if os.path.exists(model_dir):
+                    self.logger.info(f"Contents of model directory: {os.listdir(model_dir)}")
+                else:
+                    self.logger.error(f"Model directory does not exist: {model_dir}")
+                    # Try to create the directory
+                    try:
+                        os.makedirs(model_dir, exist_ok=True)
+                        self.logger.info(f"Created model directory: {model_dir}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to create model directory: {str(e)}")
                 return False
 
             # Load the model package
