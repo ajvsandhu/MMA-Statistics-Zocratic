@@ -159,8 +159,19 @@ class FighterPredictor:
                 return False
 
             # Load the model package
-            model_data = joblib.load(MODEL_PATH)
-            self.logger.info("Successfully loaded model file")
+            try:
+                model_data = joblib.load(MODEL_PATH)
+                self.logger.info("Successfully loaded model file")
+            except Exception as e:
+                self.logger.error(f"Failed to load model: {str(e)}")
+                # Try loading with pickle as fallback
+                try:
+                    with open(MODEL_PATH, 'rb') as f:
+                        model_data = pickle.load(f)
+                    self.logger.info("Successfully loaded model with pickle")
+                except Exception as e2:
+                    self.logger.error(f"Failed to load model with pickle: {str(e2)}")
+                    return False
 
             # Extract model components
             if isinstance(model_data, dict):
@@ -170,7 +181,7 @@ class FighterPredictor:
                 self.model_info = model_data.get('metadata', self.model_info)
             else:
                 self.model = model_data
-                self.scaler = model_data  # The scaler is part of the model pipeline
+                self.scaler = StandardScaler()  # Create new scaler if not found
                 self.feature_names = IMPORTANT_FEATURES
 
             # Verify model is loaded
@@ -178,11 +189,17 @@ class FighterPredictor:
                 self.logger.error("Failed to load model")
                 return False
 
-            self.logger.info("Model loaded successfully")
-            return True
+            # Ensure model is properly initialized
+            if hasattr(self.model, 'predict_proba'):
+                self.logger.info("Model loaded successfully")
+                return True
+            else:
+                self.logger.error("Loaded model does not support probability predictions")
+                return False
 
         except Exception as e:
             self.logger.error(f"Error loading model: {str(e)}")
+            traceback.print_exc()  # Print full traceback for debugging
             return False
 
     def _save_model(self) -> bool:
