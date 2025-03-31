@@ -12,9 +12,18 @@ load_dotenv()
 
 # Base Directories
 BASE_DIR = Path(__file__).resolve().parent.parent  # Gets the backend directory parent
-DATA_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Handle Render's environment
+if os.getenv('RENDER'):
+    # On Render, the code is in /opt/render/project/src
+    DATA_DIR = Path('/opt/render/project/src')
+    MODELS_DIR = DATA_DIR / "ml" / "models"
+else:
+    # Local environment
+    DATA_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    MODELS_DIR = DATA_DIR / "backend" / "ml" / "models"
+
 CONFIG_DIR = DATA_DIR / "config"
-MODELS_DIR = Path(os.getenv('MODEL_DIR', DATA_DIR / "ml" / "models"))
 
 # Configuration Files
 CONFIG_PATH = CONFIG_DIR / "model_config.json"
