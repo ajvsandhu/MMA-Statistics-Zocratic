@@ -172,16 +172,38 @@ def predict_fight(fighter1_name, fighter2_name):
             logger.error("Could not extract features for one or both fighters")
             return None
         
-        # Create feature vector (difference between fighters)
+        # Always process features in a consistent order (lower ranked fighter vs higher ranked fighter)
+        # This ensures predictions are consistent regardless of input order
+        rank1 = int(fighter1_data.get('ranking', 99))
+        rank2 = int(fighter2_data.get('ranking', 99))
+        
+        if rank1 > rank2:
+            first_features = fighter1_features
+            second_features = fighter2_features
+            order_swapped = True
+        else:
+            first_features = fighter2_features
+            second_features = fighter1_features
+            order_swapped = False
+        
+        # Create feature vector (difference between fighters in consistent order)
         feature_vector = []
-        for key in sorted(fighter1_features.keys()):
-            feature_vector.append(fighter1_features[key] - fighter2_features[key])
+        for key in sorted(first_features.keys()):
+            feature_vector.append(first_features[key] - second_features[key])
         
         # Scale features
         feature_vector_scaled = scaler.transform([feature_vector])
         
         # Make prediction
-        probability = model.predict_proba(feature_vector_scaled)[0][1]
+        raw_probability = model.predict_proba(feature_vector_scaled)[0][1]
+        
+        # Adjust probability based on order
+        if order_swapped:
+            fighter1_prob = 1 - raw_probability
+            fighter2_prob = raw_probability
+        else:
+            fighter1_prob = raw_probability
+            fighter2_prob = 1 - raw_probability
         
         # Get fighter details
         fighter1_record = fighter1_data.get('Record', 'N/A')
@@ -194,13 +216,13 @@ def predict_fight(fighter1_name, fighter2_name):
                 'name': fighter1_name,
                 'record': fighter1_record,
                 'weight': fighter1_weight,
-                'probability': probability
+                'probability': fighter1_prob
             },
             'fighter2': {
                 'name': fighter2_name,
                 'record': fighter2_record,
                 'weight': fighter2_weight,
-                'probability': 1 - probability
+                'probability': fighter2_prob
             }
         }
         

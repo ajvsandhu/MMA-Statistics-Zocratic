@@ -891,20 +891,39 @@ class FighterPredictor:
                 'ranking'
             ]
             
-            # Create feature differences
+            # Always process features in a consistent order (lower ranked fighter vs higher ranked fighter)
+            # This ensures predictions are consistent regardless of input order
+            rank1 = int(fighter1_features.get('ranking', 99))
+            rank2 = int(fighter2_features.get('ranking', 99))
+            
+            if rank1 > rank2:
+                first_features = fighter1_features
+                second_features = fighter2_features
+                order_swapped = True
+            else:
+                first_features = fighter2_features
+                second_features = fighter1_features
+                order_swapped = False
+            
+            # Create feature differences in consistent order
             feature_differences = []
             for feature in expected_features:
-                diff = fighter1_features[feature] - fighter2_features[feature]
+                diff = first_features[feature] - second_features[feature]
                 feature_differences.append(diff)
             
             # Make prediction
             feature_differences = np.array(feature_differences).reshape(1, -1)
             prediction = self.model.predict_proba(feature_differences)[0]
             
-            # Determine winner and probabilities
-            fighter1_prob = prediction[0]
-            fighter2_prob = prediction[1]
+            # Adjust probabilities back to original fighter order if needed
+            if order_swapped:
+                fighter1_prob = prediction[1]
+                fighter2_prob = prediction[0]
+            else:
+                fighter1_prob = prediction[0]
+                fighter2_prob = prediction[1]
             
+            # Determine winner and probabilities
             winner = fighter1_name if fighter1_prob > fighter2_prob else fighter2_name
             loser = fighter2_name if winner == fighter1_name else fighter1_name
             winner_prob = max(fighter1_prob, fighter2_prob) * 100
