@@ -32,8 +32,8 @@ except ImportError as e:
     raise
 
 # Verify scikit-learn version
-if not sklearn.__version__.startswith('1.3.0'):
-    raise ImportError(f"This application requires scikit-learn version 1.3.0, but found version {sklearn.__version__}")
+if not sklearn.__version__.startswith('1.6.1'):
+    raise ImportError(f"This application requires scikit-learn version 1.6.1, but found version {sklearn.__version__}")
 
 # Verify numpy version
 if not np.__version__.startswith('1.24.3'):
