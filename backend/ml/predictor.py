@@ -22,6 +22,7 @@ from sklearn.calibration import CalibratedClassifierCV
 import random
 import joblib
 import traceback
+import sklearn
 
 from backend.api.database import get_db_connection
 from backend.ml.config import get_config
@@ -260,7 +261,6 @@ class FighterPredictor:
                 self.scaler = StandardScaler()
             
             # Create model package with all necessary components
-            # Use protocol=4 for better compatibility across Python versions
             model_package = {
                 'model': self.model,
                 'scaler': self.scaler,
@@ -269,13 +269,15 @@ class FighterPredictor:
                     'version': APP_VERSION,
                     'accuracy': self.model_info.get('accuracy', 0.0),
                     'last_trained': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'n_features': len(self.feature_names)
+                    'n_features': len(self.feature_names),
+                    'sklearn_version': sklearn.__version__  # Store scikit-learn version
                 }
             }
             
-            # Save using joblib with increased compatibility
-            joblib.dump(model_package, MODEL_PATH, protocol=4, compress=('zlib', 3))
-            self.logger.info(f"Model saved to {MODEL_PATH} with increased compatibility")
+            # Save using joblib with protocol=4 and no compression
+            # This provides better cross-version compatibility
+            joblib.dump(model_package, MODEL_PATH, protocol=4, compress=None)
+            self.logger.info(f"Model saved to {MODEL_PATH} with scikit-learn version {sklearn.__version__}")
             return True
             
         except Exception as e:
