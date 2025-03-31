@@ -14,15 +14,25 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple, Union
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.preprocessing import StandardScaler
-from sklearn.calibration import CalibratedClassifierCV
 import random
 import joblib
 import traceback
-import sklearn
+
+# Import scikit-learn after ensuring dependencies are available
+try:
+    import sklearn
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import accuracy_score, classification_report
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.calibration import CalibratedClassifierCV
+except ImportError as e:
+    logging.error(f"Failed to import scikit-learn: {str(e)}")
+    raise
+
+# Verify scikit-learn version
+if sklearn.__version__ != '1.6.1':
+    raise ImportError(f"This application requires scikit-learn version 1.6.1, but found version {sklearn.__version__}")
 
 from backend.api.database import get_db_connection
 from backend.ml.config import get_config
@@ -156,33 +166,35 @@ class FighterPredictor:
             bool: True if model was successfully loaded, False otherwise
         """
         try:
-            # Get absolute path of the model file
-            abs_model_path = os.path.abspath(MODEL_PATH)
-            self.logger.info(f"Attempting to load model from: {abs_model_path}")
+            # Get potential model paths
+            potential_paths = [
+                os.path.abspath(MODEL_PATH),
+                os.path.join(os.getcwd(), 'backend/ml/models/fight_predictor_model.joblib'),
+                "/opt/render/project/src/backend/ml/models/fight_predictor_model.joblib",
+                os.path.join(os.path.dirname(__file__), 'models/fight_predictor_model.joblib')
+            ]
             
-            # Check if we're on Render
-            if os.environ.get('RENDER'):
-                self.logger.info("Running on Render environment")
-                # Try multiple potential paths
-                potential_paths = [
-                    abs_model_path,
-                    "/opt/render/project/src/backend/ml/models/fight_predictor_model.joblib",
-                    "/opt/render/project/src/ml/models/fight_predictor_model.joblib"
-                ]
-                
-                for path in potential_paths:
+            # Log environment info
+            self.logger.info(f"Current working directory: {os.getcwd()}")
+            self.logger.info(f"Running on Render: {bool(os.environ.get('RENDER'))}")
+            self.logger.info(f"Available model paths: {potential_paths}")
+            
+            model_loaded = False
+            for path in potential_paths:
+                try:
                     if os.path.exists(path):
-                        self.logger.info(f"Found model at: {path}")
-                        abs_model_path = path
+                        self.logger.info(f"Attempting to load model from: {path}")
+                        model_data = joblib.load(path)
+                        model_loaded = True
                         break
+                except Exception as e:
+                    self.logger.warning(f"Failed to load model from {path}: {str(e)}")
+                    continue
             
-            # Load the model with scikit-learn version handling
-            import sklearn
-            self.logger.info(f"Using scikit-learn version: {sklearn.__version__}")
-            
-            # Load the model data
-            model_data = joblib.load(abs_model_path)
-            
+            if not model_loaded:
+                self.logger.error("Could not find model file in any potential locations")
+                return False
+                
             # Extract components with validation
             if isinstance(model_data, dict):
                 self.model = model_data.get('model')
