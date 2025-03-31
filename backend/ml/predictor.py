@@ -28,16 +28,18 @@ try:
     from sklearn.calibration import CalibratedClassifierCV
     from sklearn._loss import loss  # Explicitly import _loss
 except ImportError as e:
-    logging.error(f"Failed to import scikit-learn: {str(e)}")
+    logging.error(f"Failed to import dependencies: {str(e)}")
     raise
 
 # Verify scikit-learn version
 if not sklearn.__version__.startswith('1.6.1'):
     raise ImportError(f"This application requires scikit-learn version 1.6.1, but found version {sklearn.__version__}")
 
-# Verify numpy version
-if not np.__version__.startswith('1.24.3'):
-    raise ImportError(f"This application requires numpy version 1.24.3, but found version {np.__version__}")
+# Verify numpy version - allow newer versions since they maintain backward compatibility
+if np.__version__.startswith('2.'):
+    logging.warning(f"Using newer numpy version {np.__version__}, some features may behave differently")
+elif not np.__version__.startswith('1.24'):
+    raise ImportError(f"This application requires numpy version 1.24.x or 2.x, but found version {np.__version__}")
 
 from backend.api.database import get_db_connection
 from backend.ml.config import get_config
@@ -193,6 +195,8 @@ class FighterPredictor:
                         self.logger.info(f"Attempting to load model from: {path}")
                         # Set numpy random seed before loading
                         np.random.seed(42)
+                        # Import numpy._core explicitly before loading
+                        from numpy import _core
                         # Import _loss explicitly before loading
                         from sklearn._loss import loss
                         model_data = joblib.load(path)
