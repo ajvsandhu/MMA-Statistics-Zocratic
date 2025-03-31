@@ -26,7 +26,7 @@ from backend.constants import (
 )
 from backend.utils import sanitize_json
 from backend.api.database import get_db_connection, test_connection
-from backend.ml.model_loader import load_model, get_loaded_model
+from backend.ml.predictor import FighterPredictor
 from backend.api.routes import fighters, predictions
 
 # Configure logging
@@ -39,6 +39,9 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+# Global predictor instance
+predictor = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,19 +65,17 @@ async def lifespan(app: FastAPI):
 
 async def setup_dependencies():
     """Setup required dependencies like model and database"""
+    global predictor
     # Load model with multiple attempts
     model_loaded = False
     try:
         for attempt in range(3):  # Try up to 3 times
             logger.info(f"Loading model attempt {attempt+1}/3...")
-            if load_model():
-                model = get_loaded_model()
-                if model:
-                    logger.info("Model loaded successfully!")
-                    model_loaded = True
-                    break
-                else:
-                    logger.warning("Model loading returned True but no model was loaded. Retrying...")
+            predictor = FighterPredictor()
+            if predictor.model is not None:
+                logger.info("Model loaded successfully!")
+                model_loaded = True
+                break
             else:
                 logger.warning("Model loading failed. Retrying...")
         
@@ -136,7 +137,7 @@ def sanitize_value(value: Any) -> Union[str, int, float, bool, Dict, list, None]
     elif isinstance(value, dict):
         return {k: sanitize_value(v) for k, v in value.items()}
     elif isinstance(value, list):
-        return [sanitize_value(v) for v in v if v is not None]
+        return [sanitize_value(item) for item in value if item is not None]
     else:
         # Convert to string and handle special cases
         str_value = str(value).strip()
@@ -204,7 +205,7 @@ def read_root():
 def health_check():
     """Health check endpoint - returns status of model and database"""
     # Do basic checks
-    model = get_loaded_model()
+    model = predictor.model is not None
     db_connected = test_connection()
     
     response_data = {

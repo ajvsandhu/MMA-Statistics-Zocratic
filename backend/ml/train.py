@@ -224,6 +224,43 @@ def save_model_components(model, scaler, feature_names, train_accuracy, test_acc
     joblib.dump(model_package, os.path.join(model_dir, 'fight_predictor_model.joblib'))
     logger.info("Model training completed successfully!")
 
+def calculate_recent_win_streak(recent_fights):
+    """Calculate the number of consecutive wins in recent fights."""
+    streak = 0
+    for fight in recent_fights:
+        result = fight.get('result', '').upper()
+        if 'W' in result:
+            streak += 1
+        else:
+            break
+    return streak
+
+def calculate_recent_loss_streak(recent_fights):
+    """Calculate the number of consecutive losses in recent fights."""
+    streak = 0
+    for fight in recent_fights:
+        result = fight.get('result', '').upper()
+        if 'L' in result:
+            streak += 1
+        else:
+            break
+    return streak
+
+def calculate_finish_rate(recent_fights):
+    """Calculate the rate of fights ending in finishes (KO/TKO/SUB)."""
+    if not recent_fights:
+        return 0.0
+    finishes = sum(1 for fight in recent_fights if any(x in fight.get('method', '').upper() 
+                  for x in ['KO', 'TKO', 'SUBMISSION', 'SUB']))
+    return finishes / len(recent_fights) if recent_fights else 0.0
+
+def calculate_decision_rate(recent_fights):
+    """Calculate the rate of fights going to decision."""
+    if not recent_fights:
+        return 0.0
+    decisions = sum(1 for fight in recent_fights if 'DECISION' in fight.get('method', '').upper())
+    return decisions / len(recent_fights) if recent_fights else 0.0
+
 def extract_features(fighter_data):
     """Extract comprehensive features from fighter data."""
     try:
@@ -285,6 +322,14 @@ def extract_features(fighter_data):
                 features['weight'] = 0
         except:
             features['weight'] = 0
+            
+        # Extract ranking and convert to numeric value
+        ranking = fighter_data.get('ranking', '99')
+        try:
+            ranking = int(ranking)
+        except (ValueError, TypeError):
+            ranking = 99
+        features['ranking'] = ranking
         
         # Win rate calculation
         record = fighter_data.get('Record', '0-0-0')
@@ -292,8 +337,30 @@ def extract_features(fighter_data):
             wins, losses, draws = map(int, record.split('-'))
             total = wins + losses + draws
             features['win_rate'] = wins / total if total > 0 else 0
+            features['total_fights'] = total  # Add total fights count
         except:
             features['win_rate'] = 0
+            features['total_fights'] = 0
+            
+        # Calculate derived metrics
+        features['striking_differential'] = features['slpm'] - features['sapm']
+        features['takedown_differential'] = features['td_avg'] * features['td_acc'] - features['td_avg'] * (1 - features['td_def'])
+        features['combat_effectiveness'] = (features['slpm'] * features['str_acc']) + (features['td_avg'] * features['td_acc']) + features['sub_avg']
+        
+        # Stance encoding
+        stance = fighter_data.get('STANCE', 'Orthodox').lower()
+        stance_encoding = {'orthodox': 0, 'southpaw': 1, 'switch': 2}
+        features['stance_encoded'] = stance_encoding.get(stance, 0)
+        
+        # Recent performance metrics
+        recent_fights = fighter_data.get('recent_fights', [])
+        features['recent_win_streak'] = calculate_recent_win_streak(recent_fights)
+        features['recent_loss_streak'] = calculate_recent_loss_streak(recent_fights)
+        features['finish_rate'] = calculate_finish_rate(recent_fights)
+        features['decision_rate'] = calculate_decision_rate(recent_fights)
+        
+        # Experience factor - now using total_fights
+        features['experience_factor'] = features['total_fights'] * features['win_rate'] if features['total_fights'] > 0 else 0
         
         return features
         

@@ -150,22 +150,22 @@ async def predict_fight(fight_data: FighterInput):
                 "name": fighter1.get("fighter_name"),
                 "record": fighter1.get("Record"),
                 "image_url": fighter1.get("image_url"),
-                "probability": prediction.get("winner_probability" if prediction["winner"] == fighter1.get("fighter_name") else "loser_probability", 0.5),
-                "win_probability": f"{int(round(prediction.get('winner_probability' if prediction['winner'] == fighter1.get('fighter_name') else 'loser_probability', 0.5) * 100))}%"
+                "probability": prediction.get("fighter1_probability", 0.5),
+                "win_probability": f"{int(round(prediction.get('fighter1_probability', 0.5)))}%"
             },
             "fighter2": {
                 "name": fighter2.get("fighter_name"),
                 "record": fighter2.get("Record"),
                 "image_url": fighter2.get("image_url"),
-                "probability": prediction.get("winner_probability" if prediction["winner"] == fighter2.get("fighter_name") else "loser_probability", 0.5),
-                "win_probability": f"{int(round(prediction.get('winner_probability' if prediction['winner'] == fighter2.get('fighter_name') else 'loser_probability', 0.5) * 100))}%"
+                "probability": prediction.get("fighter2_probability", 0.5),
+                "win_probability": f"{int(round(prediction.get('fighter2_probability', 0.5)))}%"
             },
             "winner": prediction["winner"],
             "loser": prediction["loser"],
             "winner_probability": prediction["winner_probability"],
             "loser_probability": prediction["loser_probability"],
-            "prediction_confidence": prediction["prediction_confidence"],
-            "model_version": prediction.get("model_version", "1.0"),
+            "prediction_confidence": max(prediction["winner_probability"], prediction["loser_probability"]),
+            "model_version": "1.0",
             "status": "success"
         }
         

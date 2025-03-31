@@ -37,12 +37,6 @@ interface Prediction {
   loser_probability: number;
   prediction_confidence: number;
   model_version: string;
-  head_to_head: {
-    fighter1_wins?: number;
-    fighter2_wins?: number;
-    last_winner?: string;
-    last_method?: string;
-  };
   fighter1: {
     name: string;
     record: string;
@@ -194,18 +188,24 @@ export default function FightPredictionsPage() {
     const color1 = getComparisonColor(compareVal1, compareVal2);
     const color2 = getComparisonColor(compareVal2, compareVal1);
     
-    const displayValue1 = unit === '%' ? String(value1).replace('%', '') : String(value1);
-    const displayValue2 = unit === '%' ? String(value2).replace('%', '') : String(value2);
+    const formatValue = (value: string | number): string => {
+      if (unit === '%') {
+        // Ensure the percentage sign is always shown
+        const numValue = String(value).replace('%', '').trim();
+        return `${numValue}%`;
+      }
+      return String(value);
+    };
 
     return (
       <motion.div 
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-3 gap-2 py-1.5 items-center hover:bg-accent/5 rounded-lg transition-colors"
+        className="grid grid-cols-[1fr,auto,1fr] gap-2 py-1.5 items-center hover:bg-accent/5 rounded-lg transition-colors"
       >
-        <div className={`text-right font-medium ${color1}`}>{displayValue1}</div>
-        <div className="text-center text-sm text-muted-foreground font-medium px-2">{label}</div>
-        <div className={`text-left font-medium ${color2}`}>{displayValue2}</div>
+        <div className={`text-right font-medium ${color1}`}>{formatValue(value1)}</div>
+        <div className="text-center text-sm text-muted-foreground font-medium px-2 whitespace-nowrap min-w-[100px]">{label}</div>
+        <div className={`text-left font-medium ${color2}`}>{formatValue(value2)}</div>
       </motion.div>
     );
   };
@@ -227,10 +227,8 @@ export default function FightPredictionsPage() {
     try {
       const predictionEndpoint = ENDPOINTS.PREDICTION(cleanFighter1, cleanFighter2);
       const response = await fetch(predictionEndpoint.url, predictionEndpoint.options);
-
       const data = await response.json();
 
-      // Handle 503 Service Unavailable or other error responses
       if (!response.ok) {
         if (response.status === 503) {
           toast({
@@ -247,36 +245,35 @@ export default function FightPredictionsPage() {
         }
         return;
       }
-      
+
+      // Extract just the fighter name from the winner/loser data
+      const winnerName = typeof data.winner === 'object' ? data.winner.fighter_name : data.winner;
+      const loserName = typeof data.loser === 'object' ? data.loser.fighter_name : data.loser;
+
+      // Format the prediction data
       const validatedPrediction: Prediction = {
-        winner: data.winner || "Unknown",
-        loser: data.loser || "Unknown",
-        winner_probability: safeParseNumber(data.winner_probability, 0.5),
-        loser_probability: safeParseNumber(data.loser_probability, 0.5),
-        prediction_confidence: safeParseNumber(data.prediction_confidence, 0.5),
-        model_version: data.model_version || "1.0.0",
-        head_to_head: {
-          fighter1_wins: safeParseNumber(data.head_to_head?.fighter1_wins, 0),
-          fighter2_wins: safeParseNumber(data.head_to_head?.fighter2_wins, 0),
-          last_winner: data.head_to_head?.last_winner || "N/A",
-          last_method: data.head_to_head?.last_method || "N/A",
-        },
+        winner: winnerName,
+        loser: loserName,
+        winner_probability: data.winner_probability,
+        loser_probability: data.loser_probability,
+        prediction_confidence: data.prediction_confidence,
+        model_version: data.model_version,
         fighter1: {
-          name: cleanFighter1,
-          record: data.fighter1?.record || fighter1?.record || "0-0-0",
-          image_url: data.fighter1?.image_url || fighter1?.image_url || "",
-          probability: safeParseNumber(data.fighter1?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5),
-          win_probability: `${Math.round(safeParseNumber(data.fighter1?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5) * 100)}%`
+          name: data.fighter1.name,
+          record: data.fighter1.record,
+          image_url: data.fighter1.image_url,
+          probability: data.fighter1.probability,
+          win_probability: data.fighter1.win_probability
         },
         fighter2: {
-          name: cleanFighter2,
-          record: data.fighter2?.record || fighter2?.record || "0-0-0",
-          image_url: data.fighter2?.image_url || fighter2?.image_url || "",
-          probability: safeParseNumber(data.fighter2?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5),
-          win_probability: `${Math.round(safeParseNumber(data.fighter2?.name === data.winner ? data.winner_probability : data.loser_probability, 0.5) * 100)}%`
-        },
+          name: data.fighter2.name,
+          record: data.fighter2.record,
+          image_url: data.fighter2.image_url,
+          probability: data.fighter2.probability,
+          win_probability: data.fighter2.win_probability
+        }
       };
-      
+
       setPrediction(validatedPrediction);
       setShowPredictionModal(true);
     } catch (error) {
@@ -314,9 +311,11 @@ export default function FightPredictionsPage() {
     return String(name);
   };
 
-  const PredictionModal = () => (
-    <AnimatePresence mode="wait">
-      {showPredictionModal && prediction && (
+  const PredictionModal = () => {
+    if (!showPredictionModal || !prediction) return null;
+
+    return (
+      <AnimatePresence mode="wait">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -397,16 +396,16 @@ export default function FightPredictionsPage() {
                     }}
                     className="text-center space-y-2"
                   >
-                    <h4 className="text-xl font-bold">{safeDisplayName(prediction?.fighter1?.name)}</h4>
+                    <h4 className="text-xl font-bold">{prediction.fighter1.name}</h4>
                     <motion.div 
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-                      className={`text-lg font-medium ${safeDisplayName(prediction?.fighter1?.name) === safeDisplayName(prediction?.winner) ? 'text-green-500' : 'text-red-500'}`}
+                      className={`text-lg font-medium ${prediction.fighter1.name === prediction.winner ? 'text-green-500' : 'text-red-500'}`}
                     >
-                      {prediction?.fighter1?.win_probability || '0%'}
+                      {prediction.fighter1.win_probability}
                     </motion.div>
-                    <p className="text-sm text-muted-foreground">{prediction?.fighter1?.record}</p>
+                    <p className="text-sm text-muted-foreground">{prediction.fighter1.record}</p>
                   </motion.div>
 
                   <motion.div 
@@ -426,16 +425,16 @@ export default function FightPredictionsPage() {
                     }}
                     className="text-center space-y-2"
                   >
-                    <h4 className="text-xl font-bold">{safeDisplayName(prediction?.fighter2?.name)}</h4>
+                    <h4 className="text-xl font-bold">{prediction.fighter2.name}</h4>
                     <motion.div 
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-                      className={`text-lg font-medium ${safeDisplayName(prediction?.fighter2?.name) === safeDisplayName(prediction?.winner) ? 'text-green-500' : 'text-red-500'}`}
+                      className={`text-lg font-medium ${prediction.fighter2.name === prediction.winner ? 'text-green-500' : 'text-red-500'}`}
                     >
-                      {prediction?.fighter2?.win_probability || '0%'}
+                      {prediction.fighter2.win_probability}
                     </motion.div>
-                    <p className="text-sm text-muted-foreground">{prediction?.fighter2?.record}</p>
+                    <p className="text-sm text-muted-foreground">{prediction.fighter2.record}</p>
                   </motion.div>
                 </div>
 
@@ -464,7 +463,7 @@ export default function FightPredictionsPage() {
                       transition={{ duration: 0.5, type: "spring" }}
                       className="text-xl font-bold"
                     >
-                      {safeDisplayName(prediction?.winner)}
+                      {prediction.winner}
                     </motion.h4>
                     <p className="text-primary">Predicted Winner</p>
                   </div>
@@ -484,9 +483,9 @@ export default function FightPredictionsPage() {
             )}
           </motion.div>
         </motion.div>
-      )}
-    </AnimatePresence>
-  );
+      </AnimatePresence>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/80">
