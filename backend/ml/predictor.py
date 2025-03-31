@@ -17,6 +17,7 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 import random
 import joblib
 import traceback
+import sys
 
 # Import scikit-learn after ensuring dependencies are available
 try:
@@ -26,17 +27,40 @@ try:
     from sklearn.metrics import accuracy_score, classification_report
     from sklearn.preprocessing import StandardScaler
     from sklearn.calibration import CalibratedClassifierCV
+    from sklearn._loss import loss  # Explicitly import _loss
 except ImportError as e:
-    logging.error(f"Failed to import dependencies: {str(e)}")
+    logging.error(f"Failed to import scikit-learn: {str(e)}")
     raise
 
-# Verify scikit-learn version
-if not sklearn.__version__.startswith('1.6.1'):
-    raise ImportError(f"This application requires scikit-learn version 1.6.1, but found version {sklearn.__version__}")
+def check_compatibility():
+    """Check if the current environment is compatible with our model.
+    Only warns about major version incompatibilities that could affect the model."""
+    try:
+        # Get the model's metadata to check what version it was trained with
+        model_path = os.path.join(os.getcwd(), 'backend/ml/models/fight_predictor_model.joblib')
+        if os.path.exists(model_path):
+            model_data = joblib.load(model_path)
+            if isinstance(model_data, dict) and 'metadata' in model_data:
+                trained_sklearn_version = model_data['metadata'].get('sklearn_version', '')
+                current_sklearn_version = sklearn.__version__
+                
+                # Only warn if major versions don't match
+                if trained_sklearn_version.split('.')[0] != current_sklearn_version.split('.')[0]:
+                    logging.warning(f"Model was trained with scikit-learn {trained_sklearn_version}, "
+                                 f"but running with {current_sklearn_version}. This might affect predictions.")
+    except Exception as e:
+        logging.warning(f"Could not verify model compatibility: {str(e)}")
+        
+    # Log current versions for debugging
+    logging.info(f"Environment: Python {sys.version.split()[0]}")
+    logging.info(f"Libraries: numpy {np.__version__}, scikit-learn {sklearn.__version__}")
 
-# Verify numpy version - require numpy 1.24.3 for compatibility
-if not np.__version__.startswith('1.24.3'):
-    raise ImportError(f"This application requires numpy version 1.24.3, but found version {np.__version__}")
+# Run compatibility check
+check_compatibility()
+
+# Log versions for debugging
+logging.info(f"Using numpy version: {np.__version__}")
+logging.info(f"Using scikit-learn version: {sklearn.__version__}")
 
 from backend.api.database import get_db_connection
 from backend.ml.config import get_config
@@ -192,6 +216,8 @@ class FighterPredictor:
                         self.logger.info(f"Attempting to load model from: {path}")
                         # Set numpy random seed before loading
                         np.random.seed(42)
+                        # Import _loss explicitly before loading
+                        from sklearn._loss import loss
                         model_data = joblib.load(path)
                         model_loaded = True
                         break
