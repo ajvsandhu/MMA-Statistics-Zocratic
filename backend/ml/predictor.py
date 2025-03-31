@@ -150,89 +150,69 @@ class FighterPredictor:
 
     def _load_model(self) -> bool:
         """
-        Loads the trained model in a deployment-friendly way.
+        Load the trained model from disk.
         
         Returns:
-            bool: True if everything loaded okay, False if something went wrong
+            bool: True if model was successfully loaded, False otherwise
         """
         try:
-            # Log the absolute path being used
+            # Get absolute path of the model file
             abs_model_path = os.path.abspath(MODEL_PATH)
             self.logger.info(f"Attempting to load model from: {abs_model_path}")
             
             # Check if we're on Render
-            if os.getenv('RENDER'):
+            if os.environ.get('RENDER'):
                 self.logger.info("Running on Render environment")
-                # Try both potential paths on Render
+                # Try multiple potential paths
                 potential_paths = [
                     abs_model_path,
-                    '/opt/render/project/src/ml/models/fight_predictor_model.joblib',
-                    '/opt/render/project/src/backend/ml/models/fight_predictor_model.joblib'
+                    "/opt/render/project/src/backend/ml/models/fight_predictor_model.joblib",
+                    "/opt/render/project/src/ml/models/fight_predictor_model.joblib"
                 ]
                 
                 for path in potential_paths:
-                    self.logger.info(f"Trying path: {path}")
                     if os.path.exists(path):
-                        abs_model_path = path
                         self.logger.info(f"Found model at: {path}")
+                        abs_model_path = path
                         break
             
-            if not os.path.exists(abs_model_path):
-                self.logger.error(f"Model file not found at {abs_model_path}")
-                # Log the current working directory and contents
-                cwd = os.getcwd()
-                self.logger.error(f"Current working directory: {cwd}")
-                model_dir = os.path.dirname(abs_model_path)
-                if os.path.exists(model_dir):
-                    self.logger.info(f"Contents of model directory: {os.listdir(model_dir)}")
-                else:
-                    self.logger.error(f"Model directory does not exist: {model_dir}")
-                return False
-
-            # Load the model package with increased compatibility
-            try:
-                model_data = joblib.load(abs_model_path)
-                self.logger.info("Successfully loaded model file")
-            except Exception as e:
-                self.logger.error(f"Failed to load model: {str(e)}")
-                self.logger.error(f"Full error: {traceback.format_exc()}")
-                return False
-
-            # Extract model components with better error handling
+            # Load the model with scikit-learn version handling
+            import sklearn
+            self.logger.info(f"Using scikit-learn version: {sklearn.__version__}")
+            
+            # Load the model data
+            model_data = joblib.load(abs_model_path)
+            
+            # Extract components with validation
             if isinstance(model_data, dict):
-                try:
-                    self.model = model_data.get('model')
-                    self.scaler = model_data.get('scaler')
-                    self.feature_names = model_data.get('feature_names')
-                    
-                    # Handle both old and new metadata format
-                    metadata = model_data.get('metadata', model_data.get('model_info', {}))
-                    if metadata:
-                        self.model_info.update(metadata)
-                except Exception as e:
-                    self.logger.error(f"Error extracting model components: {str(e)}")
-                    return False
+                self.model = model_data.get('model')
+                self.scaler = model_data.get('scaler')
+                self.feature_names = model_data.get('feature_names', [])
+                self.model_info = model_data.get('metadata', {})
             else:
-                self.logger.warning("Model data not in expected format, using as direct model")
                 self.model = model_data
+                self.logger.warning("Model loaded without metadata, using defaults")
+            
+            # Validate model has required methods
+            if not hasattr(self.model, 'predict_proba'):
+                raise AttributeError("Model does not support probability predictions")
+            
+            # Initialize scaler if not present
+            if not self.scaler:
+                self.logger.warning("No scaler found, initializing default scaler")
                 self.scaler = StandardScaler()
-                self.feature_names = IMPORTANT_FEATURES
-
-            # Verify model is loaded and supports probability predictions
-            if self.model is None:
-                self.logger.error("Failed to load model - model object is None")
-                return False
-
-            if hasattr(self.model, 'predict_proba'):
-                self.logger.info("Model loaded successfully")
-                return True
-            else:
-                self.logger.error("Loaded model does not support probability predictions")
-                return False
-
+            
+            # Initialize feature names if not present
+            if not self.feature_names:
+                self.logger.warning("No feature names found, using defaults")
+                self.feature_names = [f"feature_{i}" for i in range(100)]
+            
+            self.logger.info("Model loaded successfully")
+            return True
+            
         except Exception as e:
-            self.logger.error(f"Error loading model: {str(e)}")
-            self.logger.error(f"Full traceback: {traceback.format_exc()}")
+            self.logger.error(f"Failed to load model: {str(e)}")
+            self.logger.error(f"Full error: {traceback.format_exc()}")
             return False
 
     def _save_model(self) -> bool:
