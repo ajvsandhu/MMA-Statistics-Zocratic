@@ -26,7 +26,6 @@ try:
     from sklearn.metrics import accuracy_score, classification_report
     from sklearn.preprocessing import StandardScaler
     from sklearn.calibration import CalibratedClassifierCV
-    from sklearn._loss import loss  # Explicitly import _loss
 except ImportError as e:
     logging.error(f"Failed to import dependencies: {str(e)}")
     raise
@@ -195,10 +194,6 @@ class FighterPredictor:
                         self.logger.info(f"Attempting to load model from: {path}")
                         # Set numpy random seed before loading
                         np.random.seed(42)
-                        # Import numpy._core explicitly before loading
-                        from numpy import _core
-                        # Import _loss explicitly before loading
-                        from sklearn._loss import loss
                         model_data = joblib.load(path)
                         model_loaded = True
                         break
