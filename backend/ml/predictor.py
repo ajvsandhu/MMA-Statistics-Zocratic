@@ -149,7 +149,7 @@ class FighterPredictor:
 
     def _load_model(self) -> bool:
         """
-        Loads up our trained model so it's ready to make predictions! 🎯
+        Loads the trained model in a deployment-friendly way.
         
         Returns:
             bool: True if everything loaded okay, False if something went wrong
@@ -165,8 +165,8 @@ class FighterPredictor:
                 # Try both potential paths on Render
                 potential_paths = [
                     abs_model_path,
-                    os.path.join('/opt/render/project/src/backend/ml/models', DEFAULT_MODEL_FILE),
-                    os.path.join('/opt/render/project/src/ml/models', DEFAULT_MODEL_FILE)
+                    '/opt/render/project/src/ml/models/fight_predictor_model.joblib',
+                    '/opt/render/project/src/backend/ml/models/fight_predictor_model.joblib'
                 ]
                 
                 for path in potential_paths:
@@ -186,15 +186,9 @@ class FighterPredictor:
                     self.logger.info(f"Contents of model directory: {os.listdir(model_dir)}")
                 else:
                     self.logger.error(f"Model directory does not exist: {model_dir}")
-                    # Try to create the directory
-                    try:
-                        os.makedirs(model_dir, exist_ok=True)
-                        self.logger.info(f"Created model directory: {model_dir}")
-                    except Exception as e:
-                        self.logger.error(f"Failed to create model directory: {str(e)}")
                 return False
 
-            # Load the model package
+            # Load the model package with increased compatibility
             try:
                 model_data = joblib.load(abs_model_path)
                 self.logger.info("Successfully loaded model file")
@@ -203,23 +197,31 @@ class FighterPredictor:
                 self.logger.error(f"Full error: {traceback.format_exc()}")
                 return False
 
-            # Extract model components
+            # Extract model components with better error handling
             if isinstance(model_data, dict):
-                self.model = model_data.get('model')
-                self.scaler = model_data.get('scaler')
-                self.feature_names = model_data.get('feature_names')
-                self.model_info = model_data.get('metadata', self.model_info)
+                try:
+                    self.model = model_data.get('model')
+                    self.scaler = model_data.get('scaler')
+                    self.feature_names = model_data.get('feature_names')
+                    
+                    # Handle both old and new metadata format
+                    metadata = model_data.get('metadata', model_data.get('model_info', {}))
+                    if metadata:
+                        self.model_info.update(metadata)
+                except Exception as e:
+                    self.logger.error(f"Error extracting model components: {str(e)}")
+                    return False
             else:
+                self.logger.warning("Model data not in expected format, using as direct model")
                 self.model = model_data
-                self.scaler = StandardScaler()  # Create new scaler if not found
+                self.scaler = StandardScaler()
                 self.feature_names = IMPORTANT_FEATURES
 
-            # Verify model is loaded
+            # Verify model is loaded and supports probability predictions
             if self.model is None:
                 self.logger.error("Failed to load model - model object is None")
                 return False
 
-            # Ensure model is properly initialized
             if hasattr(self.model, 'predict_proba'):
                 self.logger.info("Model loaded successfully")
                 return True
@@ -234,9 +236,7 @@ class FighterPredictor:
 
     def _save_model(self) -> bool:
         """
-        Save the trained model to disk.
-        
-        Saves the model, scaler, feature names, and model info to disk.
+        Save the trained model to disk in a deployment-friendly format.
         
         Returns:
             bool: True if model was successfully saved, False otherwise
@@ -252,7 +252,7 @@ class FighterPredictor:
             # Ensure we have valid feature names
             if not self.feature_names or len(self.feature_names) == 0:
                 self.logger.warning("No feature names available, creating dummy feature names")
-                self.feature_names = [f"feature_{i}" for i in range(100)]  # Create dummy feature names
+                self.feature_names = [f"feature_{i}" for i in range(100)]
                 
             # Ensure we have a valid scaler
             if not self.scaler:
@@ -260,22 +260,26 @@ class FighterPredictor:
                 self.scaler = StandardScaler()
             
             # Create model package with all necessary components
+            # Use protocol=4 for better compatibility across Python versions
             model_package = {
                 'model': self.model,
                 'scaler': self.scaler,
                 'feature_names': self.feature_names,
-                'model_info': self.model_info
+                'metadata': {
+                    'version': APP_VERSION,
+                    'accuracy': self.model_info.get('accuracy', 0.0),
+                    'last_trained': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'n_features': len(self.feature_names)
+                }
             }
             
-            # Save to disk using joblib for better compatibility
-            joblib.dump(model_package, MODEL_PATH)
-                
-            self.logger.info(f"Model saved to {MODEL_PATH}")
+            # Save using joblib with increased compatibility
+            joblib.dump(model_package, MODEL_PATH, protocol=4, compress=('zlib', 3))
+            self.logger.info(f"Model saved to {MODEL_PATH} with increased compatibility")
             return True
             
         except Exception as e:
             self.logger.error(f"Error saving model: {str(e)}")
-            import traceback
             self.logger.error(traceback.format_exc())
             return False
     
