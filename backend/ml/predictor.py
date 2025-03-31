@@ -34,9 +34,9 @@ except ImportError as e:
 if not sklearn.__version__.startswith('1.6.1'):
     raise ImportError(f"This application requires scikit-learn version 1.6.1, but found version {sklearn.__version__}")
 
-# Verify numpy version - allow numpy 2.2.3 since that's what works locally
-if not np.__version__.startswith('2.2.3'):
-    raise ImportError(f"This application requires numpy version 2.2.3, but found version {np.__version__}")
+# Verify numpy version - require numpy 1.24.3 for compatibility
+if not np.__version__.startswith('1.24.3'):
+    raise ImportError(f"This application requires numpy version 1.24.3, but found version {np.__version__}")
 
 from backend.api.database import get_db_connection
 from backend.ml.config import get_config
