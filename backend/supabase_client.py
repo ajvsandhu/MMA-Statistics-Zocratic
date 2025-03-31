@@ -131,6 +131,7 @@ class TableQuery:
         self.order_nulls_last = False
         self.limit_val = None
         self.count_param = None
+        self.update_data = None
         
     def select(self, query="*", count=None):
         self.select_query = query
@@ -186,9 +187,28 @@ class TableQuery:
     def execute(self):
         try:
             url = self._build_url()
-            response = requests.get(url, headers=self.client.headers)
-            response.raise_for_status()
-            data = response.json()
+            
+            # Handle different types of requests based on the operation
+            if self.update_data is not None:
+                # This is an update operation
+                response = requests.patch(
+                    url,
+                    headers=self.client.headers,
+                    json=self.update_data
+                )
+                response.raise_for_status()
+                
+                # For update operations, return empty data if response is empty
+                try:
+                    data = response.json()
+                except json.JSONDecodeError:
+                    # If response is empty (204 No Content), return empty list
+                    data = []
+            else:
+                # This is a select operation
+                response = requests.get(url, headers=self.client.headers)
+                response.raise_for_status()
+                data = response.json()
             
             # Handle count parsing safely
             try:
@@ -220,21 +240,8 @@ class TableQuery:
             return QueryResponse([], 0)
             
     def update(self, data):
-        try:
-            url = self.url
-            if self.filter_conditions:
-                url += "?" + "&".join(self.filter_conditions)
-                
-            response = requests.patch(
-                url,
-                headers=self.client.headers,
-                json=data
-            )
-            response.raise_for_status()
-            return QueryResponse(response.json(), len(response.json()))
-        except Exception as e:
-            logger.error(f"Error updating data: {e}")
-            return QueryResponse([], 0)
+        self.update_data = data
+        return self
             
     def upsert(self, data, on_conflict=None):
         try:
