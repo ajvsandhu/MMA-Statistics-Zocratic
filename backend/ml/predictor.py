@@ -34,6 +34,10 @@ except ImportError as e:
 if sklearn.__version__ != '1.6.1':
     raise ImportError(f"This application requires scikit-learn version 1.6.1, but found version {sklearn.__version__}")
 
+# Verify numpy version
+if np.__version__ != '1.24.3':
+    raise ImportError(f"This application requires numpy version 1.24.3, but found version {np.__version__}")
+
 from backend.api.database import get_db_connection
 from backend.ml.config import get_config
 from backend.ml.feature_engineering import (
@@ -178,12 +182,16 @@ class FighterPredictor:
             self.logger.info(f"Current working directory: {os.getcwd()}")
             self.logger.info(f"Running on Render: {bool(os.environ.get('RENDER'))}")
             self.logger.info(f"Available model paths: {potential_paths}")
+            self.logger.info(f"Using numpy version: {np.__version__}")
+            self.logger.info(f"Using scikit-learn version: {sklearn.__version__}")
             
             model_loaded = False
             for path in potential_paths:
                 try:
                     if os.path.exists(path):
                         self.logger.info(f"Attempting to load model from: {path}")
+                        # Set numpy random seed before loading
+                        np.random.seed(42)
                         model_data = joblib.load(path)
                         model_loaded = True
                         break
