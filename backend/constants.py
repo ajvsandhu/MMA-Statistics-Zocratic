@@ -14,7 +14,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent  # Gets the backend directory parent
 DATA_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG_DIR = DATA_DIR / "config"
-MODELS_DIR = Path(os.getenv('MODEL_DIR', DATA_DIR / "models"))
+MODELS_DIR = Path(os.getenv('MODEL_DIR', DATA_DIR / "ml" / "models"))
 
 # Configuration Files
 CONFIG_PATH = CONFIG_DIR / "model_config.json"
@@ -56,11 +56,11 @@ CACHE_TIMEOUT = int(os.getenv('CACHE_TIMEOUT', 3600))
 RANKINGS_CACHE_TIMEOUT = int(os.getenv('RANKINGS_CACHE_TIMEOUT', 86400))
 
 # Model Configuration
-MODEL_DIR = os.path.join("backend", "ml", "models")
+MODEL_DIR = str(MODELS_DIR)  # Use the absolute path from MODELS_DIR
 DEFAULT_MODEL_FILE = "fight_predictor_model.joblib"
-MODEL_PATH = os.path.join(MODEL_DIR, DEFAULT_MODEL_FILE)
-SCALER_PATH = os.path.join(MODEL_DIR, "scaler.joblib")
-FEATURES_PATH = os.path.join(MODEL_DIR, "feature_names.joblib")
+MODEL_PATH = str(MODELS_DIR / DEFAULT_MODEL_FILE)
+SCALER_PATH = str(MODELS_DIR / "scaler.joblib")
+FEATURES_PATH = str(MODELS_DIR / "feature_names.joblib")
 FEATURE_NAMES_PATH = FEATURES_PATH
 MODEL_INFO_FILENAME = "model_info.json"
 MODEL_INFO_PATH = MODELS_DIR / MODEL_INFO_FILENAME
