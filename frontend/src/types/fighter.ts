@@ -85,5 +85,5 @@ export interface FighterPredictionData {
   record: string;
   image_url: string;
   probability: number;
-  win_probability: string;
+  win_probability?: string;
 } 
