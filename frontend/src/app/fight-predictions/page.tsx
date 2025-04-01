@@ -246,31 +246,36 @@ export default function FightPredictionsPage() {
         return;
       }
 
-      // Extract just the fighter name from the winner/loser data
-      const winnerName = typeof data.winner === 'object' ? data.winner.fighter_name : data.winner;
-      const loserName = typeof data.loser === 'object' ? data.loser.fighter_name : data.loser;
+      // Ensure probabilities are numbers and properly formatted
+      const fighter1Prob = Number(data.fighter1?.probability || 0);
+      const fighter2Prob = Number(data.fighter2?.probability || 0);
+      
+      // Normalize probabilities to ensure they sum to 100
+      const totalProb = fighter1Prob + fighter2Prob;
+      const normalizedFighter1Prob = totalProb > 0 ? Math.round((fighter1Prob / totalProb) * 100) : 50;
+      const normalizedFighter2Prob = totalProb > 0 ? Math.round((fighter2Prob / totalProb) * 100) : 50;
 
       // Format the prediction data
       const validatedPrediction: Prediction = {
-        winner: winnerName,
-        loser: loserName,
-        winner_probability: data.winner_probability,
-        loser_probability: data.loser_probability,
-        prediction_confidence: data.prediction_confidence,
-        model_version: data.model_version,
+        winner: data.winner?.name || data.winner,
+        loser: data.loser?.name || data.loser,
+        winner_probability: Math.max(normalizedFighter1Prob, normalizedFighter2Prob),
+        loser_probability: Math.min(normalizedFighter1Prob, normalizedFighter2Prob),
+        prediction_confidence: data.prediction_confidence || Math.max(normalizedFighter1Prob, normalizedFighter2Prob),
+        model_version: data.model_version || '1.0',
         fighter1: {
-          name: data.fighter1.name,
-          record: data.fighter1.record,
-          image_url: data.fighter1.image_url,
-          probability: data.fighter1.probability,
-          win_probability: data.fighter1.win_probability
+          name: data.fighter1?.name || cleanFighter1,
+          record: data.fighter1?.record || '',
+          image_url: data.fighter1?.image_url || '',
+          probability: normalizedFighter1Prob,
+          win_probability: `${normalizedFighter1Prob}%`
         },
         fighter2: {
-          name: data.fighter2.name,
-          record: data.fighter2.record,
-          image_url: data.fighter2.image_url,
-          probability: data.fighter2.probability,
-          win_probability: data.fighter2.win_probability
+          name: data.fighter2?.name || cleanFighter2,
+          record: data.fighter2?.record || '',
+          image_url: data.fighter2?.image_url || '',
+          probability: normalizedFighter2Prob,
+          win_probability: `${normalizedFighter2Prob}%`
         }
       };
 
@@ -349,14 +354,14 @@ export default function FightPredictionsPage() {
               <X className="w-5 h-5" />
             </motion.button>
             
-            <motion.h3 
+            <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-2xl font-bold mb-8 text-center bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70"
             >
               Fight Prediction
-            </motion.h3>
+            </motion.div>
 
             {isPredicting ? (
               <div className="flex items-center justify-center py-16">
@@ -401,9 +406,9 @@ export default function FightPredictionsPage() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-                      className={`text-lg font-medium ${prediction.fighter1.name === prediction.winner ? 'text-green-500' : 'text-red-500'}`}
+                      className={`text-2xl font-bold ${Number(prediction.fighter1.probability) > Number(prediction.fighter2.probability) ? 'text-green-500' : 'text-red-500'}`}
                     >
-                      {prediction.fighter1.win_probability}
+                      {prediction.fighter1.probability}%
                     </motion.div>
                     <p className="text-sm text-muted-foreground">{prediction.fighter1.record}</p>
                   </motion.div>
@@ -430,21 +435,21 @@ export default function FightPredictionsPage() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-                      className={`text-lg font-medium ${prediction.fighter2.name === prediction.winner ? 'text-green-500' : 'text-red-500'}`}
+                      className={`text-2xl font-bold ${Number(prediction.fighter2.probability) > Number(prediction.fighter1.probability) ? 'text-green-500' : 'text-red-500'}`}
                     >
-                      {prediction.fighter2.win_probability}
+                      {prediction.fighter2.probability}%
                     </motion.div>
                     <p className="text-sm text-muted-foreground">{prediction.fighter2.record}</p>
                   </motion.div>
                 </div>
 
                 {/* Winner Banner */}
-                <motion.div 
+                <motion.div
                   variants={{
                     hidden: { opacity: 0, y: 20 },
                     visible: { opacity: 1, y: 0 }
                   }}
-                  className="relative overflow-hidden"
+                  className="relative overflow-hidden bg-accent/10 rounded-lg"
                 >
                   <motion.div 
                     initial={{ x: "-100%" }}
@@ -456,16 +461,16 @@ export default function FightPredictionsPage() {
                     }}
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-accent/30 to-transparent"
                   />
-                  <div className="relative text-center py-4">
+                  <div className="relative text-center py-6">
                     <motion.h4 
                       initial={{ scale: 0.9 }}
                       animate={{ scale: 1 }}
                       transition={{ duration: 0.5, type: "spring" }}
-                      className="text-xl font-bold"
+                      className="text-2xl font-bold text-primary"
                     >
                       {prediction.winner}
                     </motion.h4>
-                    <p className="text-primary">Predicted Winner</p>
+                    <p className="text-sm text-muted-foreground mt-1">Predicted Winner</p>
                   </div>
                 </motion.div>
 

@@ -4,7 +4,7 @@ import logging
 import traceback
 import json
 from ...ml.predictor import FighterPredictor
-from ...ml.feature_engineering import extract_recent_fight_stats, check_head_to_head, find_common_opponents
+from ...ml.feature_engineering import extract_all_features
 from ..database import get_db_connection
 from ...constants import (
     LOG_LEVEL,
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=f"{API_V1_STR}/prediction", tags=["Predictions"])
 
 # Create predictor instance and ensure model is loaded
-predictor = FighterPredictor(train=False)  # Explicitly set train=False to only load the model
+predictor = FighterPredictor()
 if not predictor.model:
     logger.warning("Model not loaded, attempting to load...")
     try:
@@ -56,130 +56,129 @@ class ModelInfoResponse(BaseModel):
 
 @router.post("/predict")
 async def predict_fight(fight_data: FighterInput):
+    """
+    Predict the winner of a fight between two fighters.
+    """
     try:
         logger.info(f"Received prediction request for {fight_data.fighter1_name} vs {fight_data.fighter2_name}")
         
-        if not predictor.model:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "error": "Prediction service temporarily unavailable",
-                    "message": "The prediction service is currently unavailable. Basic fighter information is still accessible.",
-                    "status": "model_not_loaded",
-                    "fighter1": {
-                        "name": fight_data.fighter1_name,
-                        "status": "Model unavailable",
-                        "message": "Fighter data can still be viewed"
-                    },
-                    "fighter2": {
-                        "name": fight_data.fighter2_name,
-                        "status": "Model unavailable",
-                        "message": "Fighter data can still be viewed"
-                    }
+        # Validate fighter names
+        if not fight_data.fighter1_name or not fight_data.fighter2_name:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invalid input",
+                    "message": "Both fighter names are required",
+                    "status": "invalid_input"
                 }
             )
+        
+        # Check if model is loaded
+        if not predictor.model:
+            return {
+                "error": "Model not loaded",
+                "message": "The prediction model is not available",
+                "status": "model_not_loaded"
+            }
         
         # Get database connection
         db = get_db_connection()
         if not db:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=503,
-                content={
-                    "error": "Database connection error",
-                    "message": "Unable to connect to the database. Please try again later.",
+                detail={
+                    "error": "Database error",
+                    "message": "Could not connect to database",
                     "status": "database_error"
                 }
             )
         
-        # Get fighter data from database with case-insensitive search
+        # Get fighter data
         fighter1_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter1_name).execute()
         fighter2_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter2_name).execute()
         
         if not fighter1_data.data:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail={
                     "error": "Fighter not found",
                     "message": f"Could not find fighter: {fight_data.fighter1_name}",
                     "status": "fighter_not_found"
                 }
             )
+        
         if not fighter2_data.data:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail={
                     "error": "Fighter not found",
                     "message": f"Could not find fighter: {fight_data.fighter2_name}",
                     "status": "fighter_not_found"
                 }
             )
-            
-        fighter1 = fighter1_data.data[0]
-        fighter2 = fighter2_data.data[0]
         
-        # Log fighter data for debugging
-        logger.info(f"Fighter 1 data: {fighter1}")
-        logger.info(f"Fighter 2 data: {fighter2}")
+        # Get recent fights for both fighters
+        fighter1_fights = db.table("fighter_last_5_fights").select("*")\
+            .eq("fighter_name", fighter1_data.data[0]['fighter_name'])\
+            .order('fight_date', desc=True)\
+            .limit(5)\
+            .execute()
+            
+        fighter2_fights = db.table("fighter_last_5_fights").select("*")\
+            .eq("fighter_name", fighter2_data.data[0]['fighter_name'])\
+            .order('fight_date', desc=True)\
+            .limit(5)\
+            .execute()
+            
+        # Add recent fights to fighter data
+        fighter1_data.data[0]['recent_fights'] = fighter1_fights.data if fighter1_fights.data else []
+        fighter2_data.data[0]['recent_fights'] = fighter2_fights.data if fighter2_fights.data else []
         
         # Make prediction
-        prediction = predictor.predict_winner(fighter1, fighter2)
+        prediction = predictor.predict_winner(fighter1_data.data[0]['fighter_name'], fighter2_data.data[0]['fighter_name'])
         
-        if not prediction:
-            return JSONResponse(
+        if not prediction or "error" in prediction:
+            raise HTTPException(
                 status_code=500,
-                content={
+                detail={
                     "error": "Prediction failed",
-                    "message": "Failed to generate prediction. Please try again.",
+                    "message": prediction.get("error", "Unknown prediction error"),
                     "status": "prediction_error"
                 }
             )
-            
-        if 'error' in prediction:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error": "Prediction error",
-                    "message": prediction.get('error', 'Unknown prediction error'),
-                    "status": "prediction_error"
-                }
-            )
-            
-        # Format response using exact field names from your database
+        
+        # Format response
         response = {
             "fighter1": {
-                "name": fighter1.get("fighter_name"),
-                "record": fighter1.get("Record"),
-                "image_url": fighter1.get("image_url"),
-                "probability": prediction.get("fighter1_probability", 0.5),
-                "win_probability": f"{int(round(prediction.get('fighter1_probability', 0.5)))}%"
+                "name": fighter1_data.data[0]['fighter_name'],
+                "record": fighter1_data.data[0].get("Record", "0-0-0"),
+                "image_url": fighter1_data.data[0].get("image_url"),
+                "probability": prediction["fighter1_probability"]
             },
             "fighter2": {
-                "name": fighter2.get("fighter_name"),
-                "record": fighter2.get("Record"),
-                "image_url": fighter2.get("image_url"),
-                "probability": prediction.get("fighter2_probability", 0.5),
-                "win_probability": f"{int(round(prediction.get('fighter2_probability', 0.5)))}%"
+                "name": fighter2_data.data[0]['fighter_name'],
+                "record": fighter2_data.data[0].get("Record", "0-0-0"),
+                "image_url": fighter2_data.data[0].get("image_url"),
+                "probability": prediction["fighter2_probability"]
             },
-            "winner": prediction["winner"],
-            "loser": prediction["loser"],
-            "winner_probability": prediction["winner_probability"],
-            "loser_probability": prediction["loser_probability"],
-            "prediction_confidence": max(prediction["winner_probability"], prediction["loser_probability"]),
-            "model_version": "1.0",
+            "winner": {
+                "name": prediction["winner"],
+                "probability": prediction["winner_probability"]
+            },
             "status": "success"
         }
         
-        logger.info(f"Prediction made successfully: {response}")
-        return JSONResponse(content=response)
+        logger.info(f"Prediction successful: {response}")
+        return response
         
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"Error making prediction: {str(e)}")
+        logger.error(f"Error in prediction endpoint: {str(e)}")
         logger.error(traceback.format_exc())
-        return JSONResponse(
+        raise HTTPException(
             status_code=500,
-            content={
+            detail={
                 "error": "Internal server error",
                 "message": f"An unexpected error occurred: {str(e)}",
                 "status": "internal_error"

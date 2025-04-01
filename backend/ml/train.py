@@ -1,373 +1,190 @@
+"""
+Training script for MMA fight prediction model.
+Handles data collection, preprocessing, and model training.
+"""
+
 import os
 import logging
-import joblib
 import numpy as np
-import pandas as pd
-from datetime import datetime
+from typing import Tuple, List, Dict, Any
+import joblib
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report
-from backend.supabase_client import SupabaseClient
-from dotenv import load_dotenv
-from supabase import create_client, Client
-from typing import List, Dict, Tuple
 
-from backend.constants import MODEL_PATH, SCALER_PATH, FEATURES_PATH
-
-# Load environment variables
-load_dotenv()
-
-# Get Supabase credentials
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Supabase URL or Key not found in environment variables")
+from backend.api.database import get_db_connection
+from backend.ml.feature_engineering import extract_all_features, create_fight_vector
 
 # Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def train_model():
-    """
-    Train the fight prediction model using historical fight data.
-    This model uses a comprehensive set of fighter statistics to predict fight outcomes.
-    Features include:
-    - Striking metrics (SLpM, SApM, accuracy, defense)
-    - Grappling metrics (takedowns, submissions)
-    - Physical attributes (height, reach, weight)
-    - Historical performance (win rate, recent results)
-    """
-    logger.info("Starting model training process...")
-    
+def get_training_data() -> Tuple[np.ndarray, np.ndarray]:
+    """Collect and preprocess training data from the database."""
     try:
-        # Initialize Supabase client
-        supabase: Client = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_KEY")
+        # Get database connection
+        supabase = get_db_connection()
+        if not supabase:
+            raise Exception("Could not connect to database")
+        
+        # Get all fighters
+        response = supabase.table('fighters').select('*').execute()
+        if not response.data:
+            raise Exception("No fighters found in database")
+        
+        fighters = {f['fighter_name']: f for f in response.data}
+        logger.info(f"Retrieved {len(fighters)} fighters")
+        
+        # Get all fights
+        response = supabase.table('fighter_last_5_fights').select('*').execute()
+        if not response.data:
+            raise Exception("No fights found in database")
+        
+        fights = response.data
+        logger.info(f"Retrieved {len(fights)} fights")
+        
+        # Process fights into training data
+        X = []
+        y = []
+        processed = 0
+        skipped = 0
+        
+        for fight in fights:
+            try:
+                # Get fighter data
+                fighter_name = fight.get('fighter_name')
+                opponent_name = fight.get('opponent')
+                result = fight.get('result', '').upper()
+                
+                if not all([fighter_name, opponent_name, result]):
+                    skipped += 1
+                    continue
+                
+                # Get fighter data
+                fighter = fighters.get(fighter_name)
+                opponent = fighters.get(opponent_name)
+                
+                if not fighter or not opponent:
+                    skipped += 1
+                    continue
+                
+                # Add recent fights
+                fighter['recent_fights'] = [f for f in fights if f['fighter_name'] == fighter_name]
+                opponent['recent_fights'] = [f for f in fights if f['fighter_name'] == opponent_name]
+                
+                # Extract features
+                fighter_features = extract_all_features(fighter)
+                opponent_features = extract_all_features(opponent)
+                
+                if not fighter_features or not opponent_features:
+                    skipped += 1
+                    continue
+                
+                # Create feature vector
+                feature_vector = create_fight_vector(fighter_features, opponent_features)
+                
+                if feature_vector.size == 0:
+                    skipped += 1
+                    continue
+                
+                # Create label (1 for win, 0 for loss)
+                if 'W' in result:
+                    label = 1
+                elif 'L' in result:
+                    label = 0
+                else:  # Skip draws and no contests
+                    skipped += 1
+                    continue
+                
+                X.append(feature_vector)
+                y.append(label)
+                processed += 1
+                
+            except Exception as e:
+                logger.error(f"Error processing fight: {str(e)}")
+                skipped += 1
+                continue
+        
+        logger.info(f"Processed {processed} fights, skipped {skipped} fights")
+        
+        if not X:
+            raise Exception("No valid training examples found")
+        
+        # Convert to numpy arrays
+        X = np.array(X)
+        y = np.array(y)
+        
+        return X, y
+        
+    except Exception as e:
+        logger.error(f"Error getting training data: {str(e)}")
+        raise
+
+def train_model(X: np.ndarray, y: np.ndarray) -> Dict[str, Any]:
+    """Train the fight prediction model."""
+    try:
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
         )
         
-        # Get all fighters and fights
-        fighters = get_all_fighters(supabase)
-        fights = get_all_fights(supabase)
+        # Scale features
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
         
-        # Process fights to create training data
-        X, y, feature_names = process_fights(fighters, fights)
+        # Create and train model
+        model = GradientBoostingClassifier(
+            n_estimators=100,
+            learning_rate=0.1,
+            max_depth=3,
+            subsample=0.8,
+            random_state=42
+        )
         
-        if len(X) < 50:
-            logger.error(f"Insufficient training data: only {len(X)} samples")
-            return
+        model.fit(X_train_scaled, y_train)
         
-        # Train and evaluate model
-        train_and_evaluate_model(X, y, feature_names)
+        # Evaluate model
+        y_pred = model.predict(X_test_scaled)
+        report = classification_report(y_test, y_pred)
+        logger.info(f"\nModel Performance:\n{report}")
         
-    except Exception as e:
-        logger.error(f"Error during model training: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-
-def get_all_fighters(supabase: Client) -> List[Dict]:
-    """Retrieve all fighters from the database."""
-    count_response = supabase.table("fighters").select("*", count="exact").execute()
-    total_fighters = count_response.count
-    logger.info(f"Total fighters in database: {total_fighters}")
-    
-    fighters = []
-    page_size = 1000
-    for offset in range(0, total_fighters, page_size):
-        response = supabase.table("fighters").select("*").range(offset, offset + page_size - 1).execute()
-        if response.data:
-            fighters.extend(response.data)
-            logger.info(f"Retrieved {len(fighters)}/{total_fighters} fighters")
-    
-    return fighters
-
-def get_all_fights(supabase: Client) -> List[Dict]:
-    """Retrieve all fights from the database."""
-    count_response = supabase.table("fighter_last_5_fights").select("*", count="exact").execute()
-    total_fights = count_response.count
-    logger.info(f"Total fights in database: {total_fights}")
-    
-    fights = []
-    page_size = 1000
-    for offset in range(0, total_fights, page_size):
-        response = supabase.table("fighter_last_5_fights").select("*").range(offset, offset + page_size - 1).execute()
-        if response.data:
-            fights.extend(response.data)
-            logger.info(f"Retrieved {len(fights)}/{total_fights} fights")
-    
-    return fights
-
-def process_fights(fighters: List[Dict], fights: List[Dict]) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-    """Process fights to create training data."""
-    X = []  # Features
-    y = []  # Labels (win/loss)
-    
-    processed_count = 0
-    skipped_count = 0
-    
-    # Create fighter lookup dictionary
-    fighter_dict = {f['fighter_name']: f for f in fighters}
-    
-    # Process each fight
-    for fight in fights:
-        try:
-            fighter_name = fight.get('fighter_name')
-            opponent = fight.get('opponent')
-            result = fight.get('result', '').upper()
-            
-            # Skip if missing essential data
-            if not all([fighter_name, opponent, result]):
-                skipped_count += 1
-                continue
-                
-            # Find fighter data
-            fighter_data = fighter_dict.get(fighter_name)
-            opponent_data = fighter_dict.get(opponent)
-            
-            if not fighter_data or not opponent_data:
-                skipped_count += 1
-                continue
-            
-            # Extract features
-            fighter_features = extract_features(fighter_data)
-            opponent_features = extract_features(opponent_data)
-            
-            if not fighter_features or not opponent_features:
-                skipped_count += 1
-                continue
-            
-            # Create feature vector (difference between fighters)
-            feature_vector = []
-            for key in sorted(fighter_features.keys()):
-                feature_vector.append(fighter_features[key] - opponent_features[key])
-            
-            # Create label (1 if fighter won, 0 if lost)
-            if 'W' not in result and 'L' not in result:  # Skip draws and no contests
-                skipped_count += 1
-                continue
-                
-            label = 1 if 'W' in result else 0
-            
-            X.append(feature_vector)
-            y.append(label)
-            processed_count += 1
-            
-        except Exception as e:
-            logger.error(f"Error processing fight: {str(e)}")
-            skipped_count += 1
-            continue
-    
-    logger.info(f"Processed {processed_count} fights, skipped {skipped_count} fights")
-    
-    return np.array(X), np.array(y), sorted(fighter_features.keys())
-
-def train_and_evaluate_model(X: np.ndarray, y: np.ndarray, feature_names: List[str]):
-    """Train and evaluate the model."""
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    # Scale features
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    
-    # Train model with optimized parameters
-    model = GradientBoostingClassifier(
-        n_estimators=200,  # Increased for better performance
-        learning_rate=0.05,  # Reduced for better generalization
-        max_depth=4,  # Increased for more complex patterns
-        min_samples_split=5,  # Added to prevent overfitting
-        min_samples_leaf=2,  # Added to prevent overfitting
-        random_state=42
-    )
-    
-    model.fit(X_train_scaled, y_train)
-    
-    # Evaluate model
-    train_accuracy = model.score(X_train_scaled, y_train)
-    test_accuracy = model.score(X_test_scaled, y_test)
-    
-    logger.info(f"Training accuracy: {train_accuracy:.3f}")
-    logger.info(f"Test accuracy: {test_accuracy:.3f}")
-    
-    # Generate classification report
-    y_pred = model.predict(X_test_scaled)
-    logger.info("\nClassification Report:")
-    logger.info(classification_report(y_test, y_pred))
-    
-    # Save model components
-    save_model_components(model, scaler, feature_names, train_accuracy, test_accuracy, len(X))
-
-def save_model_components(model, scaler, feature_names, train_accuracy, test_accuracy, n_samples):
-    """Save model components and metadata."""
-    model_dir = os.path.join('backend', 'ml', 'models')
-    os.makedirs(model_dir, exist_ok=True)
-    
-    # Create model package with metadata
-    model_package = {
-        'model': model,
-        'scaler': scaler,
-        'feature_names': feature_names,
-        'metadata': {
-            'training_date': datetime.now().isoformat(),
-            'train_accuracy': train_accuracy,
-            'test_accuracy': test_accuracy,
-            'n_samples': n_samples,
-            'n_features': len(feature_names),
-            'model_type': 'GradientBoostingClassifier',
-            'scikit_learn_version': '1.3.2'  # Explicitly specify version
+        # Save model
+        os.makedirs('backend/ml/models', exist_ok=True)
+        model_path = 'backend/ml/models/fight_predictor_model.joblib'
+        
+        model_package = {
+            'model': model,
+            'scaler': scaler
         }
-    }
-    
-    # Save model package
-    joblib.dump(model_package, os.path.join(model_dir, 'fight_predictor_model.joblib'))
-    logger.info("Model training completed successfully!")
-
-def calculate_recent_win_streak(recent_fights):
-    """Calculate the number of consecutive wins in recent fights."""
-    streak = 0
-    for fight in recent_fights:
-        result = fight.get('result', '').upper()
-        if 'W' in result:
-            streak += 1
-        else:
-            break
-    return streak
-
-def calculate_recent_loss_streak(recent_fights):
-    """Calculate the number of consecutive losses in recent fights."""
-    streak = 0
-    for fight in recent_fights:
-        result = fight.get('result', '').upper()
-        if 'L' in result:
-            streak += 1
-        else:
-            break
-    return streak
-
-def calculate_finish_rate(recent_fights):
-    """Calculate the rate of fights ending in finishes (KO/TKO/SUB)."""
-    if not recent_fights:
-        return 0.0
-    finishes = sum(1 for fight in recent_fights if any(x in fight.get('method', '').upper() 
-                  for x in ['KO', 'TKO', 'SUBMISSION', 'SUB']))
-    return finishes / len(recent_fights) if recent_fights else 0.0
-
-def calculate_decision_rate(recent_fights):
-    """Calculate the rate of fights going to decision."""
-    if not recent_fights:
-        return 0.0
-    decisions = sum(1 for fight in recent_fights if 'DECISION' in fight.get('method', '').upper())
-    return decisions / len(recent_fights) if recent_fights else 0.0
-
-def extract_features(fighter_data):
-    """Extract comprehensive features from fighter data."""
-    try:
-        features = {}
         
-        # Basic stats - handle N/A and percentage values
-        def safe_float(val, default=0.0):
-            try:
-                if isinstance(val, (int, float)):
-                    return float(val)
-                if not val or val == 'N/A':
-                    return default
-                # Handle percentage strings
-                if isinstance(val, str) and '%' in val:
-                    return float(val.strip('%')) / 100
-                return float(val)
-            except:
-                return default
+        joblib.dump(model_package, model_path)
+        logger.info(f"Model saved to {model_path}")
         
-        # Striking metrics
-        features['slpm'] = safe_float(fighter_data.get('SLpM'))
-        features['str_acc'] = safe_float(fighter_data.get('Str. Acc.'))
-        features['sapm'] = safe_float(fighter_data.get('SApM'))
-        features['str_def'] = safe_float(fighter_data.get('Str. Def'))
-        
-        # Grappling metrics
-        features['td_avg'] = safe_float(fighter_data.get('TD Avg.'))
-        features['td_acc'] = safe_float(fighter_data.get('TD Acc.'))
-        features['td_def'] = safe_float(fighter_data.get('TD Def.'))
-        features['sub_avg'] = safe_float(fighter_data.get('Sub. Avg.'))
-        
-        # Physical attributes
-        reach_str = fighter_data.get('Reach', 'N/A')
-        try:
-            features['reach'] = float(reach_str.strip('"').strip() or 0)
-        except:
-            features['reach'] = 0
-        
-        # Height conversion
-        height_str = fighter_data.get('Height', 'N/A')
-        try:
-            if height_str != 'N/A':
-                height_parts = height_str.replace("'", "").replace('"', "").split()
-                feet = int(height_parts[0]) if len(height_parts) > 0 else 0
-                inches = int(height_parts[1]) if len(height_parts) > 1 else 0
-                features['height'] = feet * 12 + inches
-            else:
-                features['height'] = 0
-        except:
-            features['height'] = 0
-        
-        # Weight class encoding
-        weight_str = fighter_data.get('Weight', 'N/A')
-        try:
-            if weight_str != 'N/A':
-                weight = float(weight_str.split()[0])
-                features['weight'] = weight
-            else:
-                features['weight'] = 0
-        except:
-            features['weight'] = 0
-            
-        # Extract ranking and convert to numeric value
-        ranking = fighter_data.get('ranking', '99')
-        try:
-            ranking = int(ranking)
-        except (ValueError, TypeError):
-            ranking = 99
-        features['ranking'] = ranking
-        
-        # Win rate calculation
-        record = fighter_data.get('Record', '0-0-0')
-        try:
-            wins, losses, draws = map(int, record.split('-'))
-            total = wins + losses + draws
-            features['win_rate'] = wins / total if total > 0 else 0
-            features['total_fights'] = total  # Add total fights count
-        except:
-            features['win_rate'] = 0
-            features['total_fights'] = 0
-            
-        # Calculate derived metrics
-        features['striking_differential'] = features['slpm'] - features['sapm']
-        features['takedown_differential'] = features['td_avg'] * features['td_acc'] - features['td_avg'] * (1 - features['td_def'])
-        features['combat_effectiveness'] = (features['slpm'] * features['str_acc']) + (features['td_avg'] * features['td_acc']) + features['sub_avg']
-        
-        # Stance encoding
-        stance = fighter_data.get('STANCE', 'Orthodox').lower()
-        stance_encoding = {'orthodox': 0, 'southpaw': 1, 'switch': 2}
-        features['stance_encoded'] = stance_encoding.get(stance, 0)
-        
-        # Recent performance metrics
-        recent_fights = fighter_data.get('recent_fights', [])
-        features['recent_win_streak'] = calculate_recent_win_streak(recent_fights)
-        features['recent_loss_streak'] = calculate_recent_loss_streak(recent_fights)
-        features['finish_rate'] = calculate_finish_rate(recent_fights)
-        features['decision_rate'] = calculate_decision_rate(recent_fights)
-        
-        # Experience factor - now using total_fights
-        features['experience_factor'] = features['total_fights'] * features['win_rate'] if features['total_fights'] > 0 else 0
-        
-        return features
+        return model_package
         
     except Exception as e:
-        logger.error(f"Error extracting features: {str(e)}")
-        return None
+        logger.error(f"Error training model: {str(e)}")
+        raise
+
+def main():
+    """Main training function."""
+    try:
+        logger.info("Starting model training")
+        
+        # Get training data
+        X, y = get_training_data()
+        logger.info(f"Training data shape: X={X.shape}, y={y.shape}")
+        
+        # Train model
+        train_model(X, y)
+        
+        logger.info("Training completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Training failed: {str(e)}")
+        raise
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    train_model() 
+    main() 
