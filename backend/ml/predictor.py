@@ -97,6 +97,20 @@ class FighterPredictor:
             if not fighter1_name or not fighter2_name:
                 return {"error": "Fighter names cannot be empty"}
             
+            # Check if it's the same fighter
+            if fighter1_name == fighter2_name:
+                return {
+                    "winner": fighter1_name,
+                    "loser": fighter2_name,
+                    "winner_probability": 50,
+                    "loser_probability": 50,
+                    "fighter1_name": fighter1_name,
+                    "fighter2_name": fighter2_name,
+                    "fighter1_probability": 50,
+                    "fighter2_probability": 50,
+                    "status": "success"
+                }
+            
             # Get fighter data
             fighter1_data = self._get_fighter_data(fighter1_name)
             fighter2_data = self._get_fighter_data(fighter2_name)
@@ -156,7 +170,8 @@ class FighterPredictor:
                 "fighter1_name": fighter1_name,
                 "fighter2_name": fighter2_name,
                 "fighter1_probability": fighter1_prob,
-                "fighter2_probability": fighter2_prob
+                "fighter2_probability": fighter2_prob,
+                "status": "success"
             }
             
         except Exception as e:

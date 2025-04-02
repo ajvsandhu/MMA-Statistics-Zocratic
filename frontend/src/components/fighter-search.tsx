@@ -160,33 +160,35 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
       <motion.div 
         initial={false}
         animate={{ scale: isLoading ? 0.99 : 1 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.15 }}
         className="relative"
+        style={{ willChange: 'transform' }}
       >
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
         <Input
           placeholder="Search fighters..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9 pr-4"
+          className="w-full pl-10 h-12 bg-background/60 border-0 ring-1 ring-white/10 focus:ring-primary/20 focus:bg-background/80 transition-all duration-300 rounded-lg placeholder:text-muted-foreground/50"
           onFocus={() => setShowSuggestions(true)}
         />
       </motion.div>
       <AnimatePresence mode="wait">
         {showSuggestions && (searchTerm.trim() || isLoading || error) && (
           <motion.div 
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute top-full w-full z-50 mt-1 rounded-md border bg-popover text-popover-foreground shadow-md overflow-hidden"
+            className="absolute top-[calc(100%+0.75rem)] w-full z-50 rounded-lg border bg-background/95 backdrop-blur-sm text-foreground shadow-lg overflow-hidden"
+            style={{ willChange: 'transform, opacity' }}
           >
-            <Command className="rounded-md" shouldFilter={false}>
+            <Command className="rounded-lg border-0" shouldFilter={false}>
               {error && (
                 <motion.p 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="p-2 text-sm text-destructive"
+                  className="p-4 text-sm text-destructive/90 text-center"
                 >
                   {error}
                 </motion.p>
@@ -195,39 +197,57 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="p-2"
+                  className="p-4"
                 >
-                  <div className="flex items-center justify-center py-2">
+                  <div className="flex items-center justify-center py-4">
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
+                      className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full"
                     />
                   </div>
                 </motion.div>
-              ) : validFighters.length === 0 ? (
-                <CommandEmpty>No fighters found.</CommandEmpty>
+              ) : !validFighters.length && searchTerm.trim() ? (
+                <CommandEmpty className="py-8 text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="text-muted-foreground/40 mb-2">
+                        <Search className="w-6 h-6" />
+                      </div>
+                    </motion.div>
+                    No fighters found
+                  </div>
+                </CommandEmpty>
               ) : (
-                <CommandGroup>
+                <CommandGroup className="py-2 px-1">
                   {validFighters.map((fighter, index) => (
                     <motion.div
                       key={`${fighter}-${index}`}
-                      initial={{ opacity: 0, x: -10 }}
+                      initial={{ opacity: 0, x: -5 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                      transition={{ duration: 0.15, delay: index * 0.03 }}
+                      style={{ willChange: 'transform, opacity' }}
                     >
                       <CommandItem
                         value={fighter}
                         onSelect={handleFighterSelect}
-                        className="cursor-pointer transition-colors"
+                        className="cursor-pointer transition-all duration-200 py-3 px-3 mx-1 my-0.5 rounded-md data-[selected=true]:bg-accent/50 hover:bg-accent/40 group"
                       >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4 transition-opacity",
-                            searchTerm === fighter ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {getFighterDisplayElement(fighter)}
+                        <div className="relative mr-3">
+                          <Check
+                            className={cn(
+                              "w-4 h-4 text-primary transition-all duration-300",
+                              searchTerm === fighter ? "opacity-100 scale-100" : "opacity-0 scale-90"
+                            )}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          {getFighterDisplayElement(fighter)}
+                        </div>
                       </CommandItem>
                     </motion.div>
                   ))}

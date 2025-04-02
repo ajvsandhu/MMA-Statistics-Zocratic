@@ -733,9 +733,10 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl overflow-x-hidden">
-      <div className="space-y-8 flex flex-col items-center">
-        {/* Fighter Header with staggered animations */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8 bg-accent/50 p-6 rounded-lg transition-all duration-500 hover:bg-accent/60 animate-in fade-in slide-in-from-top-4 duration-700">
+      <div className="space-y-8">
+        {/* Fighter Header */}
+        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8 bg-background/40 backdrop-blur-md p-8 rounded-lg ring-1 ring-white/10">
+          {/* Fighter Image */}
           <div className="relative aspect-square md:col-span-1">
             {!imageError ? (
               stats.tap_link ? (
@@ -743,7 +744,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
                   href={stats.tap_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block w-full h-full transform transition-all duration-500 hover:scale-105 hover:shadow-xl rounded-lg overflow-hidden"
+                  className="group block w-full h-full transform transition-all duration-300 hover:scale-[1.02] rounded-lg overflow-hidden ring-1 ring-white/10"
                 >
                   <img 
                     src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
@@ -751,54 +752,70 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
                     className="w-full h-full object-cover object-top transition-transform duration-500"
                     onError={() => setImageError(true)}
                   />
-                  <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
-                    <span className="text-white opacity-0 hover:opacity-100 transition-all duration-300 transform translate-y-2 hover:translate-y-0">View on Tapology</span>
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-x-0 bottom-0 p-4 text-center">
+                      <span className="text-sm font-medium text-white/90">View on Tapology</span>
+                    </div>
                   </div>
                 </a>
               ) : (
-                <div className="w-full h-full rounded-lg overflow-hidden transition-transform duration-300 hover:scale-102">
+                <div className="w-full h-full rounded-lg overflow-hidden ring-1 ring-white/10">
                   <img 
                     src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
                     alt={stats.name}
-                    className="w-full h-full object-cover object-top transition-transform duration-300"
+                    className="w-full h-full object-cover object-top"
                     onError={() => setImageError(true)}
                   />
                 </div>
               )
             ) : (
-              <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center transition-colors duration-300">
-                <span className="text-gray-500">No image available</span>
+              <div className="w-full h-full bg-background/40 rounded-lg flex items-center justify-center ring-1 ring-white/10">
+                <span className="text-muted-foreground">No image available</span>
               </div>
             )}
           </div>
-          <div className="md:col-span-2">
+
+          {/* Fighter Info */}
+          <div className="md:col-span-2 flex flex-col justify-between">
             <div className="space-y-4">
-              <div className="animate-in slide-in-from-right duration-700 delay-200">
-                <h2 className="text-4xl font-bold">{stats.name}</h2>
+              <div>
+                <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/80">
+                  {stats.name}
+                </h2>
                 {stats.nickname && (
-                  <p className="text-xl text-muted-foreground">"{stats.nickname}"</p>
+                  <p className="text-xl text-primary/90 mt-1">"{stats.nickname}"</p>
                 )}
-                <p className="text-2xl font-semibold mt-2">{stats.record}</p>
+                <div className="flex items-center gap-3 mt-3">
+                  <p className="text-2xl font-semibold">{stats.record}</p>
+                  {Number(stats.ranking) !== 99 && stats.ranking !== '99' && (
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary">
+                      Rank #{stats.ranking}
+                    </span>
+                  )}
+                </div>
                 {stats.weight_class && (
-                  <p className="text-lg text-muted-foreground">{stats.weight_class}</p>
+                  <p className="text-lg text-muted-foreground mt-1">{stats.weight_class}</p>
                 )}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 animate-in slide-in-from-bottom duration-700 delay-300">
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
-                  { label: 'Height', value: stats.height || 'N/A' },
-                  { label: 'Weight', value: stats.weight || 'N/A' },
-                  { label: 'Reach', value: stats.reach || 'N/A' },
-                  { label: 'Stance', value: stats.stance || 'N/A' },
-                  { label: 'DOB', value: stats.dob ? `${stats.dob} ${calculateAge(stats.dob) ? `(${calculateAge(stats.dob)} years)` : ''}` : 'N/A' },
-                  { label: 'Ranking', value: Number(stats.ranking) === 99 || stats.ranking === '99' ? 'Unranked' : `#${stats.ranking || 'N/A'}` },
-                ].map(({ label, value }, index) => (
+                  { label: 'Height', value: stats.height || 'N/A', icon: '📏' },
+                  { label: 'Weight', value: stats.weight || 'N/A', icon: '⚖️' },
+                  { label: 'Reach', value: stats.reach || 'N/A', icon: '🤜' },
+                  { label: 'Stance', value: stats.stance || 'N/A', icon: '🥋' },
+                  { label: 'Age', value: stats.dob ? calculateAge(stats.dob) : 'N/A', icon: '📅' },
+                  { label: 'Status', value: Number(stats.ranking) === 99 ? 'Unranked' : 'Ranked', icon: '📊' },
+                ].map(({ label, value, icon }) => (
                   <div 
-                    key={label} 
-                    className="bg-background/50 p-3 rounded-lg transition-all duration-300 hover:bg-background/70 hover:shadow-md"
-                    style={{ animationDelay: `${(index + 1) * 100}ms` }}
+                    key={label}
+                    className="bg-background/40 backdrop-blur-sm p-3 rounded-lg ring-1 ring-white/10 transition-colors duration-300 hover:bg-background/60"
                   >
-                    <p className="text-sm text-muted-foreground">{label}</p>
-                    <p className="font-medium">{value}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span role="img" aria-label={label}>{icon}</span>
+                      <p className="text-sm text-muted-foreground">{label}</p>
+                    </div>
+                    <p className="font-medium truncate">{value}</p>
                   </div>
                 ))}
               </div>
@@ -807,33 +824,33 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
         </div>
 
         {/* Stats and History Tabs */}
-        <div className="w-full animate-in fade-in duration-1000 delay-300">
+        <div className="animate-in fade-in duration-500">
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="stats">Detailed Stats</TabsTrigger>
               <TabsTrigger value="history">Fight History</TabsTrigger>
             </TabsList>
 
-            <div className="relative min-h-[500px] overflow-hidden">
+            <div className="relative min-h-[500px]">
               <TabsContent 
-                value="overview" 
-                className="animate-in fade-in scale-100 duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:scale-95 data-[state=inactive]:duration-300 absolute inset-0 data-[state=active]:relative"
+                value="overview"
+                className="space-y-8 [&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
               >
                 <OverviewView />
               </TabsContent>
 
               <TabsContent 
-                value="stats" 
-                className="animate-in fade-in scale-100 duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:scale-95 data-[state=inactive]:duration-300 absolute inset-0 data-[state=active]:relative"
+                value="stats"
+                className="space-y-8 [&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
               >
                 {/* Striking Stats */}
                 <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                  <Card>
-                    <CardHeader>
+                  <Card className="overflow-hidden">
+                    <CardHeader className="border-b border-border/5 bg-background/40 backdrop-blur-sm">
                       <CardTitle>Striking Statistics</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-6">
                       <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
                           <p className="text-sm text-muted-foreground">Strikes Landed per min</p>
@@ -942,11 +959,11 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
 
                 {/* Grappling Stats */}
                 <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                  <Card>
-                    <CardHeader>
+                  <Card className="overflow-hidden">
+                    <CardHeader className="border-b border-border/5 bg-background/40 backdrop-blur-sm">
                       <CardTitle>Grappling Statistics</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-6">
                       <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
                           <p className="text-sm text-muted-foreground">Takedowns per 15 min</p>
@@ -1055,8 +1072,8 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
               </TabsContent>
 
               <TabsContent 
-                value="history" 
-                className="animate-in fade-in scale-100 duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:scale-95 data-[state=inactive]:duration-300 absolute inset-0 data-[state=active]:relative"
+                value="history"
+                className="[&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
               >
                 <FightHistoryView />
               </TabsContent>

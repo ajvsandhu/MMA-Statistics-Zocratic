@@ -197,12 +197,22 @@ def create_fight_vector(fighter1_features: Dict[str, float], fighter2_features: 
     if not fighter1_features or not fighter2_features:
         return np.array([])
     
-    # Ensure both feature dictionaries have the same keys
-    all_keys = sorted(set(fighter1_features.keys()) & set(fighter2_features.keys()))
+    # Get all feature names
+    feature_names = sorted(set(fighter1_features.keys()) & set(fighter2_features.keys()))
+    
+    # Check if fighters are identical
+    identical = True
+    for key in feature_names:
+        if abs(fighter1_features.get(key, 0.0) - fighter2_features.get(key, 0.0)) > 1e-10:
+            identical = False
+            break
+    
+    if identical:
+        return np.zeros(len(feature_names))
     
     # Calculate differences for each feature
     feature_vector = []
-    for key in all_keys:
+    for key in feature_names:
         f1_val = fighter1_features.get(key, 0.0)
         f2_val = fighter2_features.get(key, 0.0)
         
@@ -216,7 +226,7 @@ def create_fight_vector(fighter1_features: Dict[str, float], fighter2_features: 
         elif key in ['height', 'reach', 'weight']:
             # Physical attributes: Relative difference
             avg = (f1_val + f2_val) / 2.0 if f2_val != 0 else f1_val
-            diff = (f1_val - f2_val) / (avg + 1e-6)
+            diff = (f1_val - f2_val) / (avg + 1e-6) if avg + 1e-6 != 0 else 0
         else:
             # Other numerical features: Direct difference
             diff = f1_val - f2_val

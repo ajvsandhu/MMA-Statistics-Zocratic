@@ -13,6 +13,25 @@ export const metadata: Metadata = {
   description: "UFC fighter statistics and predictions",
 };
 
+function Header() {
+  return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 border-b" />
+      </div>
+      <div className="container flex h-14 max-w-screen-2xl items-center relative">
+        <MainNav />
+        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+          <div className="w-full flex-1 md:w-auto md:flex-none" />
+          <div className="relative px-3">
+            <ThemeToggle />
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -28,15 +47,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <div className="min-h-screen bg-background text-foreground">
-            <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <div className="container flex h-14 max-w-screen-2xl items-center">
-                <MainNav />
-                <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-                  <div className="w-full flex-1 md:w-auto md:flex-none" />
-                  <ThemeToggle />
-                </div>
-              </div>
-            </header>
+            <Header />
             <main className="flex-1">
               {children}
             </main>
