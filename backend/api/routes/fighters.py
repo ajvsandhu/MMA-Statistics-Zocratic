@@ -13,98 +13,164 @@ from backend.constants import (
 )
 import traceback
 from backend.utils import sanitize_json, set_parent_key
+from thefuzz import fuzz, process
+from functools import lru_cache
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=API_V1_STR, tags=["Fighters"])
 
-@router.get("/fighters")
-def get_fighters(query: str = Query("", min_length=0)) -> Dict[str, List[str]]:
-    """Get all fighters or search for fighters by name."""
+# Cache for fighter data with 5-minute expiry
+CACHE_EXPIRY = 300  # 5 minutes
+_fighter_cache = {'data': None, 'timestamp': 0}
+
+def get_cached_fighters():
+    """Get fighters from cache or database with 5-minute expiry."""
+    current_time = time.time()
+    
+    # Return cached data if still valid
+    if _fighter_cache['data'] is not None and current_time - _fighter_cache['timestamp'] < CACHE_EXPIRY:
+        return _fighter_cache['data']
+    
+    # Fetch fresh data
     try:
         supabase = get_db_connection()
         if not supabase:
             logger.error("No database connection available")
-            raise HTTPException(status_code=500, detail="Database connection error")
-
-        fighters_list = []
-
-        try:
-            # Fetch fighters data from Supabase
-            if not query:
-                try:
-                    response = supabase.table('fighters')\
-                        .select('fighter_name,Record,ranking,id')\
-                        .order('ranking', desc=False, nulls_last=True)\
-                        .limit(MAX_SEARCH_RESULTS)\
-                        .execute()
-                except Exception:
-                    response = supabase.table('fighters')\
-                        .select('fighter_name,Record,ranking,id')\
-                        .order('ranking')\
-                        .limit(MAX_SEARCH_RESULTS)\
-                        .execute()
-            else:
-                response = supabase.table('fighters')\
-                    .select('fighter_name,Record,ranking,id')\
-                    .ilike('fighter_name', f'%{query}%')\
-                    .order('ranking')\
-                    .limit(MAX_SEARCH_RESULTS)\
-                    .execute()
+            return None
             
-            if not response or not hasattr(response, 'data') or not response.data:
-                logger.info(f"No fighters found for query: {query}")
-                return {"fighters": []}
-            
-            fighter_data = response.data
-            logger.info(f"Found {len(fighter_data)} fighters matching query: {query}")
-        except Exception as e:
-            logger.error(f"Error fetching fighters: {str(e)}")
+        response = supabase.table('fighters').select('fighter_name,Record,ranking,Weight').execute()
+        if response and hasattr(response, 'data'):
+            _fighter_cache['data'] = response.data
+            _fighter_cache['timestamp'] = current_time
+            return response.data
+    except Exception as e:
+        logger.error(f"Error fetching fighters: {str(e)}")
+        return None
+    
+    return None
+
+def format_ranking(rank_val: int) -> str:
+    """Format ranking value into display format."""
+    if rank_val == 1:
+        return "Champion"
+    elif 2 <= rank_val <= 16:
+        return f"#{rank_val - 1}"
+    return None  # Return None for unranked (99) or invalid rankings
+
+@router.get("/fighters")
+def get_fighters(
+    query: str = Query("", min_length=0),
+    weight_class: Optional[str] = None,
+    is_ranked: Optional[bool] = None,
+    min_score: int = Query(45, ge=0, le=100)
+) -> Dict[str, List[str]]:
+    """
+    Get all fighters or search for fighters by name with optional filters.
+    
+    Args:
+        query: Search query for fighter name
+        weight_class: Filter by weight class
+        is_ranked: Filter by ranking status (True for ranked, False for unranked)
+        min_score: Minimum fuzzy match score (0-100)
+    """
+    try:
+        # Get fighters from cache or database
+        fighter_data = get_cached_fighters()
+        if not fighter_data:
             return {"fighters": []}
         
-        if not query:
-            # Return all fighters with record and ranking info
-            for fighter in fighter_data:
-                fighter_name = fighter.get('fighter_name', '')
-                record = fighter.get('Record', DEFAULT_RECORD)
-                
-                if fighter_name:
-                    formatted_name = f"{fighter_name} ({record})"
-                    fighters_list.append(formatted_name)
-        else:
-            # Improved search logic
-            query_parts = query.lower().split()
-            
-            for fighter in fighter_data:
-                fighter_name = fighter.get('fighter_name', '')
-                record = fighter.get('Record', DEFAULT_RECORD)
-                
-                if not fighter_name:
-                    continue
-                    
-                name_parts = fighter_name.lower().split()
-                matches = False
-                
-                if query.lower() in fighter_name.lower():
-                    matches = True
-                else:
-                    for q_part in query_parts:
-                        for name_part in name_parts:
-                            if name_part.startswith(q_part):
-                                matches = True
-                                break
-                        if matches:
-                            break
-                            
-                if matches:
-                    formatted_name = f"{fighter_name} ({record})"
-                    fighters_list.append(formatted_name)
+        fighters_list = []
         
-        logger.info(f"Returning {len(fighters_list)} fighters")
-        return {"fighters": fighters_list[:MAX_SEARCH_RESULTS]}
+        # Pre-process query
+        query_lower = query.lower().strip() if query else ""
+
+        # Format and filter fighters
+        for fighter in fighter_data:
+            fighter_name = fighter.get('fighter_name', '')
+            record = fighter.get('Record', DEFAULT_RECORD)
+            weight_class_info = fighter.get('Weight', '')
+            ranking = fighter.get('ranking', '99')
+            
+            # Skip invalid entries
+            if not fighter_name:
+                continue
+
+            # Apply weight class filter
+            if weight_class and weight_class != weight_class_info:
+                continue
+
+            # Convert ranking to proper format
+            try:
+                rank_val = int(ranking) if ranking else 99
+                rank_display = format_ranking(rank_val)
+            except (ValueError, TypeError):
+                rank_val = 99
+                rank_display = None
+
+            # Apply ranking filter here, after we have the numerical rank value
+            if is_ranked is not None:
+                if is_ranked and rank_val > 16:  # Skip unranked fighters when ranked filter is on
+                    continue
+                elif not is_ranked and rank_val != 99:  # Skip ranked fighters when unranked filter is on
+                    continue
+                
+            formatted_name = f"{fighter_name} ({record})"
+            if weight_class_info:
+                formatted_name += f" - {weight_class_info}"
+            if rank_display:  # Only add ranking if it should be displayed
+                formatted_name += f" | {rank_display}"
+            
+            # If there's a search query, calculate fuzzy match score
+            if query_lower:
+                name_lower = fighter_name.lower()
+                
+                # Calculate fuzzy scores
+                ratio = fuzz.ratio(query_lower, name_lower)
+                partial_ratio = fuzz.partial_ratio(query_lower, name_lower)
+                token_sort_ratio = fuzz.token_sort_ratio(query_lower, name_lower)
+                token_set_ratio = fuzz.token_set_ratio(query_lower, name_lower)
+                
+                # Get best score from different matching methods
+                best_score = max(
+                    ratio,
+                    partial_ratio * 1.2,  # Give more weight to partial matches
+                    token_sort_ratio * 1.1,
+                    token_set_ratio * 1.1
+                )
+                
+                # Boost scores for exact matches and ranked fighters
+                if query_lower == name_lower:
+                    best_score += 15
+                elif name_lower.startswith(query_lower):
+                    best_score += 10
+                elif query_lower in name_lower:
+                    best_score += 5
+                
+                # Add to results if score is good enough
+                if best_score >= min_score:
+                    fighters_list.append((formatted_name, best_score, rank_val))
+            else:
+                fighters_list.append((formatted_name, 0, rank_val))
+        
+        # Sort and limit results
+        if query:
+            # Sort by score first, then by ranking
+            fighters_list.sort(key=lambda x: (-x[1], x[2]))
+        else:
+            # Sort by ranking only when no search query
+            fighters_list.sort(key=lambda x: x[2])
+            
+        # Take top 5 results
+        result = [fighter[0] for fighter in fighters_list[:5]]
+        
+        logger.info(f"Returning {len(result)} fighters")
+        return {"fighters": result}
+        
     except Exception as e:
-        logger.error(f"Unexpected error in get_fighters: {str(e)}")
+        logger.error(f"Error in get_fighters: {str(e)}")
         return {"fighters": []}
 
 @router.get("/fighter-stats/{fighter_name}")
@@ -469,4 +535,25 @@ def scrape_and_store_fighters(fighters: List[Dict]):
     except Exception as e:
         logger.error(f"Error in scrape_and_store_fighters: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+@router.get("/fighters-count")
+def get_fighters_count():
+    """Get total number of fighters in the database."""
+    try:
+        supabase = get_db_connection()
+        if not supabase:
+            logger.error("No database connection available")
+            raise HTTPException(status_code=500, detail="Database connection error")
+        
+        response = supabase.table('fighters').select('id', count='exact').execute()
+        
+        if not response or not hasattr(response, 'count'):
+            logger.warning("Could not get fighters count")
+            return {"count": 0}
+        
+        logger.info(f"Total fighters count: {response.count}")
+        return {"count": response.count}
+    except Exception as e:
+        logger.error(f"Error getting fighters count: {str(e)}")
+        return {"count": 0}
 
