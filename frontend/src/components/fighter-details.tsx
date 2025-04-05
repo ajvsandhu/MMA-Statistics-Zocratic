@@ -344,7 +344,7 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 p-4 md:p-8">
         {/* Fighter Image */}
-        <div className="relative w-full max-w-[240px] mx-auto md:max-w-none aspect-square md:col-span-1">
+        <div className="relative w-full max-w-[200px] sm:max-w-[240px] mx-auto md:max-w-none aspect-[3/4] sm:aspect-[4/5] md:col-span-1">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -362,7 +362,7 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
                   <img 
                     src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
                     alt={stats.name}
-                    className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                     onError={() => setImageError(true)}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -375,7 +375,7 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
                 <img 
                   src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
                   alt={stats.name}
-                  className="w-full h-full object-cover object-top"
+                  className="w-full h-full object-cover object-center"
                   onError={() => setImageError(true)}
                 />
               )

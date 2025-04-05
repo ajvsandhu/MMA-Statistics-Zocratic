@@ -111,13 +111,18 @@ export const formatFighterUrl = (name: string, record?: string): string => {
   const encodedName = encodeURIComponent(cleanName);
   
   if (record) {
-    // Clean the record by removing parentheses and extra spaces
+    // Clean the record and ensure it has the full format (W-L-D)
     const cleanRecord = record
       .replace(/[()]/g, '')  // Remove parentheses
-      .trim()                // Remove leading/trailing spaces
-      .replace(/\s+/g, '-')  // Replace spaces with hyphens
-      .toLowerCase();        // Convert to lowercase
-    return `${encodedName}-${cleanRecord}`;
+      .trim();               // Remove leading/trailing spaces
+    
+    // Split the record into wins, losses, draws
+    const [wins = '0', losses = '0', draws = '0'] = cleanRecord.split('-');
+    
+    // Combine with all three numbers
+    const fullRecord = `${wins}-${losses}-${draws}`;
+    
+    return `${encodedName}-${fullRecord}`;
   }
   
   return encodedName;

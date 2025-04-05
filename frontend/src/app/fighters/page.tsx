@@ -14,9 +14,9 @@ function FightersContent() {
 
   // Handle initial load and URL changes
   useEffect(() => {
-    const name = searchParams.get('name')
+    const name = searchParams.get('name') || searchParams.get('fighter')
     if (name) {
-      setSelectedFighter(name)
+      setSelectedFighter(decodeURIComponent(name))
     }
   }, [searchParams])
 
