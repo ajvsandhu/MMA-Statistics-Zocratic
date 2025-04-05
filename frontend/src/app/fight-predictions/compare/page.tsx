@@ -373,31 +373,31 @@ export default function ComparePage() {
 
   return (
     <div className="fixed inset-0 pt-[65px]">
-      <div className="h-[calc(100vh-65px)] px-4 sm:px-6 lg:px-8">
+      <div className="h-[calc(100vh-65px)] px-2 sm:px-4 lg:px-8 overflow-y-auto pb-safe">
         <motion.div 
-          className="h-full flex flex-col pt-8 sm:pt-16 max-w-[1400px] mx-auto"
+          className="h-full flex flex-col pt-4 sm:pt-8 max-w-[1400px] mx-auto"
           {...(isMobile ? fadeAnimation : animationVariants.page)}
         >
           {/* Header */}
-          <div className="flex items-center justify-between h-12">
-            <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center justify-between h-12 mb-4">
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 onClick={() => router.push('/fight-predictions')}
-                className="gap-1 sm:gap-2 px-2 sm:px-4"
+                className="gap-1 px-2"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Back</span>
+                <span className="sr-only sm:not-sr-only">Back</span>
               </Button>
-              <h2 className="text-xl sm:text-2xl font-bold">Fighter Comparison</h2>
+              <h2 className="text-lg sm:text-xl font-bold">Fighter Comparison</h2>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[400px,1fr,400px] gap-4 lg:gap-6 overflow-hidden">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[350px,1fr,350px] gap-4 lg:gap-6 overflow-visible">
             {/* Fighter 1 Column */}
             <div className="flex flex-col">
-              <h3 className="text-lg font-semibold mb-1">Fighter 1</h3>
+              <h3 className="text-base sm:text-lg font-semibold mb-1">Fighter 1</h3>
               <div className="relative z-30">
                 <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} />
               </div>
@@ -461,8 +461,8 @@ export default function ComparePage() {
                     animate={isMobile ? {} : { opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
                   >
-                    <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl max-w-[450px] mx-auto">
-                      <CardContent className="p-3 sm:p-4">
+                    <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl max-w-[400px] mx-auto">
+                      <CardContent className="p-3">
                         <div className="space-y-2">
                           {/* Physical Stats */}
                           <div>
@@ -578,7 +578,7 @@ export default function ComparePage() {
 
             {/* Fighter 2 Column */}
             <div className="flex flex-col">
-              <h3 className="text-lg font-semibold mb-1">Fighter 2</h3>
+              <h3 className="text-base sm:text-lg font-semibold mb-1">Fighter 2</h3>
               <div className="relative z-30">
                 <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} />
               </div>
@@ -610,11 +610,11 @@ export default function ComparePage() {
             onClick={() => setShowPredictionModal(false)}
           >
             <div 
-              className="relative w-full max-w-lg mx-4 rounded-lg border bg-card p-4 md:p-6 shadow-lg"
+              className="relative w-full max-w-lg mx-4 rounded-lg border bg-card p-4 shadow-lg"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-4 md:mb-6">
-                <h3 className="text-xl md:text-2xl font-bold">Fight Prediction</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Fight Prediction</h3>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -624,23 +624,23 @@ export default function ComparePage() {
                 </Button>
               </div>
 
-              <div className="space-y-4 md:space-y-6">
+              <div className="space-y-4">
                 {/* Winner Prediction */}
                 <div className="text-center space-y-2">
-                  <p className="text-sm md:text-base text-muted-foreground">Predicted Winner</p>
-                  <h4 className="text-2xl md:text-3xl font-bold text-primary">
+                  <p className="text-sm text-muted-foreground">Predicted Winner</p>
+                  <h4 className="text-2xl font-bold text-primary">
                     {prediction?.winner}
                   </h4>
-                  <p className="text-sm md:text-base text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Confidence: {prediction?.prediction_confidence}%
                   </p>
                 </div>
 
                 {/* Probability Bars */}
-                <div className="mt-2 md:mt-4 space-y-3 md:space-y-4">
+                <div className="mt-2 space-y-3">
                   <motion.div
                     {...(isMobile ? fadeAnimation : animationVariants.listItem)}
-                    className="space-y-1.5 md:space-y-2"
+                    className="space-y-1.5"
                   >
                     <div className="flex justify-between text-sm">
                       <span>{prediction?.fighter1.name}</span>
@@ -656,7 +656,7 @@ export default function ComparePage() {
 
                   <motion.div
                     {...(isMobile ? fadeAnimation : animationVariants.listItem)}
-                    className="space-y-1.5 md:space-y-2"
+                    className="space-y-1.5"
                   >
                     <div className="flex justify-between text-sm">
                       <span>{prediction?.fighter2.name}</span>
@@ -672,7 +672,7 @@ export default function ComparePage() {
                 </div>
 
                 {/* Model Info */}
-                <div className="text-xs md:text-sm text-center text-muted-foreground mt-2">
+                <div className="text-xs text-center text-muted-foreground mt-2">
                   Model Version: {prediction?.model_version}
                 </div>
               </div>
