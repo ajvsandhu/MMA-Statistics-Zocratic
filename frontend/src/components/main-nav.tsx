@@ -38,57 +38,43 @@ export function MainNav() {
   }
 
   return (
-    <nav className="flex items-center space-x-6">
-      <Link
-        href="/"
-        className="text-lg font-semibold hover:text-primary transition-colors"
-      >
+    <nav className={cn(
+      "fixed top-0 inset-x-0 z-50",
+      "bg-background/95 backdrop-blur-md border-b",
+      "px-4 h-[65px] flex items-center",
+      isMobile ? "justify-between" : "justify-start"
+    )}>
+      <Link href="/" className="font-bold text-lg mr-6">
         ZOCRATIC
       </Link>
-      <div className="relative">
-        <div className="flex items-center space-x-2">
-          {links.map((link) => {
-            const isActive = link.href === '/' 
-              ? pathname === '/'
-              : pathname.startsWith(link.href)
-            
-            return (
-              <motion.div
-                key={link.href}
-                {...(isMobile ? mobileNavAnimation : {
-                  initial: { opacity: 0, y: -10 },
-                  animate: { opacity: 1, y: 0 },
-                  transition: { duration: 0.3 }
-                })}
-              >
-                <Link
-                  href={link.href}
-                  className={cn(
-                    "px-4 py-2 rounded-full relative text-sm font-medium transition-colors",
-                    "hover:text-primary",
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  )}
-                >
-                  {link.label}
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeNav"
-                      className="absolute inset-0 rounded-full bg-muted"
-                      style={{
-                        zIndex: -1,
-                      }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 380,
-                        damping: 30,
-                      }}
-                    />
-                  )}
-                </Link>
-              </motion.div>
-            )
-          })}
-        </div>
+      <div className={cn(
+        "flex items-center gap-1",
+        isMobile ? "overflow-x-auto no-scrollbar" : "gap-2"
+      )}>
+        {links.map(({ href, label }) => {
+          const isActive = pathname === href
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "relative px-3 py-1.5 text-sm font-medium transition-colors",
+                "rounded-md hover:bg-accent/50",
+                isMobile ? "flex-shrink-0 text-xs px-2" : "",
+                isActive ? "text-foreground" : "text-muted-foreground"
+              )}
+            >
+              {label}
+              {isActive && (
+                <motion.div
+                  layoutId="nav-active"
+                  className="absolute inset-0 bg-accent/50 rounded-md -z-10"
+                  {...(isMobile ? mobileNavAnimation : {})}
+                />
+              )}
+            </Link>
+          )
+        })}
       </div>
     </nav>
   )
