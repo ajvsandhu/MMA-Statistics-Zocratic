@@ -111,9 +111,14 @@ class FighterPredictor:
                     "status": "success"
                 }
             
+            # Determine canonical order (alphabetical) to ensure consistent predictions
+            swapped = fighter1_name > fighter2_name
+            canonical_fighter1 = fighter2_name if swapped else fighter1_name
+            canonical_fighter2 = fighter1_name if swapped else fighter2_name
+            
             # Get fighter data
-            fighter1_data = self._get_fighter_data(fighter1_name)
-            fighter2_data = self._get_fighter_data(fighter2_name)
+            fighter1_data = self._get_fighter_data(canonical_fighter1)
+            fighter2_data = self._get_fighter_data(canonical_fighter2)
             
             if not fighter1_data or not fighter2_data:
                 return {"error": "Could not retrieve fighter data"}
@@ -139,9 +144,13 @@ class FighterPredictor:
             # Get prediction probabilities
             probabilities = self.model.predict_proba(feature_vector)[0]
             
-            # Convert to percentages
-            fighter1_prob = int(round(probabilities[1] * 100))
-            fighter2_prob = int(round(probabilities[0] * 100))
+            # Convert to percentages and handle the swap if needed
+            if swapped:
+                fighter1_prob = int(round(probabilities[0] * 100))
+                fighter2_prob = int(round(probabilities[1] * 100))
+            else:
+                fighter1_prob = int(round(probabilities[1] * 100))
+                fighter2_prob = int(round(probabilities[0] * 100))
             
             # Ensure percentages sum to 100
             if fighter1_prob + fighter2_prob != 100:

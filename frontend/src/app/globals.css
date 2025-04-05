@@ -4,97 +4,247 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --background: 240 10% 85%;
+    --foreground: 240 10% 3.9%;
+    --card: 240 10% 85%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 240 10% 85%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 224 100% 68%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4% 80%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4% 80%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4% 80%;
+    --accent-foreground: 240 5.9% 10%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 75%;
+    --input: 240 5.9% 75%;
+    --ring: 224 100% 68%;
     --radius: 0.5rem;
+
+    --nav-text: 240 10% 3.9%;
+    --nav-text-hover: 224 100% 68%;
+    --nav-bg-active: 240 5% 80%;
+
+    /* Scrollbar Colors */
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
-}
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 224 100% 68%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 5% 11%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 5% 11%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 5% 11%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5% 11%;
+    --input: 240 5% 11%;
+    --ring: 224 100% 68%;
 
-@layer base {
+    --nav-text: 210 20% 98%;
+    --nav-text-hover: 210 20% 98%;
+    --nav-bg-active: 215 27.9% 16.9%;
+
+    /* Scrollbar Colors - Dark Mode */
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+  }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
-}
 
-/* Custom Scrollbar Styles */
-@layer utilities {
-  /* For Webkit browsers like Chrome/Safari */
+  /* Scrollbar Styling */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    background: hsl(var(--background));
-    border-radius: var(--radius);
+    background: var(--scrollbar-bg);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted));
-    border: 2px solid hsl(var(--background));
-    border-radius: var(--radius);
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground));
+    background: var(--scrollbar-thumb-hover);
   }
 
-  /* For Firefox */
+  /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
+  }
+}
+
+@layer components {
+  .light {
+    --bg-color: 240 10% 85%;
+    --bg-gradient-from: rgba(79, 70, 229, 0.1);
+    --bg-gradient-to: transparent;
+    --bg-shine: rgba(255, 255, 255, 0.3);
+    --app-bg: hsl(240 10% 85%);
+    --app-gradient: radial-gradient(
+      circle at top center,
+      rgba(79, 70, 229, 0.1) 0%,
+      rgba(79, 70, 229, 0.05) 25%,
+      rgba(79, 70, 229, 0.02) 50%,
+      transparent 100%
+    );
+    --nav-bg: rgba(220, 220, 230, 0.95);
+    --nav-border: rgba(0, 0, 0, 0.1);
+    --nav-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    
+    /* Enhanced gradient system */
+    --gradient-start: rgba(79, 70, 229, 0.1);
+    --gradient-mid: rgba(79, 70, 229, 0.05);
+    --gradient-end: rgba(79, 70, 229, 0.02);
+    --gradient-shine: rgba(255, 255, 255, 0.3);
+    
+    /* Enhanced ambient light effect */
+    --ambient-light: radial-gradient(
+      circle at 50% -20%,
+      rgba(79, 70, 229, 0.15),
+      rgba(79, 70, 229, 0.05) 20%,
+      transparent 50%
+    );
   }
 
-  /* Hide scrollbar for Chrome, Safari and Opera */
-  .no-scrollbar::-webkit-scrollbar {
+  .dark {
+    --bg-color: 240 10% 3.9%;
+    --bg-gradient-from: rgba(79, 70, 229, 0.15);
+    --bg-gradient-to: transparent;
+    --bg-shine: rgba(255, 255, 255, 0.03);
+    --app-bg: #0A0A0B;
+    --app-gradient: radial-gradient(
+      circle at top center,
+      rgba(79, 70, 229, 0.12) 0%,
+      rgba(79, 70, 229, 0.06) 25%,
+      rgba(30, 30, 35, 0.4) 50%,
+      transparent 100%
+    );
+    --nav-bg: rgba(10, 10, 11, 0.8);
+    --nav-border: rgba(255, 255, 255, 0.08);
+    --nav-shadow: none;
+    
+    /* Enhanced gradient system */
+    --gradient-start: rgba(79, 70, 229, 0.15);
+    --gradient-mid: rgba(79, 70, 229, 0.08);
+    --gradient-end: rgba(79, 70, 229, 0.03);
+    --gradient-shine: rgba(255, 255, 255, 0.05);
+    
+    /* Enhanced ambient light effect */
+    --ambient-light: radial-gradient(
+      circle at 50% -20%,
+      rgba(79, 70, 229, 0.2),
+      rgba(79, 70, 229, 0.1) 20%,
+      transparent 50%
+    );
+  }
+}
+
+@layer utilities {
+  .scrollbar-custom {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
 
-  /* Hide scrollbar for IE, Edge and Firefox */
-  .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+  .glass-effect {
+    @apply bg-background/60 backdrop-blur-xl border-white/20;
+    position: relative;
+    overflow: hidden;
   }
+
+  .glass-effect::before {
+    content: '';
+    @apply absolute inset-0;
+    background: radial-gradient(
+      circle at top left,
+      var(--primary),
+      transparent 70%
+    );
+    opacity: 0.1;
+  }
+
+  .glass-effect-hover {
+    @apply hover:shadow-2xl transition-all duration-500;
+  }
+
+  .glass-effect-hover:hover::before {
+    opacity: 0.15;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      to right,
+      hsl(var(--primary)),
+      hsl(var(--primary)) 30%,
+      hsl(var(--primary)/0.8)
+    );
+  }
+}
+
+/* Global styles */
+html {
+  scroll-behavior: smooth;
+  background: hsl(var(--background));
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }

@@ -20,9 +20,15 @@ import {
   Cell,
 } from "recharts"
 import { ErrorBoundary } from "react-error-boundary"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { ChevronDown, ChevronUp, X } from "lucide-react"
 import { FighterStats, FightHistory } from "@/types/fighter"
 import { formatDate } from "@/lib/utils"
+import { motion, AnimatePresence } from "framer-motion"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
 
 // Constants
 const DEFAULT_PLACEHOLDER_IMAGE = '/placeholder-fighter.png'
@@ -79,29 +85,29 @@ interface FightStatCategory {
 }
 
 interface Fight {
-  id?: string;
-  fighter_name: string;
-  fight_url: string;
+  id?: string | number;
+  fighter_name?: string;
+  fight_url?: string;
   opponent: string;
-  date: string;
-  fight_date: string;
-  opponent_name: string;
-  opponent_display_name: string;
+  date?: string;
+  fight_date?: string;
+  opponent_name?: string;
+  opponent_display_name?: string;
   result: string;
   method: string;
   round: number;
   time: string;
   event: string;
-  kd: string;
-  sig_str: string;
-  sig_str_pct: string;
-  total_str: string;
-  head_str: string;
-  body_str: string;
-  leg_str: string;
-  takedowns: string;
-  td_pct: string;
-  ctrl: string;
+  kd?: string;
+  sig_str?: string;
+  sig_str_pct?: string;
+  total_str?: string;
+  head_str?: string;
+  body_str?: string;
+  leg_str?: string;
+  takedowns?: string;
+  td_pct?: string;
+  ctrl?: string;
 }
 
 // Error Fallback Component
@@ -271,13 +277,454 @@ const getResultStyles = (result: string) => {
   };
 };
 
+// Add these new constants after the existing ones
+const STAT_CATEGORIES = {
+  striking: {
+    title: "Striking",
+    icon: "🥊",
+    stats: [
+      { key: "slpm", label: "Strikes Landed/min", format: (v: number) => v.toFixed(1) },
+      { key: "str_acc", label: "Strike Accuracy", format: (v: number) => `${v}%` },
+      { key: "sapm", label: "Strikes Absorbed/min", format: (v: number) => v.toFixed(1) },
+      { key: "str_def", label: "Strike Defense", format: (v: number) => `${v}%` }
+    ]
+  },
+  grappling: {
+    title: "Grappling",
+    icon: "🤼",
+    stats: [
+      { key: "td_avg", label: "Takedowns/15min", format: (v: number) => v.toFixed(1) },
+      { key: "td_acc", label: "Takedown Accuracy", format: (v: number) => `${v}%` },
+      { key: "td_def", label: "Takedown Defense", format: (v: number) => `${v}%` },
+      { key: "sub_avg", label: "Submissions/15min", format: (v: number) => v.toFixed(1) }
+    ]
+  }
+}
+
+// Add this function before the FighterHeader component
+const calculateAge = (dob: string): string => {
+  if (!dob) return 'N/A';
+  
+  try {
+    const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) return 'N/A';
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age.toString();
+  } catch (error) {
+    console.error('Error calculating age:', error);
+    return 'N/A';
+  }
+};
+
+// Add this new component for the fighter header
+const FighterHeader = ({ stats, imageError, setImageError }: { 
+  stats: FighterStats | null, 
+  imageError: boolean, 
+  setImageError: (error: boolean) => void 
+}) => {
+  if (!stats) return null;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-br from-background/90 to-background/60 backdrop-blur-xl border border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300"
+    >
+      <div className="absolute inset-0 bg-grid-white/[0.03] -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent -z-10" />
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 p-4 md:p-8">
+        {/* Fighter Image */}
+        <div className="relative w-full max-w-[240px] mx-auto md:max-w-none aspect-square md:col-span-1">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="relative w-full h-full rounded-xl overflow-hidden ring-2 ring-white/20 shadow-xl hover:ring-white/30 transition-all duration-300"
+          >
+            {!imageError ? (
+              stats.tap_link ? (
+                <a 
+                  href={stats.tap_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group block w-full h-full"
+                >
+                  <img 
+                    src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
+                    alt={stats.name}
+                    className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    onError={() => setImageError(true)}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-x-0 bottom-0 p-4 text-center">
+                      <span className="text-sm font-medium text-white/90">View on Tapology</span>
+                    </div>
+                  </div>
+                </a>
+              ) : (
+                <img 
+                  src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
+                  alt={stats.name}
+                  className="w-full h-full object-cover object-top"
+                  onError={() => setImageError(true)}
+                />
+              )
+            ) : (
+              <div className="w-full h-full bg-background/60 flex items-center justify-center">
+                <span className="text-muted-foreground">No image available</span>
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Fighter Info */}
+        <div className="md:col-span-2 flex flex-col justify-between text-center md:text-left">
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="space-y-4"
+          >
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/80">
+                {stats.name}
+              </h2>
+              {stats.nickname && (
+                <p className="text-lg md:text-xl text-primary/90 mt-1">"{stats.nickname}"</p>
+              )}
+              <div className="flex items-center justify-center md:justify-start gap-3 mt-3">
+                <p className="text-xl md:text-2xl font-semibold">{stats.record}</p>
+                {Number(stats.ranking) !== 99 && stats.ranking !== '99' && (
+                  <Badge variant="secondary" className="px-3 py-1 text-sm font-medium bg-accent/20 ring-1 ring-white/20">
+                    {formatRanking(String(stats.ranking))}
+                  </Badge>
+                )}
+              </div>
+              {stats.weight_class && (
+                <p className="text-base md:text-lg text-muted-foreground mt-1">{stats.weight_class}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4">
+              {[
+                { label: 'Height', value: stats.height || 'N/A', icon: '📏' },
+                { label: 'Weight', value: stats.weight || 'N/A', icon: '⚖️' },
+                { label: 'Reach', value: stats.reach || 'N/A', icon: '🤜' },
+                { label: 'Stance', value: stats.stance || 'N/A', icon: '🥋' },
+                { label: 'Age', value: stats.dob ? calculateAge(stats.dob) : 'N/A', icon: '📅' },
+                { label: 'Status', value: Number(stats.ranking) === 99 ? 'Unranked' : 'Ranked', icon: '📊' },
+              ].map(({ label, value, icon }) => (
+                <motion.div 
+                  key={label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="bg-background/60 backdrop-blur-sm p-2 md:p-3 rounded-lg ring-1 ring-white/20 transition-all duration-300 hover:bg-background/80 hover:ring-white/30 hover:shadow-lg"
+                >
+                  <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                    <span role="img" aria-label={label}>{icon}</span>
+                    <p className="text-xs md:text-sm text-muted-foreground">{label}</p>
+                  </div>
+                  <p className="text-sm md:text-base font-medium truncate">{value}</p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const formatRanking = (ranking: string | null): string => {
+  if (!ranking) return '';
+  const rankNum = parseInt(ranking);
+  if (isNaN(rankNum)) return '';
+  if (rankNum === 1) return 'Champion';
+  if (rankNum >= 2 && rankNum <= 16) return `#${rankNum - 1}`;
+  return '';  // Return empty string for unranked (99) or invalid rankings
+};
+
+// Move FightHistoryView outside of FighterDetails
+const FightHistoryView = ({ 
+  fightHistory, 
+  selectedFight, 
+  setSelectedFight 
+}: { 
+  fightHistory: FightHistory[], 
+  selectedFight: Fight | null, 
+  setSelectedFight: (fight: Fight | null) => void 
+}) => {
+  return (
+    <div className="space-y-4 relative">
+      <h4 className="text-xl font-medium tracking-tight mb-6">
+        Fight History
+      </h4>
+      
+      <AnimatePresence>
+        {selectedFight && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100]"
+              onClick={() => setSelectedFight(null)}
+            />
+            
+            {/* Modal Container */}
+            <div 
+              className="fixed inset-0 z-[101] overflow-hidden flex items-center justify-center"
+              onClick={() => setSelectedFight(null)}
+            >
+              {/* Modal Content */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ 
+                  duration: 0.15,
+                  ease: [0.16, 1, 0.3, 1]
+                }}
+                className="relative w-[95vw] max-w-3xl max-h-[90vh] bg-background/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header - Always visible */}
+                <div className="sticky top-0 z-[102] flex items-center justify-between border-b border-white/20 bg-background/95 backdrop-blur-xl p-4">
+                  <h3 className="text-xl font-semibold truncate pr-4">{selectedFight.event}</h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-white/10 shrink-0"
+                    onClick={() => setSelectedFight(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Scrollable Content */}
+                <div className="overflow-y-auto">
+                  <div className="p-4 md:p-6">
+                    <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+                      {/* Fight Details */}
+                      <div className="space-y-4 md:space-y-6">
+                        <div className="space-y-3">
+                          <h4 className="text-lg font-medium flex items-center gap-2">
+                            <span role="img" aria-label="Fight Details">⚔️</span>
+                            Fight Details
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            {[
+                              { label: "Method", value: selectedFight.method, icon: getMethodIcon(selectedFight.method) },
+                              { label: "Round", value: selectedFight.round, icon: "🔄" },
+                              { label: "Time", value: selectedFight.time, icon: "⏱️" },
+                              { label: "Date", value: formatDate(selectedFight.date || selectedFight.fight_date || ''), icon: "📅" }
+                            ].map(({ label, value, icon }) => (
+                              <motion.div
+                                key={label}
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-accent/20 rounded-lg p-3 ring-1 ring-white/10"
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span role="img" aria-label={label}>{icon}</span>
+                                  <p className="text-sm text-muted-foreground">{label}</p>
+                                </div>
+                                <p className="font-medium">{value}</p>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h4 className="text-lg font-medium flex items-center gap-2">
+                            <span role="img" aria-label="Opponent">🥊</span>
+                            Opponent
+                          </h4>
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-accent/20 rounded-lg p-4 ring-1 ring-white/10"
+                          >
+                            <p className="text-xl font-medium mb-2">
+                              {selectedFight.opponent_display_name || selectedFight.opponent}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Result:</span>
+                              <span className={cn(
+                                "text-sm font-medium px-2 py-1 rounded-full",
+                                selectedFight.result.toLowerCase().includes('win') && "bg-emerald-500/20 text-emerald-500",
+                                selectedFight.result.toLowerCase().includes('loss') && "bg-red-500/20 text-red-500",
+                                !selectedFight.result.toLowerCase().includes('win') && 
+                                !selectedFight.result.toLowerCase().includes('loss') && "bg-yellow-500/20 text-yellow-500"
+                              )}>
+                                {selectedFight.result}
+                              </span>
+                            </div>
+                          </motion.div>
+                        </div>
+                      </div>
+
+                      {/* Fight Stats */}
+                      <div className="space-y-4 md:space-y-6">
+                        {selectedFight.sig_str && (
+                          <div className="space-y-3">
+                            <h4 className="text-lg font-medium flex items-center gap-2">
+                              <span role="img" aria-label="Strike Stats">🎯</span>
+                              Strike Stats
+                            </h4>
+                            <div className="grid grid-cols-1 gap-3">
+                              {[
+                                { label: "Significant Strikes", value: selectedFight.sig_str },
+                                { label: "Accuracy", value: selectedFight.sig_str_pct },
+                                { label: "Total Strikes", value: selectedFight.total_str },
+                                { label: "Head Strikes", value: selectedFight.head_str },
+                                { label: "Body Strikes", value: selectedFight.body_str },
+                                { label: "Leg Strikes", value: selectedFight.leg_str }
+                              ].filter(stat => stat.value).map(({ label, value }, index) => (
+                                <motion.div
+                                  key={label}
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: index * 0.05 }}
+                                  className="bg-accent/20 rounded-lg p-3 ring-1 ring-white/10"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">{label}</span>
+                                    <span className="font-medium">{value}</span>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedFight.takedowns && (
+                          <div className="space-y-3">
+                            <h4 className="text-lg font-medium flex items-center gap-2">
+                              <span role="img" aria-label="Grappling">🤼</span>
+                              Grappling
+                            </h4>
+                            <div className="grid grid-cols-1 gap-3">
+                              {[
+                                { label: "Takedowns", value: selectedFight.takedowns },
+                                { label: "Success Rate", value: selectedFight.td_pct },
+                                { label: "Control Time", value: selectedFight.ctrl }
+                              ].filter(stat => stat.value).map(({ label, value }, index) => (
+                                <motion.div
+                                  key={label}
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: 0.2 + index * 0.05 }}
+                                  className="bg-accent/20 rounded-lg p-3 ring-1 ring-white/10"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">{label}</span>
+                                    <span className="font-medium">{value}</span>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {!fightHistory || fightHistory.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <p>No fight history available</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {fightHistory.map((fight, index) => {
+            if (!fight) return null;
+            
+            const displayName = fight.opponent_display_name || fight.opponent || fight.opponent_name || "Unknown Opponent";
+            const fightDate = fight.fight_date || fight.date || "Unknown Date";
+            const fightResult = fight.result || "NC";
+            const methodIcon = getMethodIcon(fight.method || '');
+            
+            const styles = getResultStyles(fightResult);
+            
+            return (
+              <motion.button
+                key={`${displayName}-${fightDate}-${index}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: index * 0.05 }}
+                className={cn(
+                  "group relative z-10 w-full text-left",
+                  "rounded-xl p-6",
+                  "bg-background/50 backdrop-blur-sm border border-white/20",
+                  "hover:bg-background/60 hover:border-white/30",
+                  "transition-all duration-300",
+                  selectedFight === fight && "ring-2 ring-primary"
+                )}
+                onClick={() => setSelectedFight(fight)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium truncate group-hover:text-foreground/90">{displayName}</span>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{formatDate(fightDate)}</span>
+                        <span className={`text-sm ${styles.text}`}>
+                          • {fightResult}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mt-2">
+                      <span role="img" aria-label={fight.method} className="text-base">{methodIcon}</span>
+                      <span className="text-sm text-muted-foreground">{fight.method || "N/A"}</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Add responsive container styles
+const responsiveContainerStyles = {
+  width: '100%',
+  height: '100%',
+  minHeight: '160px',
+  '@media (max-width: 640px)': {
+    minHeight: '140px',
+  },
+};
+
 export function FighterDetails({ fighterName }: FighterDetailsProps) {
   const [stats, setStats] = React.useState<FighterStats | null>(null)
   const [fightHistory, setFightHistory] = React.useState<FightHistory[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [imageError, setImageError] = React.useState(false)
-  const [expandedFight, setExpandedFight] = React.useState<number | null>(null)
+  const [selectedFight, setSelectedFight] = React.useState<Fight | null>(null)
 
   // Fetch fighter data and fight history
   React.useEffect(() => {
@@ -488,140 +935,6 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
     return 'bg-zinc-500/90 border-zinc-500';
   };
 
-  // Fight history tab content
-  const FightHistoryView = () => {
-    return (
-      <div className="space-y-4 overflow-hidden">
-        <h4 className="text-xl font-medium tracking-tight mb-6">
-          Fight History
-        </h4>
-        
-        {!fightHistory || fightHistory.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No fight history available</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {fightHistory.map((fight, index) => {
-              if (!fight) return null;
-              
-              const displayName = fight.opponent_display_name || fight.opponent || fight.opponent_name || "Unknown Opponent";
-              const fightDate = fight.fight_date || fight.date || "Unknown Date";
-              const fightResult = fight.result || "NC";
-              const methodIcon = getMethodIcon(fight.method || '');
-              
-              const styles = getResultStyles(fightResult);
-              
-              return (
-                <div 
-                  key={`${displayName}-${fightDate}-${index}`}
-                  data-expanded={expandedFight === index}
-                  className={`group relative overflow-hidden rounded-xl transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${styles.bg} ${styles.ring} ${styles.hover} hover:shadow-sm`}
-                >
-                  <div 
-                    className="px-6 py-4 cursor-pointer"
-                    onClick={() => setExpandedFight(expandedFight === index ? null : index)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium truncate group-hover:text-foreground/90">{displayName}</span>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>{formatDate(fightDate)}</span>
-                            <span className={`text-sm ${styles.text}`}>
-                              • {fightResult}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mt-2">
-                          <span role="img" aria-label={fight.method} className="text-base">{methodIcon}</span>
-                          <span className="text-sm text-muted-foreground">{fight.method || "N/A"}</span>
-                        </div>
-                      </div>
-                      
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] text-muted-foreground group-hover:text-foreground/70 ${
-                          expandedFight === index ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </div>
-
-                    <div 
-                      className={`grid transition-[grid-template-rows,opacity,transform] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                        expandedFight === index ? 'grid-rows-[1fr] opacity-100 translate-y-0' : 'grid-rows-[0fr] opacity-0 -translate-y-2'
-                      }`}
-                    >
-                      <div className="overflow-hidden">
-                        <div className={`pt-4 mt-4 border-t border-border/5`}>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {[
-                              { label: "Knockdowns", value: fight.kd },
-                              { label: "Significant Strikes", value: fight.sig_str, subValue: fight.sig_str_pct },
-                              { label: "Total Strikes", value: fight.total_str },
-                              { label: "Takedowns", value: fight.takedowns, subValue: fight.td_pct }
-                            ].map((stat, statIndex) => (
-                              <div 
-                                key={stat.label}
-                                className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60"
-                              >
-                                <div className="text-sm text-muted-foreground mb-1">{stat.label}</div>
-                                <div className="text-xl font-medium">{stat.value}</div>
-                                {stat.subValue && (
-                                  <div className="text-sm text-muted-foreground mt-1">{stat.subValue}</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-
-                          {(fight.head_str || fight.body_str || fight.leg_str) && (
-                            <div className="mt-4">
-                              <div className="text-sm text-muted-foreground mb-3">Strike Distribution</div>
-                              <div className="grid grid-cols-3 gap-4">
-                                {[
-                                  { label: "Head", value: fight.head_str },
-                                  { label: "Body", value: fight.body_str },
-                                  { label: "Leg", value: fight.leg_str }
-                                ].map((stat) => (
-                                  <div 
-                                    key={stat.label}
-                                    className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60"
-                                  >
-                                    <div className="text-sm text-muted-foreground mb-1">{stat.label}</div>
-                                    <div className="text-xl font-medium">{stat.value}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {fight.ctrl && fight.ctrl !== '0:00' && (
-                              <div className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60">
-                                <div className="text-sm text-muted-foreground mb-1">Control Time</div>
-                                <div className="text-xl font-medium">{fight.ctrl}</div>
-                              </div>
-                            )}
-                            {fight.event && (
-                              <div className="bg-background/40 rounded-lg p-3 transition-all duration-300 hover:bg-background/60">
-                                <div className="text-sm text-muted-foreground mb-1">Event</div>
-                                <div className="text-lg font-medium leading-tight">{fight.event}</div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // Overview tab content
   const OverviewView = () => {
     // Use getStat function to safely access properties
@@ -649,20 +962,20 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Radar Chart */}
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[300px]">
+                <ResponsiveContainer {...responsiveContainerStyles}>
                   <RadarChart data={chartData.overallStats}>
-                    <PolarGrid strokeDasharray="3 3" />
+                    <PolarGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.2} />
                     <PolarAngleAxis 
                       dataKey="subject" 
                       tick={{ fill: 'currentColor', fontSize: 12 }}
                     />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="currentColor" strokeOpacity={0.2} />
                     <Radar
                       name={stats.name}
                       dataKey="A"
-                      stroke="#3b82f6"
-                      fill="#3b82f6"
+                      stroke="hsl(var(--primary))"
+                      fill="hsl(var(--primary))"
                       fillOpacity={0.6}
                     />
                   </RadarChart>
@@ -689,396 +1002,309 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
             </div>
           </CardContent>
         </Card>
-
-        {/* Strike Distribution Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Strike Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData.strikeDistribution} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" domain={[0, 'dataMax + 1']} />
-                  <YAxis dataKey="name" type="category" />
-                  <Tooltip
-                    content={({ payload, label }) => {
-                      if (payload && payload.length && payload[0].value != null) {
-                        const value = Number(payload[0].value);
-                        const percentage = payload[0].payload.percentage;
-                        return (
-                          <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                            <p className="font-medium">{label}</p>
-                            <p className="text-sm">{`${value.toFixed(1)} strikes/min (${percentage.toFixed(1)}%)`}</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="value" fill="#3b82f6">
-                    {chartData.strikeDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : '#3b82f6'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl overflow-x-hidden">
-      <div className="space-y-8">
-        {/* Fighter Header */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-8 bg-background/40 backdrop-blur-md p-8 rounded-lg ring-1 ring-white/10">
-          {/* Fighter Image */}
-          <div className="relative aspect-square md:col-span-1">
-            {!imageError ? (
-              stats.tap_link ? (
-                <a 
-                  href={stats.tap_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group block w-full h-full transform transition-all duration-300 hover:scale-[1.02] rounded-lg overflow-hidden ring-1 ring-white/10"
-                >
-                  <img 
-                    src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
-                    alt={stats.name}
-                    className="w-full h-full object-cover object-top transition-transform duration-500"
-                    onError={() => setImageError(true)}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute inset-x-0 bottom-0 p-4 text-center">
-                      <span className="text-sm font-medium text-white/90">View on Tapology</span>
-                    </div>
-                  </div>
-                </a>
-              ) : (
-                <div className="w-full h-full rounded-lg overflow-hidden ring-1 ring-white/10">
-                  <img 
-                    src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
-                    alt={stats.name}
-                    className="w-full h-full object-cover object-top"
-                    onError={() => setImageError(true)}
-                  />
-                </div>
-              )
-            ) : (
-              <div className="w-full h-full bg-background/40 rounded-lg flex items-center justify-center ring-1 ring-white/10">
-                <span className="text-muted-foreground">No image available</span>
-              </div>
-            )}
-          </div>
+    <div className="relative">
+      <div className="max-w-7xl mx-auto px-4 py-4 md:py-8">
+        <div className="space-y-6 md:space-y-8">
+          {/* Fighter Header */}
+          <FighterHeader stats={stats} imageError={imageError} setImageError={setImageError} />
 
-          {/* Fighter Info */}
-          <div className="md:col-span-2 flex flex-col justify-between">
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/80">
-                  {stats.name}
-                </h2>
-                {stats.nickname && (
-                  <p className="text-xl text-primary/90 mt-1">"{stats.nickname}"</p>
-                )}
-                <div className="flex items-center gap-3 mt-3">
-                  <p className="text-2xl font-semibold">{stats.record}</p>
-                  {Number(stats.ranking) !== 99 && stats.ranking !== '99' && (
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary">
-                      Rank #{stats.ranking}
-                    </span>
-                  )}
-                </div>
-                {stats.weight_class && (
-                  <p className="text-lg text-muted-foreground mt-1">{stats.weight_class}</p>
-                )}
-              </div>
+          {/* Stats and History Tabs */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="animate-in fade-in duration-500"
+          >
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-6 md:mb-8">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="stats">Stats</TabsTrigger>
+                <TabsTrigger value="fights">Fights</TabsTrigger>
+              </TabsList>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {[
-                  { label: 'Height', value: stats.height || 'N/A', icon: '📏' },
-                  { label: 'Weight', value: stats.weight || 'N/A', icon: '⚖️' },
-                  { label: 'Reach', value: stats.reach || 'N/A', icon: '🤜' },
-                  { label: 'Stance', value: stats.stance || 'N/A', icon: '🥋' },
-                  { label: 'Age', value: stats.dob ? calculateAge(stats.dob) : 'N/A', icon: '📅' },
-                  { label: 'Status', value: Number(stats.ranking) === 99 ? 'Unranked' : 'Ranked', icon: '📊' },
-                ].map(({ label, value, icon }) => (
-                  <div 
-                    key={label}
-                    className="bg-background/40 backdrop-blur-sm p-3 rounded-lg ring-1 ring-white/10 transition-colors duration-300 hover:bg-background/60"
+              <div className="relative min-h-[500px]">
+                <AnimatePresence mode="wait">
+                  <TabsContent 
+                    value="overview"
+                    key="overview"
+                    className="space-y-6 md:space-y-8 [&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span role="img" aria-label={label}>{icon}</span>
-                      <p className="text-sm text-muted-foreground">{label}</p>
-                    </div>
-                    <p className="font-medium truncate">{value}</p>
-                  </div>
-                ))}
+                    <OverviewView />
+                  </TabsContent>
+
+                  <TabsContent 
+                    value="stats"
+                    key="stats"
+                    className="space-y-6 md:space-y-8 [&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
+                  >
+                    {/* Striking Stats */}
+                    <ErrorBoundary FallbackComponent={ChartErrorFallback}>
+                      <Card className="overflow-hidden bg-background/60 backdrop-blur-xl border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300">
+                        <CardHeader className="border-b border-white/10 py-3">
+                          <CardTitle className="flex items-center justify-center gap-2 text-center w-full">
+                            <span role="img" aria-label="Striking" className="flex-shrink-0 text-lg">🥊</span>
+                            <span className="flex-shrink-0 text-lg">Striking Statistics</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 md:p-6 flex flex-col gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Strikes Landed/min</p>
+                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.slpm).toFixed(1)}</p>
+                              <p className="text-xs md:text-sm text-muted-foreground">Striking Output</p>
+                            </div>
+                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Strike Accuracy</p>
+                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.str_acc).toFixed(1)}</p>
+                              <p className="text-xs md:text-sm text-muted-foreground">Strike Success Rate</p>
+                            </div>
+                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Strikes Absorbed/min</p>
+                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.sapm).toFixed(1)}</p>
+                              <p className="text-xs md:text-sm text-muted-foreground">Strikes Received</p>
+                            </div>
+                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Strike Defense</p>
+                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.str_def).toFixed(1)}</p>
+                              <p className="text-xs md:text-sm text-muted-foreground">Strike Evasion Rate</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col gap-4">
+                            {/* Charts Section */}
+                            <div className="grid grid-cols-1 gap-4">
+                              {/* Strike Distribution Chart */}
+                              <div className="flex flex-col gap-2">
+                                <h4 className="text-sm font-medium">Strike Distribution</h4>
+                                <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
+                                  <ResponsiveContainer {...responsiveContainerStyles}>
+                                    <BarChart 
+                                      data={chartData.strikeDistribution} 
+                                      layout="vertical"
+                                      margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
+                                    >
+                                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                      <XAxis type="number" domain={[0, 'dataMax + 1']} />
+                                      <YAxis 
+                                        dataKey="name" 
+                                        type="category" 
+                                        tick={{ 
+                                          fill: 'currentColor', 
+                                          fontSize: 12,
+                                          dy: 0
+                                        }}
+                                        width={120}
+                                        tickMargin={4}
+                                        axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                      />
+                                      <Tooltip
+                                        content={({ payload, label }) => {
+                                          if (payload && payload.length && payload[0].value != null) {
+                                            const value = Number(payload[0].value);
+                                            const percentage = payload[0].payload.percentage;
+                                            return (
+                                              <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                                <p className="font-medium">{label}</p>
+                                                <p className="text-sm">{`${value.toFixed(1)} strikes/min (${percentage.toFixed(1)}%)`}</p>
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        }}
+                                      />
+                                      <Bar dataKey="value" fill="#3b82f6">
+                                        {chartData.strikeDistribution.map((entry, index) => (
+                                          <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : '#3b82f6'} />
+                                        ))}
+                                      </Bar>
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </div>
+
+                              {/* Strike Output Chart */}
+                              <div className="flex flex-col gap-2">
+                                <h4 className="text-sm font-medium">Strike Output</h4>
+                                <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
+                                  <ResponsiveContainer {...responsiveContainerStyles}>
+                                    <BarChart data={chartData.strikeData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                      <XAxis 
+                                        dataKey="name" 
+                                        tick={{ fill: 'currentColor', fontSize: 12 }}
+                                        axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                      />
+                                      <YAxis 
+                                        domain={[0, 'dataMax + 2']}
+                                        tick={{ fill: 'currentColor', fontSize: 12 }}
+                                        axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                      />
+                                      <Tooltip
+                                        content={({ payload, label }) => {
+                                          if (payload && payload.length && payload[0].value != null) {
+                                            const value = Number(payload[0].value);
+                                            return (
+                                              <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                                <p className="font-medium">{label}</p>
+                                                <p className="text-sm">{`${value.toFixed(1)} strikes/min`}</p>
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        }}
+                                      />
+                                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                        {chartData.strikeData.map((entry, index) => (
+                                          <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                      </Bar>
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </ErrorBoundary>
+
+                    {/* Grappling Stats */}
+                    <ErrorBoundary FallbackComponent={ChartErrorFallback}>
+                      <Card className="overflow-hidden bg-background/60 backdrop-blur-xl border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300">
+                        <CardHeader className="border-b border-white/10 py-3">
+                          <CardTitle className="flex items-center justify-center gap-2 text-center w-full">
+                            <span role="img" aria-label="Grappling" className="flex-shrink-0 text-lg">🤼</span>
+                            <span className="flex-shrink-0 text-lg">Grappling Statistics</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 md:p-6 flex flex-col gap-6">
+                          <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Takedowns per 15 min</p>
+                              <p className="text-3xl font-bold">{safeParseFloat(stats.td_avg).toFixed(1)}</p>
+                              <p className="text-sm text-muted-foreground">Grappling Frequency</p>
+                            </div>
+                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Takedown Accuracy</p>
+                              <p className="text-3xl font-bold">{safeParseFloat(stats.td_acc).toFixed(1)}</p>
+                              <p className="text-sm text-muted-foreground">Takedown Success Rate</p>
+                            </div>
+                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Takedown Defense</p>
+                              <p className="text-3xl font-bold">{safeParseFloat(stats.td_def).toFixed(1)}</p>
+                              <p className="text-sm text-muted-foreground">Takedown Prevention</p>
+                            </div>
+                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
+                              <p className="text-sm text-muted-foreground">Submissions per 15 min</p>
+                              <p className="text-3xl font-bold">{safeParseFloat(stats.sub_avg).toFixed(1)}</p>
+                              <p className="text-sm text-muted-foreground">Submission Threat</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-4">
+                            {/* Grappling Output Chart */}
+                            <div className="flex flex-col gap-2">
+                              <h4 className="text-sm font-medium">Grappling Output</h4>
+                              <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
+                                <ResponsiveContainer {...responsiveContainerStyles}>
+                                  <BarChart data={chartData.grappleData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <XAxis 
+                                      dataKey="name" 
+                                      tick={{ fill: 'currentColor', fontSize: 12 }}
+                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                    />
+                                    <YAxis 
+                                      domain={[0, 5]}
+                                      tick={{ fill: 'currentColor', fontSize: 12 }}
+                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                    />
+                                    <Tooltip
+                                      content={({ payload, label }) => {
+                                        if (payload && payload.length && payload[0].value != null) {
+                                          const value = Number(payload[0].value);
+                                          return (
+                                            <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                              <p className="font-medium">{label}</p>
+                                              <p className="text-sm">{`${value.toFixed(1)} per 15min`}</p>
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      }}
+                                    />
+                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                      {chartData.grappleData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Bar>
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+
+                            {/* Grappling Accuracy Chart */}
+                            <div className="flex flex-col gap-2">
+                              <h4 className="text-sm font-medium">Grappling Accuracy</h4>
+                              <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
+                                <ResponsiveContainer {...responsiveContainerStyles}>
+                                  <BarChart data={chartData.grappleAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <XAxis 
+                                      dataKey="name" 
+                                      tick={{ fill: 'currentColor', fontSize: 12 }}
+                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                    />
+                                    <YAxis 
+                                      domain={[0, 100]}
+                                      tick={{ fill: 'currentColor', fontSize: 12 }}
+                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+                                      tickFormatter={(value) => `${value}%`}
+                                    />
+                                    <Tooltip
+                                      content={({ payload, label }) => {
+                                        if (payload && payload.length && payload[0].value != null) {
+                                          const value = Number(payload[0].value);
+                                          return (
+                                            <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
+                                              <p className="font-medium">{label}</p>
+                                              <p className="text-sm">{`${value}%`}</p>
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      }}
+                                    />
+                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                      {chartData.grappleAccuracyData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                      ))}
+                                    </Bar>
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </ErrorBoundary>
+                  </TabsContent>
+
+                  <TabsContent 
+                    value="fights"
+                    key="fights"
+                    className="[&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
+                  >
+                    <FightHistoryView fightHistory={fightHistory} selectedFight={selectedFight} setSelectedFight={setSelectedFight} />
+                  </TabsContent>
+                </AnimatePresence>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats and History Tabs */}
-        <div className="animate-in fade-in duration-500">
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="stats">Detailed Stats</TabsTrigger>
-              <TabsTrigger value="history">Fight History</TabsTrigger>
-            </TabsList>
-
-            <div className="relative min-h-[500px]">
-              <TabsContent 
-                value="overview"
-                className="space-y-8 [&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
-              >
-                <OverviewView />
-              </TabsContent>
-
-              <TabsContent 
-                value="stats"
-                className="space-y-8 [&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
-              >
-                {/* Striking Stats */}
-                <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                  <Card className="overflow-hidden">
-                    <CardHeader className="border-b border-border/5 bg-background/40 backdrop-blur-sm">
-                      <CardTitle>Striking Statistics</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Strikes Landed per min</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.slpm).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Striking Output</p>
-                        </div>
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Strike Accuracy</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.str_acc).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Strike Success Rate</p>
-                        </div>
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Strikes Absorbed per min</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.sapm).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Strikes Received</p>
-                        </div>
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Strike Defense</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.str_def).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Strike Evasion Rate</p>
-                        </div>
-                      </div>
-                      <div className="space-y-6">
-                        {/* Strike Output Chart */}
-                        <div className="h-[200px]">
-                          <h4 className="text-sm font-medium mb-2">Strike Output</h4>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData.strikeData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                              <XAxis 
-                                dataKey="name" 
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              />
-                              <YAxis 
-                                domain={[0, 'dataMax + 2']}
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              />
-                              <Tooltip
-                                content={({ payload, label }) => {
-                                  if (payload && payload.length && payload[0].value != null) {
-                                    const value = Number(payload[0].value);
-                                    return (
-                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                        <p className="font-medium">{label}</p>
-                                        <p className="text-sm">{`${value.toFixed(1)} strikes/min`}</p>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {chartData.strikeData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* Strike Accuracy Chart */}
-                        <div className="h-[200px]">
-                          <h4 className="text-sm font-medium mb-2">Strike Accuracy</h4>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData.strikeAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                              <XAxis 
-                                dataKey="name" 
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              />
-                              <YAxis 
-                                domain={[0, 100]}
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                tickFormatter={(value) => `${value}%`}
-                              />
-                              <Tooltip
-                                content={({ payload, label }) => {
-                                  if (payload && payload.length && payload[0].value != null) {
-                                    const value = Number(payload[0].value);
-                                    return (
-                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                        <p className="font-medium">{label}</p>
-                                        <p className="text-sm">{`${value}%`}</p>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {chartData.strikeAccuracyData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </ErrorBoundary>
-
-                {/* Grappling Stats */}
-                <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                  <Card className="overflow-hidden">
-                    <CardHeader className="border-b border-border/5 bg-background/40 backdrop-blur-sm">
-                      <CardTitle>Grappling Statistics</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Takedowns per 15 min</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.td_avg).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Grappling Frequency</p>
-                        </div>
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Takedown Accuracy</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.td_acc).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Takedown Success Rate</p>
-                        </div>
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Takedown Defense</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.td_def).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Takedown Prevention</p>
-                        </div>
-                        <div className="space-y-2 p-4 bg-accent/10 rounded-lg">
-                          <p className="text-sm text-muted-foreground">Submissions per 15 min</p>
-                          <p className="text-3xl font-bold">{safeParseFloat(stats.sub_avg).toFixed(1)}</p>
-                          <p className="text-sm text-muted-foreground">Submission Threat</p>
-                        </div>
-                      </div>
-                      <div className="space-y-6">
-                        {/* Grappling Output Chart */}
-                        <div className="h-[200px]">
-                          <h4 className="text-sm font-medium mb-2">Grappling Output</h4>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData.grappleData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                              <XAxis 
-                                dataKey="name" 
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              />
-                              <YAxis 
-                                domain={[0, 5]}
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              />
-                              <Tooltip
-                                content={({ payload, label }) => {
-                                  if (payload && payload.length && payload[0].value != null) {
-                                    const value = Number(payload[0].value);
-                                    return (
-                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                        <p className="font-medium">{label}</p>
-                                        <p className="text-sm">{`${value.toFixed(1)} per 15min`}</p>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {chartData.grappleData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* Grappling Accuracy Chart */}
-                        <div className="h-[200px]">
-                          <h4 className="text-sm font-medium mb-2">Grappling Accuracy</h4>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData.grappleAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                              <XAxis 
-                                dataKey="name" 
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                              />
-                              <YAxis 
-                                domain={[0, 100]}
-                                tick={{ fill: 'currentColor', fontSize: 12 }}
-                                axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                tickFormatter={(value) => `${value}%`}
-                              />
-                              <Tooltip
-                                content={({ payload, label }) => {
-                                  if (payload && payload.length && payload[0].value != null) {
-                                    const value = Number(payload[0].value);
-                                    return (
-                                      <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                        <p className="font-medium">{label}</p>
-                                        <p className="text-sm">{`${value}%`}</p>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {chartData.grappleAccuracyData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </ErrorBoundary>
-              </TabsContent>
-
-              <TabsContent 
-                value="history"
-                className="[&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
-              >
-                <FightHistoryView />
-              </TabsContent>
-            </div>
-          </Tabs>
+            </Tabs>
+          </motion.div>
         </div>
       </div>
     </div>
