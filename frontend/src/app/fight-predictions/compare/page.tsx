@@ -12,6 +12,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { ENDPOINTS } from "@/lib/api-config"
 import { cn } from "@/lib/utils"
 import { FighterStats, Prediction } from "@/types/fighter"
+import { getAnimationVariants, fadeAnimation } from '@/lib/animations'
+import { useMediaQuery } from '@/hooks/use-media-query'
 
 export default function ComparePage() {
   const { toast } = useToast();
@@ -21,6 +23,9 @@ export default function ComparePage() {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [isPredicting, setIsPredicting] = useState(false);
   const [showPredictionModal, setShowPredictionModal] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)')
+  
+  const animationVariants = getAnimationVariants(isMobile)
 
   const fetchFighterData = async (fighterName: string): Promise<FighterStats | null> => {
     try {
@@ -368,329 +373,341 @@ export default function ComparePage() {
   );
 
   return (
-    <div className="container max-w-[1400px] mx-auto px-4 min-h-[calc(100vh-4rem)] py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-12">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/fight-predictions')}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <h2 className="text-2xl font-bold">Fighter Comparison</h2>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-[350px,1fr,350px] gap-12 items-start max-w-[1400px] mx-auto">
-        {/* Fighter 1 Column */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Fighter 1</h3>
-            {fighter1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setFighter1(null)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          <div className="relative isolate">
-            <div className="relative z-[2]">
-              <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} />
-            </div>
-            <AnimatePresence mode="wait">
-              {fighter1 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="mt-6 relative z-[1]"
-                >
-                  <FighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Center Stats Column */}
-        <div className="flex flex-col items-center">
-          {/* VS Badge */}
-          <div className="flex items-center justify-center mb-8">
-            <div className="px-8 py-3 rounded-full bg-accent/10 backdrop-blur-sm border border-border">
-              <span className="text-2xl font-bold text-muted-foreground">VS</span>
-            </div>
-          </div>
-
-          {/* Stats Comparison */}
-          {fighter1 && fighter2 ? (
-            <div className="w-full">
-              <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl">
-                <CardContent className="p-8">
-                  <div className="space-y-10">
-                    {/* Physical Stats */}
-                    <div>
-                      <h4 className="text-lg font-semibold mb-6 text-center">Physical Attributes</h4>
-                      <div className="space-y-4">
-                        <SimpleComparisonRow
-                          label="Height"
-                          value1={fighter1.height}
-                          value2={fighter2.height}
-                        />
-                        <SimpleComparisonRow
-                          label="Weight"
-                          value1={fighter1.weight}
-                          value2={fighter2.weight}
-                        />
-                        <SimpleComparisonRow
-                          label="Reach"
-                          value1={fighter1.reach}
-                          value2={fighter2.reach}
-                        />
-                        <SimpleComparisonRow
-                          label="Stance"
-                          value1={fighter1.stance}
-                          value2={fighter2.stance}
-                        />
-                      </div>
-                    </div>
-
-                    <Separator className="bg-border/50" />
-
-                    {/* Striking Stats */}
-                    <div>
-                      <h4 className="text-lg font-semibold mb-6 text-center">Striking</h4>
-                      <div className="space-y-4">
-                        <ComparisonRow
-                          label="Strikes Landed per Min"
-                          value1={fighter1.slpm}
-                          value2={fighter2.slpm}
-                          unit=""
-                        />
-                        <ComparisonRow
-                          label="Striking Accuracy"
-                          value1={fighter1.str_acc}
-                          value2={fighter2.str_acc}
-                          unit="%"
-                        />
-                        <ComparisonRow
-                          label="Strikes Absorbed per Min"
-                          value1={fighter1.sapm}
-                          value2={fighter2.sapm}
-                          higherIsBetter={false}
-                          unit=""
-                        />
-                        <ComparisonRow
-                          label="Striking Defense"
-                          value1={fighter1.str_def}
-                          value2={fighter2.str_def}
-                          unit="%"
-                        />
-                      </div>
-                    </div>
-
-                    <Separator className="bg-border/50" />
-
-                    {/* Grappling Stats */}
-                    <div>
-                      <h4 className="text-lg font-semibold mb-6 text-center">Grappling</h4>
-                      <div className="space-y-4">
-                        <ComparisonRow
-                          label="Takedowns per 15 Min"
-                          value1={fighter1.td_avg}
-                          value2={fighter2.td_avg}
-                          unit=""
-                        />
-                        <ComparisonRow
-                          label="Takedown Accuracy"
-                          value1={fighter1.td_acc}
-                          value2={fighter2.td_acc}
-                          unit="%"
-                        />
-                        <ComparisonRow
-                          label="Takedown Defense"
-                          value1={fighter1.td_def}
-                          value2={fighter2.td_def}
-                          unit="%"
-                        />
-                        <ComparisonRow
-                          label="Submissions per 15 Min"
-                          value1={fighter1.sub_avg}
-                          value2={fighter2.sub_avg}
-                          unit=""
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Predict Button */}
-              <div className="flex justify-center mt-8">
-                <Button
-                  size="lg"
-                  onClick={handlePredictClick}
-                  disabled={isPredicting}
-                  className="min-w-[240px] h-14 text-lg"
-                >
-                  {isPredicting ? (
-                    <>
-                      Predicting...
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="ml-2"
-                      >
-                        <Swords className="h-6 w-6" />
-                      </motion.div>
-                    </>
-                  ) : (
-                    <>
-                      Get Prediction
-                      <Swords className="ml-2 h-6 w-6" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-[400px]">
-              <div className="text-center space-y-4">
-                <div className="text-muted-foreground">
-                  <Swords className="h-16 w-16 mx-auto mb-6 opacity-50" />
-                  <p className="text-xl font-medium">
-                    Select two fighters to compare their statistics
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Fighter 2 Column */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Fighter 2</h3>
-            {fighter2 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setFighter2(null)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          <div className="relative isolate">
-            <div className="relative z-[2]">
-              <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} />
-            </div>
-            <AnimatePresence mode="wait">
-              {fighter2 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="mt-6 relative z-[1]"
-                >
-                  <FighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-
-      {/* Prediction Modal */}
-      <AnimatePresence mode="wait">
-        {showPredictionModal && prediction && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowPredictionModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl shadow-2xl max-w-2xl w-full p-6"
-              onClick={e => e.stopPropagation()}
+    <div className="container relative">
+      <motion.div 
+        className="grid gap-6 pb-8 pt-6 md:py-8"
+        variants={animationVariants.page}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/fight-predictions')}
+              className="gap-2"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold">Fight Prediction</h3>
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <h2 className="text-2xl font-bold">Fighter Comparison</h2>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-[350px,1fr,350px] gap-12 items-start max-w-[1400px] mx-auto">
+          {/* Fighter 1 Column */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Fighter 1</h3>
+              {fighter1 && (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  onClick={() => setShowPredictionModal(false)}
+                  size="sm"
+                  onClick={() => setFighter1(null)}
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </Button>
+              )}
+            </div>
+            <div className="relative isolate">
+              <div className="relative z-[2]">
+                <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} />
               </div>
+              <AnimatePresence mode="wait">
+                {fighter1 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-6 relative z-[1]"
+                  >
+                    <FighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
 
-              <div className="space-y-6">
-                {/* Winner Prediction */}
-                <div className="text-center space-y-2">
-                  <p className="text-muted-foreground">Predicted Winner</p>
-                  <h4 className="text-3xl font-bold text-primary">
-                    {prediction.winner}
-                  </h4>
-                  <p className="text-muted-foreground">
-                    Confidence: {prediction.prediction_confidence}%
-                  </p>
+          {/* Center Stats Column */}
+          <div className="flex flex-col items-center">
+            {/* VS Badge */}
+            <div className="flex items-center justify-center mb-8">
+              <div className="px-8 py-3 rounded-full bg-accent/10 backdrop-blur-sm border border-border">
+                <span className="text-2xl font-bold text-muted-foreground">VS</span>
+              </div>
+            </div>
+
+            {/* Stats Comparison */}
+            {fighter1 && fighter2 ? (
+              <div className="w-full">
+                <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl">
+                  <CardContent className="p-8">
+                    <div className="space-y-10">
+                      {/* Physical Stats */}
+                      <div>
+                        <h4 className="text-lg font-semibold mb-6 text-center">Physical Attributes</h4>
+                        <div className="space-y-4">
+                          <SimpleComparisonRow
+                            label="Height"
+                            value1={fighter1.height}
+                            value2={fighter2.height}
+                          />
+                          <SimpleComparisonRow
+                            label="Weight"
+                            value1={fighter1.weight}
+                            value2={fighter2.weight}
+                          />
+                          <SimpleComparisonRow
+                            label="Reach"
+                            value1={fighter1.reach}
+                            value2={fighter2.reach}
+                          />
+                          <SimpleComparisonRow
+                            label="Stance"
+                            value1={fighter1.stance}
+                            value2={fighter2.stance}
+                          />
+                        </div>
+                      </div>
+
+                      <Separator className="bg-border/50" />
+
+                      {/* Striking Stats */}
+                      <div>
+                        <h4 className="text-lg font-semibold mb-6 text-center">Striking</h4>
+                        <div className="space-y-4">
+                          <ComparisonRow
+                            label="Strikes Landed per Min"
+                            value1={fighter1.slpm}
+                            value2={fighter2.slpm}
+                            unit=""
+                          />
+                          <ComparisonRow
+                            label="Striking Accuracy"
+                            value1={fighter1.str_acc}
+                            value2={fighter2.str_acc}
+                            unit="%"
+                          />
+                          <ComparisonRow
+                            label="Strikes Absorbed per Min"
+                            value1={fighter1.sapm}
+                            value2={fighter2.sapm}
+                            higherIsBetter={false}
+                            unit=""
+                          />
+                          <ComparisonRow
+                            label="Striking Defense"
+                            value1={fighter1.str_def}
+                            value2={fighter2.str_def}
+                            unit="%"
+                          />
+                        </div>
+                      </div>
+
+                      <Separator className="bg-border/50" />
+
+                      {/* Grappling Stats */}
+                      <div>
+                        <h4 className="text-lg font-semibold mb-6 text-center">Grappling</h4>
+                        <div className="space-y-4">
+                          <ComparisonRow
+                            label="Takedowns per 15 Min"
+                            value1={fighter1.td_avg}
+                            value2={fighter2.td_avg}
+                            unit=""
+                          />
+                          <ComparisonRow
+                            label="Takedown Accuracy"
+                            value1={fighter1.td_acc}
+                            value2={fighter2.td_acc}
+                            unit="%"
+                          />
+                          <ComparisonRow
+                            label="Takedown Defense"
+                            value1={fighter1.td_def}
+                            value2={fighter2.td_def}
+                            unit="%"
+                          />
+                          <ComparisonRow
+                            label="Submissions per 15 Min"
+                            value1={fighter1.sub_avg}
+                            value2={fighter2.sub_avg}
+                            unit=""
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Predict Button */}
+                <div className="flex justify-center mt-8">
+                  <Button
+                    size="lg"
+                    onClick={handlePredictClick}
+                    disabled={isPredicting}
+                    className="min-w-[240px] h-14 text-lg"
+                  >
+                    {isPredicting ? (
+                      <>
+                        Predicting...
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="ml-2"
+                        >
+                          <Swords className="h-6 w-6" />
+                        </motion.div>
+                      </>
+                    ) : (
+                      <>
+                        Get Prediction
+                        <Swords className="ml-2 h-6 w-6" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[400px]">
+                <div className="text-center space-y-4">
+                  <div className="text-muted-foreground">
+                    <Swords className="h-16 w-16 mx-auto mb-6 opacity-50" />
+                    <p className="text-xl font-medium">
+                      Select two fighters to compare their statistics
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Fighter 2 Column */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Fighter 2</h3>
+              {fighter2 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFighter2(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <div className="relative isolate">
+              <div className="relative z-[2]">
+                <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} />
+              </div>
+              <AnimatePresence mode="wait">
+                {fighter2 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-6 relative z-[1]"
+                  >
+                    <FighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
+        {/* Prediction Modal */}
+        <AnimatePresence>
+          {showPredictionModal && (
+            <motion.div
+              variants={animationVariants.modal}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+            >
+              <div className="relative w-full max-w-lg rounded-lg border bg-card p-6 shadow-lg">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold">Fight Prediction</h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowPredictionModal(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
 
-                {/* Probability Bars */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>{prediction.fighter1.name}</span>
-                      <span>{prediction.fighter1.win_probability}</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        style={{ width: `${prediction.fighter1.probability}%` }}
-                        className="h-full bg-primary transition-[width] duration-500 ease-out"
-                      />
-                    </div>
+                <div className="space-y-6">
+                  {/* Winner Prediction */}
+                  <div className="text-center space-y-2">
+                    <p className="text-muted-foreground">Predicted Winner</p>
+                    <h4 className="text-3xl font-bold text-primary">
+                      {prediction?.winner}
+                    </h4>
+                    <p className="text-muted-foreground">
+                      Confidence: {prediction?.prediction_confidence}%
+                    </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>{prediction.fighter2.name}</span>
-                      <span>{prediction.fighter2.win_probability}</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        style={{ width: `${prediction.fighter2.probability}%` }}
-                        className="h-full bg-primary transition-[width] duration-500 ease-out"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  {/* Probability Bars */}
+                  <div className="mt-4 space-y-4">
+                    <motion.div
+                      variants={animationVariants.listItem}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      className="space-y-2"
+                    >
+                      <div className="flex justify-between text-sm">
+                        <span>{prediction?.fighter1.name}</span>
+                        <span>{prediction?.fighter1.win_probability}</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          style={{ width: `${prediction?.fighter1.probability}%` }}
+                          className="h-full bg-primary transition-[width] duration-500 ease-out"
+                        />
+                      </div>
+                    </motion.div>
 
-                {/* Model Info */}
-                <div className="text-center text-sm text-muted-foreground">
-                  Model Version: {prediction.model_version}
+                    <motion.div
+                      variants={animationVariants.listItem}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      className="space-y-2"
+                    >
+                      <div className="flex justify-between text-sm">
+                        <span>{prediction?.fighter2.name}</span>
+                        <span>{prediction?.fighter2.win_probability}</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          style={{ width: `${prediction?.fighter2.probability}%` }}
+                          className="h-full bg-primary transition-[width] duration-500 ease-out"
+                        />
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Model Info */}
+                  <div className="text-center text-sm text-muted-foreground">
+                    Model Version: {prediction?.model_version}
+                  </div>
                 </div>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 }
