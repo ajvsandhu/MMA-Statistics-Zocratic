@@ -2,14 +2,15 @@ import { FighterDetails } from "@/components/fighter-details"
 import { notFound } from "next/navigation"
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
-export default function FighterPage({ params }: PageProps) {
+export default async function FighterPage({ params }: PageProps) {
   // Extract the fighter name from the slug
-  const fighterName = params.slug.split('-')[0].replace(/-/g, ' ');
+  const resolvedParams = await params;
+  const fighterName = resolvedParams.slug.split('-')[0].replace(/-/g, ' ');
   
   return (
     <div className="container mx-auto px-4 py-8">

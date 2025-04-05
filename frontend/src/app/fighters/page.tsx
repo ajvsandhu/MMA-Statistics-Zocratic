@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { FighterSearch } from "@/components/fighter-search"
 import { FighterDetails } from "@/components/fighter-details"
 import { formatFighterUrl } from "@/lib/utils"
 import { motion } from "framer-motion"
 
-export default function FightersPage() {
+function FightersContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [selectedFighter, setSelectedFighter] = useState<string | null>(null)
@@ -80,5 +80,13 @@ export default function FightersPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function FightersPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <FightersContent />
+    </Suspense>
   )
 }
