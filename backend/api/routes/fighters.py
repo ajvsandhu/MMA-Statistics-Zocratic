@@ -186,20 +186,49 @@ def get_fighter_stats(fighter_name: str):
         if "(" in fighter_name:
             fighter_name = fighter_name.split("(")[0].strip()
         
-        # Fetch fighter stats from Supabase
+        # First try exact match
         response = supabase.table('fighters')\
             .select('*')\
             .eq('fighter_name', fighter_name)\
             .execute()
         
-        if not response.data:
-            logger.warning(f"Fighter not found: {fighter_name}")
-            raise HTTPException(status_code=404, detail=f"Fighter not found: {fighter_name}")
+        if response.data:
+            logger.info(f"Exact match found for fighter: {fighter_name}")
+            return sanitize_json(response.data[0])
+            
+        # If no exact match, try fuzzy matching
+        all_fighters = supabase.table('fighters').select('fighter_name').execute()
+        if not all_fighters.data:
+            logger.warning(f"No fighters found in database")
+            raise HTTPException(status_code=404, detail="No fighters found in database")
+            
+        # Get list of fighter names
+        fighter_names = [f['fighter_name'] for f in all_fighters.data]
         
-        # Return first matching fighter
-        fighter_data = response.data[0]
-        logger.info(f"Retrieved stats for fighter: {fighter_name}")
-        return sanitize_json(fighter_data)
+        # Use fuzzy matching to find the best match
+        best_match = process.extractOne(
+            fighter_name,
+            fighter_names,
+            scorer=fuzz.token_sort_ratio,
+            score_cutoff=80  # Only accept matches with 80% or higher similarity
+        )
+        
+        if best_match:
+            matched_name, score = best_match
+            logger.info(f"Fuzzy match found for {fighter_name}: {matched_name} (score: {score})")
+            
+            # Fetch the matched fighter's data
+            response = supabase.table('fighters')\
+                .select('*')\
+                .eq('fighter_name', matched_name)\
+                .execute()
+                
+            if response.data:
+                return sanitize_json(response.data[0])
+        
+        logger.warning(f"Fighter not found: {fighter_name}")
+        raise HTTPException(status_code=404, detail=f"Fighter not found: {fighter_name}")
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -292,22 +321,23 @@ def get_fighter(fighter_name: str) -> Dict:
             fighter_name = unquote(fighter_name)
         except Exception as e:
             logger.error(f"Error decoding fighter name: {str(e)}")
+            raise HTTPException(status_code=400, detail="Invalid fighter name")
         
         logger.info(f"Fighter lookup requested for: {fighter_name}")
         
         supabase = get_db_connection()
         if not supabase:
             logger.error("No database connection available")
-            return _get_default_fighter(fighter_name)
+            raise HTTPException(status_code=500, detail="Database connection error")
         
+        # Clean the fighter name - remove record if present
         clean_name = fighter_name
         if "(" in fighter_name:
             clean_name = fighter_name.split("(")[0].strip()
-            logger.info(f"Extracted clean name: {clean_name}")
         
-        fighter_data = None
+        logger.info(f"Cleaned fighter name: {clean_name}")
         
-        # Method 1: Direct match
+        # Try exact match first
         response = supabase.table('fighters')\
             .select('*')\
             .eq('fighter_name', clean_name)\
@@ -315,63 +345,66 @@ def get_fighter(fighter_name: str) -> Dict:
             
         if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
             fighter_data = response.data[0]
-            logger.info(f"Found fighter via direct match: {clean_name}")
+            logger.info(f"Found fighter via exact match: {clean_name}")
+            return _process_fighter_data(fighter_data)
         
-        # Method 2: Case insensitive match if direct match failed
-        if not fighter_data:
-            response = supabase.table('fighters')\
-                .select('*')\
-                .ilike('fighter_name', clean_name)\
-                .execute()
-                
-            if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
-                fighter_data = response.data[0]
-                logger.info(f"Found fighter via case-insensitive match: {clean_name}")
+        # If no exact match, try case-insensitive match
+        response = supabase.table('fighters')\
+            .select('*')\
+            .ilike('fighter_name', f"%{clean_name}%")\
+            .execute()
+            
+        if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
+            fighters = response.data
+            # Convert ranking to int for comparison
+            ranked_fighters = [f for f in fighters if int(f.get('ranking', 99)) < 99]
+            if ranked_fighters:
+                fighter_data = ranked_fighters[0]
+            else:
+                fighter_data = fighters[0]
+            logger.info(f"Found fighter via case-insensitive match: {clean_name}")
+            return _process_fighter_data(fighter_data)
         
-        # Method 3: Partial match if previous methods failed
-        if not fighter_data:
-            response = supabase.table('fighters')\
-                .select('*')\
-                .ilike('fighter_name', f'%{clean_name}%')\
-                .limit(1)\
-                .execute()
-                
-            if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
-                fighter_data = response.data[0]
-                logger.info(f"Found fighter via partial match: {clean_name}")
+        logger.warning(f"Fighter not found: {clean_name}")
+        raise HTTPException(status_code=404, detail=f"Fighter not found: {clean_name}")
         
-        if not fighter_data:
-            logger.warning(f"Fighter not found with any method: {clean_name}")
-            return _get_default_fighter(clean_name)
-        
-        fighter_name_from_db = fighter_data.get('fighter_name', '')
-        logger.info(f"Fetching fights using exact fighter name from database: '{fighter_name_from_db}'")
-        
-        last_5_fights = []
-        try:
-            if fighter_name_from_db:
-                fights_response = supabase.table('fighter_last_5_fights')\
-                    .select('*')\
-                    .eq('fighter_name', fighter_name_from_db)\
-                    .order('id', desc=False)\
-                    .limit(MAX_FIGHTS_DISPLAY)\
-                    .execute()
-                
-                if fights_response and hasattr(fights_response, 'data') and fights_response.data:
-                    last_5_fights = fights_response.data
-                    logger.info(f"SUCCESS! Found {len(last_5_fights)} fights for fighter '{fighter_name_from_db}'")
-        except Exception as e:
-            logger.error(f"Error fetching fights for fighter {clean_name}: {str(e)}")
-            logger.error(traceback.format_exc())
-        
-        fighter_data['last_5_fights'] = last_5_fights
-        
-        logger.info(f"Successfully retrieved fighter: {clean_name} with {len(last_5_fights)} fights")
-        return fighter_data
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in get_fighter: {str(e)}")
         logger.error(traceback.format_exc())
-        return _get_default_fighter(fighter_name if fighter_name else "Unknown Fighter")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+def _process_fighter_data(fighter_data: Dict) -> Dict:
+    """Process fighter data and fetch last 5 fights."""
+    try:
+        fighter_name_from_db = fighter_data.get('fighter_name', '')
+        logger.info(f"Fetching fights using exact fighter name from database: '{fighter_name_from_db}'")
+        
+        supabase = get_db_connection()
+        if not supabase:
+            logger.error("No database connection available")
+            return fighter_data
+        
+        last_5_fights = []
+        if fighter_name_from_db:
+            fights_response = supabase.table('fighter_last_5_fights')\
+                .select('*')\
+                .eq('fighter_name', fighter_name_from_db)\
+                .order('id', desc=False)\
+                .limit(MAX_FIGHTS_DISPLAY)\
+                .execute()
+            
+            if fights_response and hasattr(fights_response, 'data') and fights_response.data:
+                last_5_fights = fights_response.data
+                logger.info(f"SUCCESS! Found {len(last_5_fights)} fights for fighter '{fighter_name_from_db}'")
+        
+        fighter_data['last_5_fights'] = last_5_fights
+        return fighter_data
+    except Exception as e:
+        logger.error(f"Error processing fighter data: {str(e)}")
+        logger.error(traceback.format_exc())
+        return fighter_data
 
 def _get_default_fighter(name: str) -> Dict:
     """Return a default fighter object with the given name."""

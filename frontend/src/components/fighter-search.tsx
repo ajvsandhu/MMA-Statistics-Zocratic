@@ -240,13 +240,7 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
       const record = recordMatch ? recordMatch[1] : '';
       const cleanName = fighterName.split('(')[0].trim();
       
-      // Format the URL
-      const url = `/fighters/${formatFighterUrl(cleanName, record)}`;
-      
-      // Update the URL first
-      window.history.pushState({}, '', url);
-      
-      // Then update the UI state
+      // Update the UI state
       setShowSuggestions(false);
       setSearchTerm("");
       setSelectedIndex(-1);
@@ -298,17 +292,13 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
       const [baseName, ...rest] = fighter.split('(');
       const info = '(' + rest.join('(');
       return (
-        <motion.div 
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2"
-        >
+        <div className="flex items-center gap-2">
           {isHistory && <History className="w-4 h-4 text-muted-foreground" />}
           <div className="flex flex-col">
             <span className="font-medium">{baseName.trim()}</span>
             <span className="text-sm text-muted-foreground">{info}</span>
           </div>
-        </motion.div>
+        </div>
       );
     } catch (err) {
       console.error('Error creating fighter display element:', err);
@@ -323,14 +313,8 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
   return (
     <div ref={wrapperRef} className="relative w-full" onKeyDown={handleKeyDown}>
       <div className="flex gap-3">
-        <motion.div 
-          initial={false}
-          animate={{ scale: isLoading ? 0.99 : 1 }}
-          transition={{ duration: 0.15 }}
-          className="relative group flex-1"
-          style={{ willChange: 'transform' }}
-        >
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <div className="relative group flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
           <Input
             ref={inputRef}
             placeholder="Search fighters..."
@@ -342,10 +326,9 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
               "bg-white/10 dark:bg-white/5",
               "hover:bg-white/15 dark:hover:bg-white/10",
               "focus:bg-white/20 dark:focus:bg-white/15",
-              "border-white/20 backdrop-blur-md",
+              "border-white/20",
               "ring-0",
               "shadow-lg",
-              "focus:shadow-xl transition-all duration-300",
               "rounded-2xl text-base text-foreground placeholder:text-muted-foreground"
             )}
           />
@@ -359,7 +342,7 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
               <X className="h-4 w-4 text-muted-foreground" />
             </Button>
           )}
-        </motion.div>
+        </div>
         
         <Popover open={showFilters} onOpenChange={setShowFilters}>
           <PopoverTrigger asChild>
@@ -437,91 +420,78 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
         </Popover>
       </div>
 
-      <AnimatePresence mode="wait">
-        {showSuggestions && (searchTerm.trim() || isLoading || error || searchHistory.length > 0) && (
-          <motion.div 
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute top-[calc(100%+0.5rem)] w-full z-50 rounded-lg border border-border/10 bg-background/95 backdrop-blur-lg text-foreground shadow-xl overflow-hidden"
-            style={{ willChange: 'transform, opacity' }}
-          >
-            <Command className="rounded-lg border-0" shouldFilter={false}>
-              {error && (
-                <motion.p 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="p-4 text-sm text-destructive/90 text-center"
-                >
-                  {error}
-                </motion.p>
-              )}
-              {isLoading ? (
-                <div className="p-2 space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="px-2 py-1.5">
-                      <Skeleton className="h-5 w-full" />
-                      <Skeleton className="h-4 w-2/3 mt-1" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  {searchTerm.trim() ? (
-                    <CommandGroup heading="Search Results">
-                      {validFighters.length === 0 ? (
-                        <CommandEmpty>No fighters found</CommandEmpty>
-                      ) : (
-                        validFighters.map((fighter, index) => (
-                          <CommandItem
-                            key={fighter}
-                            value={fighter}
-                            onSelect={() => handleFighterSelect(fighter)}
-                            className={cn(
-                              "cursor-pointer transition-colors",
-                              index === selectedIndex && "bg-accent"
-                            )}
-                          >
-                            {getFighterDisplayElement(fighter)}
-                          </CommandItem>
-                        ))
-                      )}
-                    </CommandGroup>
-                  ) : searchHistory.length > 0 ? (
-                    <>
-                      <div className="flex items-center justify-between px-2 py-1.5">
-                        <span className="text-sm text-muted-foreground">Recent Searches</span>
-                        <button
-                          onClick={clearHistory}
-                          className="text-sm text-muted-foreground hover:text-primary transition-colors"
+      {showSuggestions && (searchTerm.trim() || isLoading || error || searchHistory.length > 0) && (
+        <div className="absolute top-[calc(100%+0.5rem)] w-full z-50 rounded-lg border border-border/10 bg-background/95 backdrop-blur-lg text-foreground shadow-xl overflow-hidden">
+          <Command className="rounded-lg border-0" shouldFilter={false}>
+            {error && (
+              <p className="p-4 text-sm text-destructive/90 text-center">
+                {error}
+              </p>
+            )}
+            {isLoading ? (
+              <div className="p-2 space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="px-2 py-1.5">
+                    <Skeleton className="h-5 w-full" />
+                    <Skeleton className="h-4 w-2/3 mt-1" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                {searchTerm.trim() ? (
+                  <CommandGroup heading="Search Results">
+                    {validFighters.length === 0 ? (
+                      <CommandEmpty>No fighters found</CommandEmpty>
+                    ) : (
+                      validFighters.map((fighter, index) => (
+                        <CommandItem
+                          key={fighter}
+                          value={fighter}
+                          onSelect={() => handleFighterSelect(fighter)}
+                          className={cn(
+                            "cursor-pointer transition-colors",
+                            index === selectedIndex && "bg-accent"
+                          )}
                         >
-                          Clear
-                        </button>
-                      </div>
-                      <CommandGroup>
-                        {searchHistory.map((fighter, index) => (
-                          <CommandItem
-                            key={fighter}
-                            value={fighter}
-                            onSelect={() => handleFighterSelect(fighter)}
-                            className={cn(
-                              "cursor-pointer transition-colors",
-                              index === selectedIndex && "bg-accent"
-                            )}
-                          >
-                            {getFighterDisplayElement(fighter, true)}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </>
-                  ) : null}
-                </>
-              )}
-            </Command>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                          {getFighterDisplayElement(fighter)}
+                        </CommandItem>
+                      ))
+                    )}
+                  </CommandGroup>
+                ) : searchHistory.length > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between px-2 py-1.5">
+                      <span className="text-sm text-muted-foreground">Recent Searches</span>
+                      <button
+                        onClick={clearHistory}
+                        className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <CommandGroup>
+                      {searchHistory.map((fighter, index) => (
+                        <CommandItem
+                          key={fighter}
+                          value={fighter}
+                          onSelect={() => handleFighterSelect(fighter)}
+                          className={cn(
+                            "cursor-pointer transition-colors",
+                            index === selectedIndex && "bg-accent"
+                          )}
+                        >
+                          {getFighterDisplayElement(fighter, true)}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </>
+                ) : null}
+              </>
+            )}
+          </Command>
+        </div>
+      )}
     </div>
   );
 } 

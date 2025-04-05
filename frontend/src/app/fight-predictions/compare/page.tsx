@@ -368,19 +368,9 @@ export default function ComparePage() {
   );
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className="container max-w-[1400px] mx-auto px-4 min-h-[calc(100vh-4rem)] py-8"
-    >
+    <div className="container max-w-[1400px] mx-auto px-4 min-h-[calc(100vh-4rem)] py-8">
       {/* Header */}
-      <motion.div 
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="flex items-center justify-between mb-12"
-      >
+      <div className="flex items-center justify-between mb-12">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -392,22 +382,12 @@ export default function ComparePage() {
           </Button>
           <h2 className="text-2xl font-bold">Fighter Comparison</h2>
         </div>
-      </motion.div>
+      </div>
 
       {/* Main Content */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-        className="grid grid-cols-1 lg:grid-cols-[350px,1fr,350px] gap-12 items-start max-w-[1400px] mx-auto"
-      >
+      <div className="grid grid-cols-1 lg:grid-cols-[350px,1fr,350px] gap-12 items-start max-w-[1400px] mx-auto">
         {/* Fighter 1 Column */}
-        <motion.div 
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-          className="space-y-6"
-        >
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Fighter 1</h3>
             {fighter1 && (
@@ -425,13 +405,13 @@ export default function ComparePage() {
             <div className="relative z-[2]">
               <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} />
             </div>
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
               {fighter1 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
                   className="mt-6 relative z-[1]"
                 >
                   <FighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />
@@ -439,49 +419,25 @@ export default function ComparePage() {
               )}
             </AnimatePresence>
           </div>
-        </motion.div>
+        </div>
 
         {/* Center Stats Column */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className="flex flex-col items-center"
-        >
+        <div className="flex flex-col items-center">
           {/* VS Badge */}
-          <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 1 }}
-            className="flex items-center justify-center mb-8"
-          >
+          <div className="flex items-center justify-center mb-8">
             <div className="px-8 py-3 rounded-full bg-accent/10 backdrop-blur-sm border border-border">
               <span className="text-2xl font-bold text-muted-foreground">VS</span>
             </div>
-          </motion.div>
+          </div>
 
           {/* Stats Comparison */}
           {fighter1 && fighter2 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 1.2 }}
-              className="w-full"
-            >
+            <div className="w-full">
               <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl">
                 <CardContent className="p-8">
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 1.4 }}
-                    className="space-y-10"
-                  >
+                  <div className="space-y-10">
                     {/* Physical Stats */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 1.6 }}
-                    >
+                    <div>
                       <h4 className="text-lg font-semibold mb-6 text-center">Physical Attributes</h4>
                       <div className="space-y-4">
                         <SimpleComparisonRow
@@ -505,16 +461,12 @@ export default function ComparePage() {
                           value2={fighter2.stance}
                         />
                       </div>
-                    </motion.div>
+                    </div>
 
                     <Separator className="bg-border/50" />
 
                     {/* Striking Stats */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 1.8 }}
-                    >
+                    <div>
                       <h4 className="text-lg font-semibold mb-6 text-center">Striking</h4>
                       <div className="space-y-4">
                         <ComparisonRow
@@ -543,16 +495,12 @@ export default function ComparePage() {
                           unit="%"
                         />
                       </div>
-                    </motion.div>
+                    </div>
 
                     <Separator className="bg-border/50" />
 
                     {/* Grappling Stats */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 2 }}
-                    >
+                    <div>
                       <h4 className="text-lg font-semibold mb-6 text-center">Grappling</h4>
                       <div className="space-y-4">
                         <ComparisonRow
@@ -580,18 +528,13 @@ export default function ComparePage() {
                           unit=""
                         />
                       </div>
-                    </motion.div>
-                  </motion.div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
               {/* Predict Button */}
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 2.2 }}
-                className="flex justify-center mt-8"
-              >
+              <div className="flex justify-center mt-8">
                 <Button
                   size="lg"
                   onClick={handlePredictClick}
@@ -616,45 +559,24 @@ export default function ComparePage() {
                     </>
                   )}
                 </Button>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           ) : (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 1 }}
-              className="flex items-center justify-center h-[400px]"
-            >
+            <div className="flex items-center justify-center h-[400px]">
               <div className="text-center space-y-4">
                 <div className="text-muted-foreground">
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 1.2 }}
-                  >
-                    <Swords className="h-16 w-16 mx-auto mb-6 opacity-50" />
-                  </motion.div>
-                  <motion.p
-                    initial={{ y: 10, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 1.4 }}
-                    className="text-xl font-medium"
-                  >
+                  <Swords className="h-16 w-16 mx-auto mb-6 opacity-50" />
+                  <p className="text-xl font-medium">
                     Select two fighters to compare their statistics
-                  </motion.p>
+                  </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
 
         {/* Fighter 2 Column */}
-        <motion.div 
-          initial={{ x: 20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-          className="space-y-6"
-        >
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Fighter 2</h3>
             {fighter2 && (
@@ -672,13 +594,13 @@ export default function ComparePage() {
             <div className="relative z-[2]">
               <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} />
             </div>
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
               {fighter2 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
                   className="mt-6 relative z-[1]"
                 >
                   <FighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />
@@ -686,9 +608,94 @@ export default function ComparePage() {
               )}
             </AnimatePresence>
           </div>
-        </motion.div>
-      </motion.div>
-    </motion.div>
+        </div>
+      </div>
+
+      {/* Prediction Modal */}
+      <AnimatePresence mode="wait">
+        {showPredictionModal && prediction && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowPredictionModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-card/95 backdrop-blur-xl border-border/50 rounded-xl shadow-2xl max-w-2xl w-full p-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold">Fight Prediction</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPredictionModal(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Winner Prediction */}
+                <div className="text-center space-y-2">
+                  <p className="text-muted-foreground">Predicted Winner</p>
+                  <h4 className="text-3xl font-bold text-primary">
+                    {prediction.winner}
+                  </h4>
+                  <p className="text-muted-foreground">
+                    Confidence: {prediction.prediction_confidence}%
+                  </p>
+                </div>
+
+                {/* Probability Bars */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>{prediction.fighter1.name}</span>
+                      <span>{prediction.fighter1.win_probability}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${prediction.fighter1.probability}%` }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="h-full bg-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>{prediction.fighter2.name}</span>
+                      <span>{prediction.fighter2.win_probability}</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${prediction.fighter2.probability}%` }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="h-full bg-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Model Info */}
+                <div className="text-center text-sm text-muted-foreground">
+                  Model Version: {prediction.model_version}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
