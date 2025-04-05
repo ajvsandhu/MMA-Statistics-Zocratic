@@ -315,6 +315,20 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
     fighter !== undefined && fighter !== null && typeof fighter === 'string'
   );
 
+  // Mobile-specific animations
+  const mobileDropdownAnimation = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 0.15 }
+  }
+
+  const mobileItemAnimation = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    transition: { duration: 0.1 }
+  }
+
   return (
     <div ref={wrapperRef} className="relative w-full" onKeyDown={handleKeyDown}>
       <div className="flex gap-3">

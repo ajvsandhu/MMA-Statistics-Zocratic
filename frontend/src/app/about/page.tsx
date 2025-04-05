@@ -108,18 +108,20 @@ export default function AboutPage() {
 
   return (
     <div className="fixed inset-0 bg-background">
-      {/* Navigation Legend */}
+      {/* Navigation Legend - Updated positioning and styling */}
       <div className={cn(
         "fixed z-50 transition-all duration-300",
-        isMobile ? "bottom-8 left-1/2 -translate-x-1/2" : "right-8 top-1/2 -translate-y-1/2"
+        isMobile 
+          ? "bottom-6 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border/50 shadow-lg" 
+          : "right-8 top-1/2 -translate-y-1/2"
       )}>
         <div className={cn(
           "flex items-center relative",
-          isMobile ? "flex-row gap-4" : "flex-col gap-6"
+          isMobile ? "flex-row gap-3" : "flex-col gap-6"
         )}>
           {isMobile ? (
             <div 
-              className="absolute inset-y-[19px] left-0 right-0 h-[2px] bg-muted-foreground/20"
+              className="absolute inset-y-[15px] left-0 right-0 h-[2px] bg-muted-foreground/10"
               style={{
                 transform: `scaleX(${(sections.length - 1) * 100}%)`
               }}
@@ -134,26 +136,28 @@ export default function AboutPage() {
           )}
           {sections.map((section, index) => (
             <div key={index} className="relative">
-              <motion.div
-                className={cn(
-                  "absolute bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-md border border-border/50",
-                  isMobile ? "-top-12 left-1/2 -translate-x-1/2" : "right-full mr-6 top-1/2 -translate-y-1/2"
-                )}
-                initial={false}
-                animate={{
-                  opacity: activeSection === index ? 1 : 0,
-                  [isMobile ? 'y' : 'x']: activeSection === index ? 0 : 20,
-                  scale: activeSection === index ? 1 : 0.95
-                }}
-                transition={{ duration: 0.4 }}
-              >
-                <span className="text-sm font-medium whitespace-nowrap text-foreground">
-                  {section}
-                </span>
-              </motion.div>
+              {!isMobile && (
+                <motion.div
+                  className="absolute right-full mr-6 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-md border border-border/50"
+                  initial={false}
+                  animate={{
+                    opacity: activeSection === index ? 1 : 0,
+                    x: activeSection === index ? 0 : 20,
+                    scale: activeSection === index ? 1 : 0.95
+                  }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <span className="text-sm font-medium whitespace-nowrap text-foreground">
+                    {section}
+                  </span>
+                </motion.div>
+              )}
               <button
                 onClick={() => scrollToSection(index)}
-                className="relative w-10 h-10 rounded-full flex items-center justify-center group"
+                className={cn(
+                  "relative flex items-center justify-center group",
+                  isMobile ? "w-8 h-8" : "w-10 h-10"
+                )}
               >
                 <motion.div
                   className="absolute inset-0 rounded-full bg-primary/20"
@@ -162,16 +166,19 @@ export default function AboutPage() {
                     scale: activeSection === index ? 1 : 0,
                     opacity: activeSection === index ? 1 : 0
                   }}
-                  transition={{ duration: 0.4 }}
+                  transition={{ duration: 0.3 }}
                 />
                 <motion.div
-                  className="w-2.5 h-2.5 rounded-full"
+                  className={cn(
+                    "rounded-full",
+                    isMobile ? "w-2 h-2" : "w-2.5 h-2.5"
+                  )}
                   initial={false}
                   animate={{
                     scale: activeSection === index ? 1 : 0.8,
                     backgroundColor: activeSection === index ? 'var(--primary)' : 'var(--muted-foreground)'
                   }}
-                  transition={{ duration: 0.4 }}
+                  transition={{ duration: 0.3 }}
                 />
               </button>
             </div>
@@ -191,21 +198,21 @@ export default function AboutPage() {
               className="h-full w-full flex items-center justify-center relative snap-start"
               initial={{ 
                 opacity: 0,
-                y: direction > 0 ? 100 : -100
+                y: isMobile ? 0 : (direction > 0 ? 100 : -100)
               }}
               animate={{ 
                 opacity: 1,
                 y: 0,
                 transition: {
-                  duration: 0.6,
+                  duration: isMobile ? 0.2 : 0.6,
                   ease: [0.16, 1, 0.3, 1]
                 }
               }}
               exit={{ 
                 opacity: 0,
-                y: direction > 0 ? -100 : 100,
+                y: isMobile ? 0 : (direction > 0 ? -100 : 100),
                 transition: {
-                  duration: 0.6,
+                  duration: isMobile ? 0.15 : 0.6,
                   ease: [0.16, 1, 0.3, 1]
                 }
               }}
@@ -218,13 +225,13 @@ export default function AboutPage() {
               />
               <motion.div
                 className="container max-w-5xl px-4"
-                initial={{ opacity: 0, y: 40 }}
+                initial={{ opacity: 0, y: isMobile ? 0 : 40 }}
                 animate={{ 
                   opacity: 1, 
                   y: 0,
                   transition: {
-                    duration: 0.8,
-                    delay: 0.2,
+                    duration: isMobile ? 0.2 : 0.8,
+                    delay: isMobile ? 0.1 : 0.2,
                     ease: [0.16, 1, 0.3, 1]
                   }
                 }}
