@@ -100,18 +100,20 @@ export const cleanFighterName = (name: string): string => {
  * @returns URL-friendly string
  */
 export const formatFighterUrl = (name: string, record?: string): string => {
+  // Clean the name by removing parentheses and extra spaces
   const cleanName = name
-    .replace(/[()]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-zA-Z0-9-]/g, '')
-    .toLowerCase();
+    .replace(/[()]/g, '')  // Remove parentheses
+    .trim()                // Remove leading/trailing spaces
+    .replace(/\s+/g, '-')  // Replace spaces with hyphens
+    .toLowerCase();        // Convert to lowercase
   
   if (record) {
+    // Clean the record by removing parentheses and extra spaces
     const cleanRecord = record
-      .replace(/[()]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/[^a-zA-Z0-9-]/g, '')
-      .toLowerCase();
+      .replace(/[()]/g, '')  // Remove parentheses
+      .trim()                // Remove leading/trailing spaces
+      .replace(/\s+/g, '-')  // Replace spaces with hyphens
+      .toLowerCase();        // Convert to lowercase
     return `${cleanName}-${cleanRecord}`;
   }
   
