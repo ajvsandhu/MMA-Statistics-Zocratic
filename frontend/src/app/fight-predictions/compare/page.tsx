@@ -296,12 +296,12 @@ export default function ComparePage() {
 
     return (
       <div className="relative group">
-        <div className="grid grid-cols-[1fr,auto,1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg transition-colors">
+        <div className="grid grid-cols-[1fr,auto,1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg">
           <div className="relative">
             <div
               style={{ width: `${width1}%` }}
               className={cn(
-                "absolute top-0 left-0 h-full rounded-l-md opacity-10 transition-all duration-500",
+                "absolute top-0 left-0 h-full rounded-l-md opacity-10",
                 color1.includes("green") ? "bg-green-500" : 
                 color1.includes("red") ? "bg-red-500" : 
                 "bg-yellow-500"
@@ -327,7 +327,7 @@ export default function ComparePage() {
             <div
               style={{ width: `${width2}%` }}
               className={cn(
-                "absolute top-0 right-0 h-full rounded-r-md opacity-10 transition-all duration-500",
+                "absolute top-0 right-0 h-full rounded-r-md opacity-10",
                 color2.includes("green") ? "bg-green-500" : 
                 color2.includes("red") ? "bg-red-500" : 
                 "bg-yellow-500"
@@ -661,11 +661,9 @@ export default function ComparePage() {
                       <span>{prediction.fighter1.win_probability}</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${prediction.fighter1.probability}%` }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="h-full bg-primary"
+                      <div
+                        style={{ width: `${prediction.fighter1.probability}%` }}
+                        className="h-full bg-primary transition-[width] duration-500 ease-out"
                       />
                     </div>
                   </div>
@@ -676,11 +674,9 @@ export default function ComparePage() {
                       <span>{prediction.fighter2.win_probability}</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${prediction.fighter2.probability}%` }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="h-full bg-primary"
+                      <div
+                        style={{ width: `${prediction.fighter2.probability}%` }}
+                        className="h-full bg-primary transition-[width] duration-500 ease-out"
                       />
                     </div>
                   </div>
