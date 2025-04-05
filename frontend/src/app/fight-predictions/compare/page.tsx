@@ -373,9 +373,9 @@ export default function ComparePage() {
 
   return (
     <div className="fixed inset-0 pt-[65px]">
-      <div className="h-[calc(100vh-65px)] px-2 sm:px-4">
+      <div className="h-[calc(100vh-65px)] px-4 sm:px-6 lg:px-8">
         <motion.div 
-          className="h-full flex flex-col pt-8 sm:pt-16"
+          className="h-full flex flex-col pt-8 sm:pt-16 max-w-[1400px] mx-auto"
           {...(isMobile ? fadeAnimation : animationVariants.page)}
         >
           {/* Header */}
@@ -394,14 +394,14 @@ export default function ComparePage() {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[500px,1fr,500px] gap-2 overflow-hidden">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-[400px,1fr,400px] gap-4 lg:gap-6 overflow-hidden">
             {/* Fighter 1 Column */}
             <div className="flex flex-col">
               <h3 className="text-lg font-semibold mb-1">Fighter 1</h3>
               <div className="relative z-30">
                 <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} />
               </div>
-              <div className="mt-1 flex-1">
+              <div className="mt-2 flex-1">
                 <AnimatePresence mode="wait">
                   {fighter1 && (
                     <motion.div
@@ -420,7 +420,7 @@ export default function ComparePage() {
             {/* Center Stats Column */}
             <div className="flex flex-col">
               {/* VS Badge and Predict Button */}
-              <div className="flex flex-col items-center mb-1">
+              <div className="flex flex-col items-center mb-2">
                 <div className="px-2.5 py-0.5 rounded-full bg-accent/10 backdrop-blur-sm border border-border">
                   <span className="text-sm font-bold text-muted-foreground">VS</span>
                 </div>
@@ -430,7 +430,7 @@ export default function ComparePage() {
                     size="sm"
                     onClick={handlePredictClick}
                     disabled={isPredicting}
-                    className="w-[200px] mt-1 shadow-lg"
+                    className="w-[200px] mt-2 shadow-lg"
                   >
                     {isPredicting ? (
                       <>
@@ -456,105 +456,111 @@ export default function ComparePage() {
               {/* Stats Comparison */}
               <div className="flex-1">
                 {fighter1 && fighter2 ? (
-                  <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl">
-                    <CardContent className="p-2">
-                      <div className="space-y-1.5">
-                        {/* Physical Stats */}
-                        <div>
-                          <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Physical Attributes</h4>
-                          <div className="space-y-1">
-                            <SimpleComparisonRow
-                              label="Height"
-                              value1={fighter1.height}
-                              value2={fighter2.height}
-                            />
-                            <SimpleComparisonRow
-                              label="Weight"
-                              value1={fighter1.weight}
-                              value2={fighter2.weight}
-                            />
-                            <SimpleComparisonRow
-                              label="Reach"
-                              value1={fighter1.reach}
-                              value2={fighter2.reach}
-                            />
-                            <SimpleComparisonRow
-                              label="Stance"
-                              value1={fighter1.stance}
-                              value2={fighter2.stance}
-                            />
+                  <motion.div
+                    initial={isMobile ? {} : { opacity: 0, y: 20 }}
+                    animate={isMobile ? {} : { opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl max-w-[450px] mx-auto">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="space-y-2">
+                          {/* Physical Stats */}
+                          <div>
+                            <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Physical Attributes</h4>
+                            <div className="space-y-1">
+                              <SimpleComparisonRow
+                                label="Height"
+                                value1={fighter1.height}
+                                value2={fighter2.height}
+                              />
+                              <SimpleComparisonRow
+                                label="Weight"
+                                value1={fighter1.weight}
+                                value2={fighter2.weight}
+                              />
+                              <SimpleComparisonRow
+                                label="Reach"
+                                value1={fighter1.reach}
+                                value2={fighter2.reach}
+                              />
+                              <SimpleComparisonRow
+                                label="Stance"
+                                value1={fighter1.stance}
+                                value2={fighter2.stance}
+                              />
+                            </div>
+                          </div>
+
+                          <Separator className="bg-border/50" />
+
+                          {/* Striking Stats */}
+                          <div>
+                            <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Striking</h4>
+                            <div className="space-y-1">
+                              <ComparisonRow
+                                label="Strikes Landed per Min"
+                                value1={fighter1.slpm}
+                                value2={fighter2.slpm}
+                                unit=""
+                              />
+                              <ComparisonRow
+                                label="Striking Accuracy"
+                                value1={fighter1.str_acc}
+                                value2={fighter2.str_acc}
+                                unit="%"
+                              />
+                              <ComparisonRow
+                                label="Strikes Absorbed per Min"
+                                value1={fighter1.sapm}
+                                value2={fighter2.sapm}
+                                higherIsBetter={false}
+                                unit=""
+                              />
+                              <ComparisonRow
+                                label="Striking Defense"
+                                value1={fighter1.str_def}
+                                value2={fighter2.str_def}
+                                unit="%"
+                              />
+                            </div>
+                          </div>
+
+                          <Separator className="bg-border/50" />
+
+                          {/* Grappling Stats */}
+                          <div>
+                            <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Grappling</h4>
+                            <div className="space-y-1">
+                              <ComparisonRow
+                                label="Takedowns per 15 Min"
+                                value1={fighter1.td_avg}
+                                value2={fighter2.td_avg}
+                                unit=""
+                              />
+                              <ComparisonRow
+                                label="Takedown Accuracy"
+                                value1={fighter1.td_acc}
+                                value2={fighter2.td_acc}
+                                unit="%"
+                              />
+                              <ComparisonRow
+                                label="Takedown Defense"
+                                value1={fighter1.td_def}
+                                value2={fighter2.td_def}
+                                unit="%"
+                              />
+                              <ComparisonRow
+                                label="Submissions per 15 Min"
+                                value1={fighter1.sub_avg}
+                                value2={fighter2.sub_avg}
+                                unit=""
+                              />
+                            </div>
                           </div>
                         </div>
-
-                        <Separator className="bg-border/50" />
-
-                        {/* Striking Stats */}
-                        <div>
-                          <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Striking</h4>
-                          <div className="space-y-1">
-                            <ComparisonRow
-                              label="Strikes Landed per Min"
-                              value1={fighter1.slpm}
-                              value2={fighter2.slpm}
-                              unit=""
-                            />
-                            <ComparisonRow
-                              label="Striking Accuracy"
-                              value1={fighter1.str_acc}
-                              value2={fighter2.str_acc}
-                              unit="%"
-                            />
-                            <ComparisonRow
-                              label="Strikes Absorbed per Min"
-                              value1={fighter1.sapm}
-                              value2={fighter2.sapm}
-                              higherIsBetter={false}
-                              unit=""
-                            />
-                            <ComparisonRow
-                              label="Striking Defense"
-                              value1={fighter1.str_def}
-                              value2={fighter2.str_def}
-                              unit="%"
-                            />
-                          </div>
-                        </div>
-
-                        <Separator className="bg-border/50" />
-
-                        {/* Grappling Stats */}
-                        <div>
-                          <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Grappling</h4>
-                          <div className="space-y-1">
-                            <ComparisonRow
-                              label="Takedowns per 15 Min"
-                              value1={fighter1.td_avg}
-                              value2={fighter2.td_avg}
-                              unit=""
-                            />
-                            <ComparisonRow
-                              label="Takedown Accuracy"
-                              value1={fighter1.td_acc}
-                              value2={fighter2.td_acc}
-                              unit="%"
-                            />
-                            <ComparisonRow
-                              label="Takedown Defense"
-                              value1={fighter1.td_def}
-                              value2={fighter2.td_def}
-                              unit="%"
-                            />
-                            <ComparisonRow
-                              label="Submissions per 15 Min"
-                              value1={fighter1.sub_avg}
-                              value2={fighter2.sub_avg}
-                              unit=""
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
@@ -576,7 +582,7 @@ export default function ComparePage() {
               <div className="relative z-30">
                 <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} />
               </div>
-              <div className="mt-1 flex-1">
+              <div className="mt-2 flex-1">
                 <AnimatePresence mode="wait">
                   {fighter2 && (
                     <motion.div

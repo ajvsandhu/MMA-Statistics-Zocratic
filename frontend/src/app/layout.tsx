@@ -19,7 +19,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "UFC Fighter Data API",
-  description: "A comprehensive API for UFC fighter statistics and analytics",
+  description: "Comprehensive UFC fighter statistics and analytics platform.",
 };
 
 function SiteHeader() {
@@ -44,9 +44,9 @@ function SiteHeader() {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -119,7 +119,7 @@ export default function RootLayout({
       <body className={`${inter.className} scrollbar-hidden`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
