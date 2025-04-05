@@ -90,7 +90,9 @@ export const formatRanking = (ranking: string | number | null | undefined): stri
  */
 export const cleanFighterName = (name: string): string => {
   if (!name || name === 'undefined') return '';
-  return name.includes('(') ? name.split('(')[0].trim() : name.trim();
+  // If the name contains a record in parentheses, extract just the name part
+  const match = name.match(/^(.*?)\s*\([^)]*\)/);
+  return match ? match[1].trim() : name.trim();
 };
 
 /**
@@ -100,12 +102,13 @@ export const cleanFighterName = (name: string): string => {
  * @returns URL-friendly string
  */
 export const formatFighterUrl = (name: string, record?: string): string => {
-  // Clean the name by removing parentheses and extra spaces
+  // Clean the name but preserve original casing
   const cleanName = name
-    .replace(/[()]/g, '')  // Remove parentheses
     .trim()                // Remove leading/trailing spaces
-    .replace(/\s+/g, '-')  // Replace spaces with hyphens
-    .toLowerCase();        // Convert to lowercase
+    .replace(/\s+/g, ' '); // Normalize spaces
+  
+  // URL encode the name
+  const encodedName = encodeURIComponent(cleanName);
   
   if (record) {
     // Clean the record by removing parentheses and extra spaces
@@ -114,10 +117,10 @@ export const formatFighterUrl = (name: string, record?: string): string => {
       .trim()                // Remove leading/trailing spaces
       .replace(/\s+/g, '-')  // Replace spaces with hyphens
       .toLowerCase();        // Convert to lowercase
-    return `${cleanName}-${cleanRecord}`;
+    return `${encodedName}-${cleanRecord}`;
   }
   
-  return cleanName;
+  return encodedName;
 };
 
 /**

@@ -182,11 +182,14 @@ def get_fighter_stats(fighter_name: str):
             logger.error("No database connection available")
             raise HTTPException(status_code=500, detail="Database connection error")
         
+        # URL decode and clean fighter name
+        fighter_name = unquote(fighter_name)
+        
         # Clean fighter name - remove record if present
         if "(" in fighter_name:
             fighter_name = fighter_name.split("(")[0].strip()
         
-        # First try exact match
+        # First try exact match (case-sensitive)
         response = supabase.table('fighters')\
             .select('*')\
             .eq('fighter_name', fighter_name)\
@@ -195,22 +198,33 @@ def get_fighter_stats(fighter_name: str):
         if response.data:
             logger.info(f"Exact match found for fighter: {fighter_name}")
             return sanitize_json(response.data[0])
-            
-        # If no exact match, try fuzzy matching
+        
+        # Try case-insensitive match
         all_fighters = supabase.table('fighters').select('fighter_name').execute()
         if not all_fighters.data:
             logger.warning(f"No fighters found in database")
             raise HTTPException(status_code=404, detail="No fighters found in database")
-            
-        # Get list of fighter names
+        
+        # First try case-insensitive exact match
+        for f in all_fighters.data:
+            if f['fighter_name'].lower() == fighter_name.lower():
+                logger.info(f"Case-insensitive match found for {fighter_name}: {f['fighter_name']}")
+                response = supabase.table('fighters')\
+                    .select('*')\
+                    .eq('fighter_name', f['fighter_name'])\
+                    .execute()
+                if response.data:
+                    return sanitize_json(response.data[0])
+        
+        # If no exact match, try fuzzy matching
         fighter_names = [f['fighter_name'] for f in all_fighters.data]
         
-        # Use fuzzy matching to find the best match
+        # Use fuzzy matching with higher threshold for more accurate matches
         best_match = process.extractOne(
             fighter_name,
             fighter_names,
             scorer=fuzz.token_sort_ratio,
-            score_cutoff=80  # Only accept matches with 80% or higher similarity
+            score_cutoff=90  # Increased threshold to 90% for more accurate matches
         )
         
         if best_match:
