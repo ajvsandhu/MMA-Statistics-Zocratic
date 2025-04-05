@@ -24,6 +24,9 @@ import { Badge } from "@/components/ui/badge"
 import { SimpleSelect } from "@/components/ui/simple-select"
 import { formatFighterUrl } from "@/lib/utils"
 import { useRouter } from "next/navigation"
+import { useEffect, useState } from 'react'
+import { getAnimationVariants, fadeAnimation } from '@/lib/animations'
+import { useMediaQuery } from '@/hooks/use-media-query'
 
 interface Fighter {
   name: string;
@@ -91,6 +94,8 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
   const wrapperRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const isMobile = useMediaQuery('(max-width: 768px)')
+  const animationVariants = getAnimationVariants(isMobile)
 
   // Load search history on mount
   React.useEffect(() => {

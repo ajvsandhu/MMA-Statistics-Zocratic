@@ -2,6 +2,9 @@
 
 import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect, useRef } from "react"
+import { cn } from "@/lib/utils"
+import { getAnimationVariants } from '@/lib/animations'
+import { useMediaQuery } from '@/hooks/use-media-query'
 
 export default function AboutPage() {
   const [activeSection, setActiveSection] = useState(0)
@@ -9,16 +12,20 @@ export default function AboutPage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [isManualScroll, setIsManualScroll] = useState(false)
   const [direction, setDirection] = useState(0)
+  const isMobile = useMediaQuery('(max-width: 768px)')
+  const animationVariants = getAnimationVariants(isMobile)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     let lastScrollTop = 0
+    let touchStartY = 0
+    let touchEndY = 0
+
     const handleWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      
       if (isManualScroll) return
+      e.preventDefault()
       
       const delta = e.deltaY
       const newDirection = delta > 0 ? 1 : -1
@@ -33,12 +40,54 @@ export default function AboutPage() {
           top: nextSection * window.innerHeight,
           behavior: 'smooth'
         })
-        setTimeout(() => setIsManualScroll(false), 1000)
+        setTimeout(() => setIsManualScroll(false), 800)
+      }
+    }
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isManualScroll) {
+        e.preventDefault()
+        return
+      }
+      touchEndY = e.touches[0].clientY
+    }
+
+    const handleTouchEnd = () => {
+      if (isManualScroll) return
+      
+      const delta = touchStartY - touchEndY
+      if (Math.abs(delta) < 50) return // Minimum swipe distance
+
+      const newDirection = delta > 0 ? 1 : -1
+      const nextSection = activeSection + newDirection
+      
+      if (nextSection >= 0 && nextSection < sections.length) {
+        setIsManualScroll(true)
+        setDirection(newDirection)
+        setActiveSection(nextSection)
+        container.scrollTo({
+          top: nextSection * window.innerHeight,
+          behavior: 'smooth'
+        })
+        setTimeout(() => setIsManualScroll(false), 800)
       }
     }
 
     container.addEventListener('wheel', handleWheel, { passive: false })
-    return () => container.removeEventListener('wheel', handleWheel)
+    container.addEventListener('touchstart', handleTouchStart, { passive: true })
+    container.addEventListener('touchmove', handleTouchMove, { passive: false })
+    container.addEventListener('touchend', handleTouchEnd, { passive: true })
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('touchmove', handleTouchMove)
+      container.removeEventListener('touchend', handleTouchEnd)
+    }
   }, [activeSection, sections.length, isManualScroll])
 
   const scrollToSection = (index: number) => {
@@ -54,28 +103,46 @@ export default function AboutPage() {
       behavior: 'smooth'
     })
 
-    setTimeout(() => setIsManualScroll(false), 1000)
+    setTimeout(() => setIsManualScroll(false), 800)
   }
 
   return (
     <div className="fixed inset-0 bg-background">
       {/* Navigation Legend */}
-      <div className="fixed right-8 top-1/2 -translate-y-1/2 z-50">
-        <div className="flex flex-col items-center gap-6 relative">
-          <div 
-            className="absolute right-[19px] top-0 bottom-0 w-[2px] bg-muted-foreground/20"
-            style={{
-              transform: `scaleY(${(sections.length - 1) * 100}%)`
-            }}
-          />
+      <div className={cn(
+        "fixed z-50 transition-all duration-300",
+        isMobile ? "bottom-8 left-1/2 -translate-x-1/2" : "right-8 top-1/2 -translate-y-1/2"
+      )}>
+        <div className={cn(
+          "flex items-center relative",
+          isMobile ? "flex-row gap-4" : "flex-col gap-6"
+        )}>
+          {isMobile ? (
+            <div 
+              className="absolute inset-y-[19px] left-0 right-0 h-[2px] bg-muted-foreground/20"
+              style={{
+                transform: `scaleX(${(sections.length - 1) * 100}%)`
+              }}
+            />
+          ) : (
+            <div 
+              className="absolute right-[19px] top-0 bottom-0 w-[2px] bg-muted-foreground/20"
+              style={{
+                transform: `scaleY(${(sections.length - 1) * 100}%)`
+              }}
+            />
+          )}
           {sections.map((section, index) => (
             <div key={index} className="relative">
               <motion.div
-                className="absolute right-full mr-6 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-md border border-border/50"
+                className={cn(
+                  "absolute bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-md border border-border/50",
+                  isMobile ? "-top-12 left-1/2 -translate-x-1/2" : "right-full mr-6 top-1/2 -translate-y-1/2"
+                )}
                 initial={false}
                 animate={{
                   opacity: activeSection === index ? 1 : 0,
-                  x: activeSection === index ? 0 : 20,
+                  [isMobile ? 'y' : 'x']: activeSection === index ? 0 : 20,
                   scale: activeSection === index ? 1 : 0.95
                 }}
                 transition={{ duration: 0.4 }}
@@ -130,7 +197,7 @@ export default function AboutPage() {
                 opacity: 1,
                 y: 0,
                 transition: {
-                  duration: 0.8,
+                  duration: 0.6,
                   ease: [0.16, 1, 0.3, 1]
                 }
               }}
@@ -138,7 +205,7 @@ export default function AboutPage() {
                 opacity: 0,
                 y: direction > 0 ? -100 : 100,
                 transition: {
-                  duration: 0.8,
+                  duration: 0.6,
                   ease: [0.16, 1, 0.3, 1]
                 }
               }}
