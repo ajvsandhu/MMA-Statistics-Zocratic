@@ -36,19 +36,123 @@ MAX_WORKERS = 10
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Import Supabase client
-from backend.supabase_client import (
-    supabase, 
-    test_connection,
-    get_fighters,
-    get_fighter_by_url,
-    insert_fighter,
-    update_fighter,
-    upsert_fighter
+from backend.api.database import (
+    get_supabase_client,
+    SimpleSupabaseClient,
+    QueryBuilder
 )
 
+# Initialize Supabase client
+supabase = get_supabase_client()
+
 # Test Supabase connection
-if not test_connection():
+if not supabase:
     raise ValueError("Could not connect to Supabase. Please check your credentials and network connection.")
+
+# Helper functions to maintain compatibility with old code
+def get_fighters():
+    """Get all fighters from the database."""
+    try:
+        response = supabase.table('fighters').select('*').execute()
+        return response.data if response else []
+    except Exception as e:
+        logger.error(f"Error getting fighters: {str(e)}")
+        return []
+
+def get_fighter_by_url(fighter_url: str):
+    """Get fighter by URL."""
+    try:
+        response = supabase.table('fighters').select('*').eq('fighter_url', fighter_url).execute()
+        return response.data[0] if response and response.data else None
+    except Exception as e:
+        logger.error(f"Error getting fighter by URL: {str(e)}")
+        return None
+
+def insert_fighter(fighter_data: dict):
+    """Insert a new fighter."""
+    try:
+        response = supabase.table('fighters').insert(fighter_data).execute()
+        return bool(response)
+    except Exception as e:
+        logger.error(f"Error inserting fighter: {str(e)}")
+        return False
+
+def update_fighter(fighter_url: str, fighter_data: dict):
+    """Update an existing fighter."""
+    try:
+        response = supabase.table('fighters').update(fighter_data).eq('fighter_url', fighter_url).execute()
+        return bool(response)
+    except Exception as e:
+        logger.error(f"Error updating fighter: {str(e)}")
+        return False
+
+def upsert_fighter(fighter_data: dict):
+    """Insert or update a fighter."""
+    try:
+        response = supabase.table('fighters').upsert(fighter_data).execute()
+        return bool(response)
+    except Exception as e:
+        logger.error(f"Error upserting fighter: {str(e)}")
+        return False
+
+def get_fighter_fights(fighter_name: str):
+    """Get all fights for a fighter."""
+    try:
+        response = supabase.table('fights').select('*').eq('fighter_name', fighter_name).execute()
+        return response.data if response else []
+    except Exception as e:
+        logger.error(f"Error getting fighter fights: {str(e)}")
+        return []
+
+def update_fighter_all_fights(fighter_name: str, fights: list):
+    """Update all fights for a fighter."""
+    try:
+        # First delete existing fights
+        supabase.table('fights').delete().eq('fighter_name', fighter_name).execute()
+        # Then insert new fights
+        if fights:
+            response = supabase.table('fights').insert(fights).execute()
+            return bool(response)
+        return True
+    except Exception as e:
+        logger.error(f"Error updating fighter fights: {str(e)}")
+        return False
+
+def update_fighter_recent_fight(fighter_name: str, new_fight: dict):
+    """Update the most recent fight for a fighter."""
+    try:
+        response = supabase.table('fights').upsert(new_fight).execute()
+        return bool(response)
+    except Exception as e:
+        logger.error(f"Error updating recent fight: {str(e)}")
+        return False
+
+def insert_fighter_fight(fight_data: dict):
+    """Insert a new fight."""
+    try:
+        response = supabase.table('fights').insert(fight_data).execute()
+        return bool(response)
+    except Exception as e:
+        logger.error(f"Error inserting fight: {str(e)}")
+        return False
+
+def delete_fighter_fights(fighter_name: str):
+    """Delete all fights for a fighter."""
+    try:
+        response = supabase.table('fights').delete().eq('fighter_name', fighter_name).execute()
+        return bool(response)
+    except Exception as e:
+        logger.error(f"Error deleting fighter fights: {str(e)}")
+        return False
+
+def truncate_table(table_name: str):
+    """Truncate a table."""
+    try:
+        response = supabase.table(table_name).delete().neq('id', 0).execute()
+        return bool(response)
+    except Exception as e:
+        logger.error(f"Error truncating table: {str(e)}")
+        return False
 
 def clean_record_text(rec_txt):
     rec_txt = rec_txt.replace("Record:", "").strip()

@@ -11,7 +11,9 @@ from difflib import SequenceMatcher
 import requests
 from dotenv import load_dotenv
 import sys
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # Simple fix - add the project root to Python's path
 sys.path.insert(0, '.')
@@ -31,6 +33,16 @@ from backend.constants import (
     MAX_FIGHTS_DISPLAY
 )
 
+# Import Supabase client 
+from backend.api.database import (
+    get_supabase_client,
+    SimpleSupabaseClient,
+    QueryBuilder
+)
+
+# Initialize Supabase client
+supabase = get_supabase_client()
+
 ###############################################################################
 # CONFIG
 ###############################################################################
@@ -43,28 +55,137 @@ RETRY_SLEEP = 2
 REQUEST_TIMEOUT = 15
 EVENT_URL = "http://ufcstats.com/statistics/events/completed"
 
-# Load environment variables
-load_dotenv()
+# Thread-local storage for requests session
+thread_local = threading.local()
 
-# Import Supabase client 
-from backend.supabase_client import (
-    supabase,
-    test_connection,
-    get_fighters,
-    get_fighter,
-    get_fighter_by_url,
-    insert_fighter,
-    update_fighter,
-    upsert_fighter,
-    get_fighter_fights,
-    delete_fighter_fights,
-    insert_fighter_fight,
-    truncate_table
-)
+def get_session():
+    """Get a thread-local session"""
+    if not hasattr(thread_local, "session"):
+        thread_local.session = requests.Session()
+        thread_local.session.headers.update(REQUEST_HEADERS)
+    return thread_local.session
 
-# Test Supabase connection
-if not test_connection():
-    raise ValueError("Could not connect to Supabase. Please check your credentials and network connection.")
+# Helper functions to maintain compatibility with old code
+def get_fighters():
+    """Get all fighters from the database."""
+    try:
+        response = supabase.table('fighters').select('*').execute()
+        if not response or not response.data:
+            logger.warning("No fighters found in database")
+            return []
+        return response.data
+    except Exception as e:
+        logger.error(f"Error getting fighters: {str(e)}")
+        return []
+
+def get_fighter(fighter_name: str):
+    """Get fighter by name."""
+    try:
+        response = supabase.table('fighters').select('*').ilike('fighter_name', f"%{fighter_name}%").execute()
+        if not response or not response.data:
+            logger.warning(f"No fighter found with name containing: {fighter_name}")
+            return None
+        return response.data[0]
+    except Exception as e:
+        logger.error(f"Error getting fighter: {str(e)}")
+        return None
+
+def get_fighter_by_url(fighter_url: str):
+    """Get fighter by URL."""
+    try:
+        response = supabase.table('fighters').select('*').eq('fighter_url', fighter_url).execute()
+        if not response or not response.data:
+            logger.warning(f"No fighter found with URL: {fighter_url}")
+            return None
+        return response.data[0]
+    except Exception as e:
+        logger.error(f"Error getting fighter by URL: {str(e)}")
+        return None
+
+def get_fighter_fights(fighter_name: str):
+    """Get all fights for a fighter."""
+    try:
+        response = supabase.table('fights').select('*').eq('fighter_name', fighter_name).execute()
+        if not response or not response.data:
+            logger.warning(f"No fights found for fighter: {fighter_name}")
+            return []
+        return response.data
+    except Exception as e:
+        logger.error(f"Error getting fighter fights: {str(e)}")
+        return []
+
+def update_fighter_all_fights(fighter_name: str, fights: list):
+    """Update all fights for a fighter."""
+    try:
+        # First delete existing fights
+        delete_response = supabase.table('fights').delete().eq('fighter_name', fighter_name).execute()
+        if not delete_response:
+            logger.warning(f"Failed to delete existing fights for {fighter_name}")
+            return False
+            
+        # Then insert new fights
+        if fights:
+            insert_response = supabase.table('fights').insert(fights).execute()
+            if not insert_response:
+                logger.warning(f"Failed to insert new fights for {fighter_name}")
+                return False
+            logger.info(f"Successfully updated {len(fights)} fights for {fighter_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating fighter fights: {str(e)}")
+        return False
+
+def update_fighter_recent_fight(fighter_name: str, new_fight: dict):
+    """Update the most recent fight for a fighter."""
+    try:
+        response = supabase.table('fights').upsert(new_fight).execute()
+        if not response:
+            logger.warning(f"Failed to update recent fight for {fighter_name}")
+            return False
+        logger.info(f"Successfully updated recent fight for {fighter_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating recent fight: {str(e)}")
+        return False
+
+def insert_fighter_fight(fight_data: dict):
+    """Insert a new fight into fighter_last_5_fights table."""
+    try:
+        response = supabase.table('fighter_last_5_fights').insert(fight_data).execute()
+        if not response:
+            logger.warning(f"Failed to insert fight: {fight_data.get('fighter_name', 'Unknown')}")
+            return False
+        logger.info(f"Successfully inserted fight for {fight_data.get('fighter_name', 'Unknown')}")
+        return True
+    except Exception as e:
+        logger.error(f"Error inserting fight: {str(e)}")
+        return False
+
+def delete_fighter_fights(fighter_name: str):
+    """Delete all fights for a fighter from fighter_last_5_fights table."""
+    try:
+        response = supabase.table('fighter_last_5_fights').delete().eq('fighter_name', fighter_name).execute()
+        if not response:
+            logger.warning(f"Failed to delete fights for {fighter_name}")
+            return False
+        logger.info(f"Successfully deleted fights for {fighter_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting fighter fights: {str(e)}")
+        return False
+
+def truncate_table(table_name: str):
+    """Truncate a table."""
+    try:
+        response = supabase.table(table_name).delete().neq('id', 0).execute()
+        if not response:
+            logger.warning(f"Failed to truncate table: {table_name}")
+            return False
+        logger.info(f"Successfully truncated table: {table_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Error truncating table: {str(e)}")
+        return False
 
 ###############################################################################
 # LOGGING
@@ -96,14 +217,64 @@ session.headers.update(REQUEST_HEADERS)
 ###############################################################################
 # 1) RECREATE TABLE with AUTOINCREMENT and reordered columns
 ###############################################################################
-def recreate_last5_table() -> None:
-    """Clear all rows from 'fighter_last_5_fights' table."""
+def reset_sequence():
+    """Reset the ID sequence for fighter_last_5_fights table to start at 1."""
     try:
-        # Delete all rows from the table
-        supabase.table("fighter_last_5_fights").delete().neq("id", 0).execute()
-        logger.info("Cleared 'fighter_last_5_fights' table.")
+        supabase.rpc('reset_sequence', {'table_name': 'fighter_last_5_fights'}).execute()
+        logger.info("Reset sequence for 'fighter_last_5_fights' table to start at 1")
     except Exception as e:
-        logger.error(f"Error clearing fighter_last_5_fights table: {e}")
+        logger.error(f"Error resetting sequence: {e}")
+
+def recreate_last5_table(mode: str = 'all') -> bool:
+    """Recreate the fighter_last_5_fights table"""
+    try:
+        supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Failed to get Supabase client")
+            return False
+
+        if mode == 'all':
+            logger.info("Clearing all records from fighter_last_5_fights table")
+            
+            # First delete all records using a proper WHERE clause
+            try:
+                # Delete all records where id is greater than or equal to 0 (matches all records)
+                response = supabase.table('fighter_last_5_fights').delete().gte('id', 0).execute()
+                if not response.data and response.data != []:
+                    logger.error("Failed to delete all fights")
+                    return False
+                logger.info("Successfully deleted all records")
+            except Exception as e:
+                logger.error(f"Error deleting records: {e}")
+                return False
+            
+            # Reset the sequence using direct SQL
+            try:
+                # Use raw SQL to reset the sequence
+                sql = "ALTER SEQUENCE fighter_last_5_fights_id_seq RESTART WITH 1"
+                response = supabase.table('fighter_last_5_fights').select("*").execute({"raw_sql": sql})
+                logger.info("Successfully reset sequence using direct SQL")
+            except Exception as e:
+                logger.error(f"Error resetting sequence: {e}")
+                # Even if sequence reset fails, we can continue since IDs will still be unique
+            
+            # Verify the table is empty
+            try:
+                response = supabase.table('fighter_last_5_fights').select('count').execute()
+                if response.data and response.data[0]['count'] > 0:
+                    logger.warning(f"Table still contains {response.data[0]['count']} records after deletion")
+                    # Try one more time with a different delete approach
+                    supabase.table('fighter_last_5_fights').delete().gte('id', 0).execute()
+                else:
+                    logger.info("Verified table is empty")
+            except Exception as e:
+                logger.error(f"Error verifying table is empty: {e}")
+                return False
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error recreating table: {e}")
+        return False
 
 ###############################################################################
 # 2) FETCH FIGHTERS
@@ -115,9 +286,13 @@ def get_fighters_in_db_order():
     try:
         all_fighters = []
         page_size = 1000
-        start = 0
+        current_page = 0
+        total_retrieved = 0
         
         while True:
+            start = current_page * page_size
+            logger.info(f"Fetching fighters page {current_page + 1} (offset: {start})")
+            
             # Get fighters from Supabase, ordered by id, with pagination
             response = supabase.table("fighters") \
                 .select("fighter_name, fighter_url") \
@@ -128,12 +303,16 @@ def get_fighters_in_db_order():
             if not response.data or len(response.data) == 0:
                 break
                 
+            batch_size = len(response.data)
             all_fighters.extend([(row["fighter_name"], row["fighter_url"]) for row in response.data])
+            total_retrieved += batch_size
             
-            if len(response.data) < page_size:
+            logger.info(f"Retrieved {batch_size} fighters in this batch (total: {total_retrieved})")
+            
+            if batch_size < page_size:
                 break
                 
-            start += page_size
+            current_page += 1
             
         logger.info(f"Retrieved {len(all_fighters)} fighters total")
         return all_fighters
@@ -281,42 +460,82 @@ def best_fighter_index(p_texts: list, db_fighter_name: str) -> tuple:
 # 6) SCRAPE SINGLE TOTALS or SUM ROUND-BY-ROUND
 ###############################################################################
 def scrape_single_totals(soup: BeautifulSoup, db_fighter_name: str) -> dict:
-    """Scrape totals from the fight page tables, restoring original working logic."""
-    tables = soup.select("table.b-fight-details__table")
-    for tbl in tables:
-        tbody = tbl.find("tbody", class_="b-fight-details__table-body")
-        if not tbody:
-            continue
-        rows = tbody.find_all("tr", class_="b-fight-details__table-row")
-        if len(rows) == 1:
+    """Scrape totals from the fight page tables."""
+    try:
+        # Find the totals table
+        tables = soup.select("table.b-fight-details__table")
+        for table in tables:
+            # Check if this is the totals table by looking at the header
+            header = table.select_one("thead")
+            if not header or not any("Totals" in th.get_text() for th in header.select("th")):
+                continue
+
+            tbody = table.find("tbody", class_="b-fight-details__table-body")
+            if not tbody:
+                continue
+
+            rows = tbody.find_all("tr", class_="b-fight-details__table-row")
+            if len(rows) != 1:  # Totals table should have exactly one row
+                continue
+
             row = rows[0]
             cols = row.find_all("td", class_="b-fight-details__table-col")
-            if len(cols) >= 10:
-                p_tags = cols[0].find_all("p", class_="b-fight-details__table-text")
-                if len(p_tags) == 2:
-                    texts = [p.get_text(strip=True) for p in p_tags]
-                    idx, ratio = best_fighter_index(texts, db_fighter_name)
-                    if ratio < 0.3:
-                        continue
+            if len(cols) < 10:  # Need at least 10 columns for all stats
+                continue
 
-                    def get_col(ci: int) -> str:
-                        ps = cols[ci].find_all("p", class_="b-fight-details__table-text")
-                        return ps[idx].get_text(strip=True) if len(ps) > idx else "0"
+            # Find which fighter we're looking at (first or second in the row)
+            p_tags = cols[0].find_all("p", class_="b-fight-details__table-text")
+            if len(p_tags) != 2:
+                continue
 
-                    ctrl_value = get_col(9)
-                    sig_str_value = get_col(2)  # Get sig_str for percentage calculation
-                    sig_landed, sig_attempted = parse_of(sig_str_value)
-                    sig_pct = str(round((sig_landed / sig_attempted) * 100)) + "%" if sig_attempted > 0 else "0%"
-                    return {
-                        "kd": get_col(1),
-                        "sig_str": get_col(2),
-                        "sig_str_pct": sig_pct,  # Fixed percentage calculation
-                        "total_str": get_col(4),
-                        "takedowns": get_col(5),
-                        "td_pct": get_col(6),  # Already correct, verified no +1% issue
-                        "ctrl": "0:00" if ctrl_value == "--" else ctrl_value
-                    }
-    return None
+            texts = [p.get_text(strip=True) for p in p_tags]
+            idx, ratio = best_fighter_index(texts, db_fighter_name)
+            if ratio < 0.3:
+                continue
+
+            # Helper function to get clean text from a column
+            def get_col(ci: int) -> str:
+                ps = cols[ci].find_all("p", class_="b-fight-details__table-text")
+                return ps[idx].get_text(strip=True) if len(ps) > idx else "0"
+
+            # Extract all stats
+            kd = get_col(1)
+            sig_str = get_col(2)
+            sig_landed, sig_attempted = parse_of(sig_str)
+            sig_pct = f"{round((sig_landed / sig_attempted) * 100)}%" if sig_attempted > 0 else "0%"
+            
+            total_str = get_col(4)
+            takedowns = get_col(5)
+            td_pct = get_col(6)
+            if not td_pct.endswith("%"):
+                td_landed, td_attempted = parse_of(takedowns)
+                td_pct = f"{round((td_landed / td_attempted) * 100)}%" if td_attempted > 0 else "0%"
+            
+            ctrl_time = get_col(9)
+            if ctrl_time == "--":
+                ctrl_time = "0:00"
+
+            # Get strike locations from the significant strikes table
+            strike_details = scrape_strike_details(soup, db_fighter_name)
+
+            return {
+                "kd": kd,
+                "sig_str": sig_str,
+                "sig_str_pct": sig_pct,
+                "total_str": total_str,
+                "takedowns": takedowns,
+                "td_pct": td_pct,
+                "ctrl": ctrl_time,
+                "head_str": strike_details.get("head_str", "0 of 0"),
+                "body_str": strike_details.get("body_str", "0 of 0"),
+                "leg_str": strike_details.get("leg_str", "0 of 0")
+            }
+
+        return None
+
+    except Exception as e:
+        logger.error(f"Error in scrape_single_totals: {e}")
+        return None
 
 def scrape_strike_details(soup: BeautifulSoup, db_fighter_name: str) -> dict:
     """Scrape head, body, and leg strikes from the significant strikes table."""
@@ -361,11 +580,11 @@ def scrape_strike_details(soup: BeautifulSoup, db_fighter_name: str) -> dict:
                 leg_attempted += la
 
     if matched_rows == 0:
-        return {"head_str": "0", "body_str": "0", "leg_str": "0"}
+        return {"head_str": "0 of 0", "body_str": "0 of 0", "leg_str": "0 of 0"}
 
-    head_str = f"{head_landed} of {head_attempted}" if head_attempted > 0 else "0"
-    body_str = f"{body_landed} of {body_attempted}" if body_attempted > 0 else "0"
-    leg_str = f"{leg_landed} of {leg_attempted}" if leg_attempted > 0 else "0"
+    head_str = f"{head_landed} of {head_attempted}" if head_attempted > 0 else "0 of 0"
+    body_str = f"{body_landed} of {body_attempted}" if body_attempted > 0 else "0 of 0"
+    leg_str = f"{leg_landed} of {leg_attempted}" if leg_attempted > 0 else "0 of 0"
 
     return {
         "head_str": head_str,
@@ -449,15 +668,15 @@ def scrape_sum_rounds(soup: BeautifulSoup, db_fighter_name: str) -> dict:
         return None
 
     kd_str = str(kd_sum)
-    sig_str_str = f"{sig_x} of {sig_y}" if sig_y > 0 else "0"
+    sig_str_str = f"{sig_x} of {sig_y}" if sig_y > 0 else "0 of 0"
     sig_str_pct_str = f"{round((sig_x / sig_y) * 100)}%" if sig_y > 0 else "0%"
-    tot_str_str = f"{tot_x} of {tot_y}" if tot_y > 0 else "0"
-    td_str = f"{td_x} of {td_y}" if td_y > 0 else "0"
+    tot_str_str = f"{tot_x} of {tot_y}" if tot_y > 0 else "0 of 0"
+    td_str = f"{td_x} of {td_y}" if td_y > 0 else "0 of 0"
     td_pct_str = f"{(sum(td_pct_vals) / len(td_pct_vals)):.0f}%" if td_pct_vals else "0%"
     ctrl_str = seconds_to_mmss(ctrl_sec)
-    head_str_str = f"{head_x} of {head_y}" if head_y > 0 else "0"
-    body_str_str = f"{body_x} of {body_y}" if body_y > 0 else "0"
-    leg_str_str = f"{leg_x} of {leg_y}" if leg_y > 0 else "0"
+    head_str_str = f"{head_x} of {head_y}" if head_y > 0 else "0 of 0"
+    body_str_str = f"{body_x} of {body_y}" if body_y > 0 else "0 of 0"
+    leg_str_str = f"{leg_x} of {leg_y}" if leg_y > 0 else "0 of 0"
 
     return {
         "kd": kd_str,
@@ -511,143 +730,198 @@ def seconds_to_mmss(sec: int) -> str:
 ###############################################################################
 # 7) PARSE RESULT, DATE, OPPONENT, EVENT, AND METHOD FROM FIGHT PAGE
 ###############################################################################
-def parse_result_and_date(soup: BeautifulSoup, fighter_name: str) -> tuple:
-    result = "N/A"
-    fight_date = "N/A"
-    opponent_name = "N/A"
-    event_name = "N/A"
-    method = "N/A"
+def parse_result_and_date(soup, fight_date_fallback=None, fighter_name=None):
+    # Extract event name
+    event_div = soup.select_one("h2.b-content__title")
+    event = event_div.select_one("a").text.strip() if event_div else "N/A"
+    logging.info(f"Extracted event: {event}")
 
-    event_el = soup.select_one("h2.b-content__title a")
-    if event_el:
-        event_name = event_el.get_text(strip=True)
-    logger.info(f"Extracted event: {event_name}")
+    # Extract fighter names
+    fighter_divs = soup.select("div.b-fight-details__person")
+    if len(fighter_divs) >= 2:
+        fighter1 = fighter_divs[0].select_one("h3.b-fight-details__person-name a").text.strip()
+        fighter2 = fighter_divs[1].select_one("h3.b-fight-details__person-name a").text.strip()
+        logging.info(f"Found fighters: {fighter1} vs {fighter2}")
 
-    persons = soup.select("div.b-fight-details__person")
-    if len(persons) >= 2:
-        fighter1_name = persons[0].select_one("h3.b-fight-details__person-name a").get_text(strip=True)
-        fighter2_name = persons[1].select_one("h3.b-fight-details__person-name a").get_text(strip=True)
-        logger.info(f"Extracted fighter names: {fighter1_name}, {fighter2_name}")
-
-        ratio1 = fuzzy_ratio(basic_clean(fighter_name), basic_clean(fighter1_name))
-        ratio2 = fuzzy_ratio(basic_clean(fighter_name), basic_clean(fighter2_name))
-        logger.info(f"Similarity ratios: {ratio1:.2f}, {ratio2:.2f}")
-
-        if max(ratio1, ratio2) > 0.7:
-            if ratio1 > ratio2:
-                our_fighter_index = 0
-                opponent_name = fighter2_name
-            else:
-                our_fighter_index = 1
-                opponent_name = fighter1_name
+        # Determine which fighter is ours using exact string matching first
+        if fighter_name == fighter1:
+            our_fighter_index = 0
+            opponent_name = fighter2
+        elif fighter_name == fighter2:
+            our_fighter_index = 1
+            opponent_name = fighter1
         else:
-            opponent_name = "Unknown"
-            logger.warning("No clear fighter name match; setting opponent to 'Unknown'")
+            # Fallback to fuzzy matching if needed
+            ratio1 = fuzzy_ratio(basic_clean(fighter_name), basic_clean(fighter1))
+            ratio2 = fuzzy_ratio(basic_clean(fighter_name), basic_clean(fighter2))
+            if max(ratio1, ratio2) > 0.7:
+                our_fighter_index = 0 if ratio1 > ratio2 else 1
+                opponent_name = fighter2 if our_fighter_index == 0 else fighter1
+            else:
+                logging.warning(f"Could not match fighter name: {fighter_name} vs {fighter1} ({ratio1}) or {fighter2} ({ratio2})")
+                return None
+    else:
+        logging.error("Could not find both fighters")
+        return None
 
-        if 'our_fighter_index' in locals():
-            i_status = persons[our_fighter_index].select_one("i.b-fight-details__person-status")
-            if i_status:
-                status_text = i_status.get_text(strip=True).upper()
-                if "W" in status_text:
-                    result = "W"
-                elif "L" in status_text:
-                    result = "L"
-                elif "D" in status_text or "DRAW" in status_text:
-                    result = "D"
-                elif "NC" in status_text or "NO CONTEST" in status_text:
-                    result = "NC"
-                elif "DQ" in status_text or "DISQUALIFICATION" in status_text:
-                    result = "DQ"
-                else:
-                    result = status_text
+    # Extract result
+    result = "N/A"
+    i_status = fighter_divs[our_fighter_index].select_one("i.b-fight-details__person-status")
+    if i_status:
+        status_text = i_status.get_text(strip=True).upper()
+        if "W" in status_text:
+            result = "W"
+        elif "L" in status_text:
+            result = "L"
+        elif "D" in status_text or "DRAW" in status_text:
+            result = "D"
+        elif "NC" in status_text or "NO CONTEST" in status_text:
+            result = "NC"
+        elif "DQ" in status_text or "DISQUALIFICATION" in status_text:
+            result = "DQ"
+        else:
+            result = status_text
 
-    info_items = soup.select("li.b-fight-details__text-item")
-    for item in info_items:
-        txt = item.get_text(strip=True)
-        if "Date:" in txt:
-            fight_date = txt.split("Date:")[1].strip()
-            break
-    logger.info(f"Extracted fight date: {fight_date}")
+    # Extract method, round, and time from the fight details section
+    method = "N/A"
+    round_num = "N/A"
+    time = "N/A"
+    
+    # Find the fight details section
+    fight_details = soup.select_one("div.b-fight-details__content")
+    if fight_details:
+        # Extract method
+        method_text = fight_details.select_one("p.b-fight-details__text")
+        if method_text:
+            method_str = method_text.get_text(strip=True)
+            if "Method:" in method_str:
+                # Split on "Method:" and take the first part before any other details
+                method = method_str.split("Method:")[1].strip()
+                # Remove any additional details in parentheses or after other keywords
+                method = method.split("(")[0].strip()
+                method = method.split("Round:")[0].strip()
+                method = method.split("Time:")[0].strip()
+                method = method.split("Time format:")[0].strip()
+        
+        # Extract round and time
+        text_items = fight_details.select("i.b-fight-details__text-item")
+        for item in text_items:
+            text = item.get_text(strip=True)
+            if "Round:" in text:
+                round_num = text.split("Round:")[1].strip()
+            elif "Time:" in text:
+                time = text.split("Time:")[1].strip()
 
-    method_container = soup.find("i", class_="b-fight-details__text-item_first")
-    if method_container:
-        method_el = method_container.find("i", style="font-style: normal")
-        if method_el:
-            method = method_el.get_text(strip=True)
-    logger.info(f"Extracted method: {method}")
+    # Extract date
+    fight_date = "N/A"
+    date_div = soup.select_one("div.b-fight-details__text-item")
+    if date_div:
+        date_text = date_div.text.strip()
+        # Extract date using regex
+        date_match = re.search(r'Date:\s+([A-Za-z]+\.\s+\d{1,2},\s+\d{4})', date_text)
+        if date_match:
+            fight_date = date_match.group(1)
+    
+    if fight_date == "N/A" and fight_date_fallback:
+        logging.info(f"Using fallback fight date: {fight_date_fallback}")
+        fight_date = fight_date_fallback
 
-    return (result, fight_date, opponent_name, event_name, method)
+    logging.info("Final parsed values:")
+    logging.info(f"Result: {result}")
+    logging.info(f"Date: {fight_date}")
+    logging.info(f"Opponent: {opponent_name}")
+    logging.info(f"Event: {event}")
+    logging.info(f"Method: {method}")
+    logging.info(f"Round: {round_num}")
+    logging.info(f"Time: {time}")
+
+    return {
+        'result': result,
+        'fight_date': fight_date,
+        'opponent': opponent_name,
+        'event': event,
+        'method': method,
+        'round': round_num,
+        'time': time
+    }
 
 ###############################################################################
 # 8) SCRAPE FIGHT PAGE (with fallback date)
 ###############################################################################
-def scrape_fight_page_for_fighter(fight_url: str, fighter_name: str, fallback_date: str) -> dict:
-    """
-    Return a dict of stats for one fight, combining totals and strike details.
-    """
+def scrape_fight_page_for_fighter(fight_url: str, fighter_name: str, fallback_date: str = None) -> dict:
+    """Scrape a single fight page for a fighter's details."""
     data = {
-        "fighter_name": fighter_name,
-        "fight_url": fight_url,
-        "kd": "0",
-        "sig_str": "0",
-        "sig_str_pct": "0",
-        "total_str": "0",
-        "head_str": "0",
-        "body_str": "0",
-        "leg_str": "0",
-        "takedowns": "0",
-        "td_pct": "0",
-        "ctrl": "0:00",
         "result": "N/A",
-        "method": "N/A",
+        "fight_date": "N/A",
         "opponent": "N/A",
-        "fight_date": fallback_date,
-        "event": "N/A"
+        "event": "N/A",
+        "method": "N/A",
+        "round": "0",
+        "time": "0:00",
+        "kd": "0",
+        "sig_str": "0 of 0",
+        "sig_str_pct": "0%",
+        "total_str": "0 of 0",
+        "takedowns": "0 of 0",
+        "td_pct": "0%",
+        "head_str": "0 of 0",
+        "body_str": "0 of 0",
+        "leg_str": "0 of 0",
+        "ctrl": "0:00"
     }
-    resp = fetch_url_quietly(fight_url)
-    if not resp:
+
+    try:
+        resp = requests.get(fight_url)
+        if resp.status_code != 200:
+            logger.error(f"Failed to get fight page {fight_url}: {resp.status_code}")
+            return data
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Get basic fight info (result, date, opponent, event, method, round, time)
+        parsed_data = parse_result_and_date(soup, fallback_date, fighter_name)
+        if parsed_data:
+            data.update(parsed_data)
+        else:
+            logger.error(f"Failed to parse fight data from {fight_url}")
+            return data
+
+        # First try to get stats from totals table
+        totals = scrape_single_totals(soup, fighter_name)
+        if totals:
+            data.update(totals)
+            logger.info("Successfully extracted stats from totals table")
+        else:
+            # Fallback to summing round-by-round stats
+            summed_stats = scrape_sum_rounds(soup, fighter_name)
+            if summed_stats:
+                data.update(summed_stats)
+                logger.info("Successfully extracted stats from round-by-round table")
+            else:
+                logger.warning("Failed to extract fight statistics")
+
+        # Get strike details (head/body/leg) separately
+        strike_details = scrape_strike_details(soup, fighter_name)
+        if strike_details:
+            data.update(strike_details)
+            logger.info("Successfully extracted strike location details")
+
+        # Log all extracted stats
+        logger.info("Extracted fight statistics:")
+        logger.info(f"KD: {data['kd']}")
+        logger.info(f"Sig Strikes: {data['sig_str']} ({data['sig_str_pct']})")
+        logger.info(f"Total Strikes: {data['total_str']}")
+        logger.info(f"Takedowns: {data['takedowns']} ({data['td_pct']})")
+        logger.info(f"Control Time: {data['ctrl']}")
+        logger.info(f"Head Strikes: {data['head_str']}")
+        logger.info(f"Body Strikes: {data['body_str']}")
+        logger.info(f"Leg Strikes: {data['leg_str']}")
+
         return data
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    res, page_date, opponent, event, method = parse_result_and_date(soup, fighter_name)
-
-    data["result"] = res
-    if page_date != "N/A":
-        data["fight_date"] = page_date
-        logger.info(f"Using fight date from page: {page_date}")
-    else:
-        data["fight_date"] = fallback_date
-        logger.info(f"Using fallback fight date: {fallback_date}")
-    data["method"] = method
-    data["opponent"] = opponent
-    data["event"] = event
-
-    # Attempt single-totals (restored original logic)
-    single_data = scrape_single_totals(soup, fighter_name)
-    if single_data:
-        data.update(single_data)
-    else:
-        # Fallback to round-by-round if totals fail
-        round_data = scrape_sum_rounds(soup, fighter_name)
-        if round_data:
-            data.update(round_data)
-
-    # Get strike details, prioritizing round-by-round summation if needed
-    strike_data = scrape_strike_details(soup, fighter_name)
-    if all(value == "0" for value in [strike_data["head_str"], strike_data["body_str"], strike_data["leg_str"]]):
-        # Fallback to round-by-round summation for strikes if totals are all zeros
-        round_strike_data = {"head_str": "0", "body_str": "0", "leg_str": "0"}
-        round_data = scrape_sum_rounds(soup, fighter_name)
-        if round_data:
-            round_strike_data = {
-                "head_str": round_data["head_str"],
-                "body_str": round_data["body_str"],
-                "leg_str": round_data["leg_str"]
-            }
-        strike_data = round_strike_data
-    data.update(strike_data)
-
-    return data
+    except Exception as e:
+        logger.error(f"Error scraping fight page {fight_url}: {e}")
+        return data
 
 ###############################################################################
 # 9) STORE FIGHT DATA (Manual check for duplicates)
@@ -661,34 +935,63 @@ def store_fight_data(fighter_name: str, fight_url: str, fallback_date: str) -> b
             logger.error(f"Failed to get fight details for {fighter_name} from {fight_url}")
             return False
 
-        # Prepare row data with ALL fields from fight_details
-        row_data = {
-            'fighter_name': fighter_name,
-            'fight_url': fight_url,
-            'kd': fight_details['kd'],
-            'sig_str': fight_details['sig_str'],
-            'sig_str_pct': fight_details['sig_str_pct'],
-            'total_str': fight_details['total_str'],
-            'head_str': fight_details['head_str'],
-            'body_str': fight_details['body_str'],
-            'leg_str': fight_details['leg_str'],
-            'takedowns': fight_details['takedowns'],
-            'td_pct': fight_details['td_pct'],
-            'ctrl': fight_details['ctrl'],
-            'result': fight_details['result'],
-            'method': fight_details['method'],
-            'opponent': fight_details['opponent'],
-            'fight_date': fight_details['fight_date'],
-            'event': fight_details['event']
+        # Add required fields that were missing
+        fight_details['fighter_name'] = fighter_name
+        fight_details['fight_url'] = fight_url
+
+        # Validate all required fields are present and not None
+        required_fields = [
+            'fighter_name', 'fight_url', 'result', 'fight_date', 'opponent', 
+            'event', 'method', 'round', 'time', 'kd', 'sig_str', 'sig_str_pct',
+            'total_str', 'takedowns', 'td_pct', 'ctrl', 'head_str', 'body_str', 'leg_str'
+        ]
+
+        # Ensure all fields have at least default values
+        default_values = {
+            'kd': '0',
+            'sig_str': '0 of 0',
+            'sig_str_pct': '0%',
+            'total_str': '0 of 0',
+            'takedowns': '0 of 0',
+            'td_pct': '0%',
+            'ctrl': '0:00',
+            'head_str': '0 of 0',
+            'body_str': '0 of 0',
+            'leg_str': '0 of 0',
+            'round': '0',
+            'time': '0:00',
+            'result': 'N/A',
+            'method': 'N/A',
+            'opponent': 'N/A',
+            'event': 'N/A'
         }
 
-        # Insert the fight
-        success = insert_fighter_fight(row_data)
-        if not success:
-            logger.error(f"Failed to store fight data for {fighter_name}")
+        # Fill in any missing fields with defaults
+        for field, default in default_values.items():
+            if field not in fight_details or fight_details[field] is None or fight_details[field] == '':
+                fight_details[field] = default
+                logger.warning(f"Using default value for {field}: {default}")
+
+        # Validate all required fields are present
+        missing_fields = [field for field in required_fields if field not in fight_details or fight_details[field] is None]
+        if missing_fields:
+            logger.error(f"Missing required fields for {fighter_name}: {missing_fields}")
             return False
 
+        # Log the final data being inserted
+        logger.info(f"Inserting fight data for {fighter_name}:")
+        for key, value in fight_details.items():
+            logger.info(f"  {key}: {value}")
+
+        # Insert the fight data
+        response = supabase.table('fighter_last_5_fights').insert(fight_details).execute()
+        if not response.data:
+            logger.error(f"Failed to insert fight for {fighter_name}")
+            return False
+
+        logger.info(f"Successfully inserted fight for {fighter_name}")
         return True
+
     except Exception as e:
         logger.error(f"Error storing fight data: {e}")
         return False
@@ -912,8 +1215,12 @@ def update_fighter_latest_fight(fighter_name, fighter_url, recent_only=False):
     try:
         if recent_only:
             logger.info(f"Updating most recent fight for {fighter_name}")
+            
             # First get their existing fights from the database
-            existing_fights = get_fighter_fights(fighter_name)
+            existing_fights = []
+            response = supabase.table('fighter_last_5_fights').select('*').eq('fighter_name', fighter_name).execute()
+            if response.data:
+                existing_fights = response.data
             logger.info(f"Found {len(existing_fights)} existing fights for {fighter_name}")
             
             # Get just their most recent fight
@@ -922,26 +1229,28 @@ def update_fighter_latest_fight(fighter_name, fighter_url, recent_only=False):
                 logger.warning(f"No new fights found for {fighter_name}")
                 return False
             
-            # Combine existing and new fights
-            all_fights = existing_fights + new_fights
+            # Sort existing fights by date (newest first)
+            existing_fights.sort(key=lambda x: datetime.strptime(x['fight_date'], '%b. %d, %Y' if '.' in x['fight_date'] else '%b %d, %Y'), reverse=True)
             
-            # Sort all fights by date, newest first
-            all_fights.sort(key=lambda x: datetime.strptime(x['fight_date'], '%b. %d, %Y' if '.' in x['fight_date'] else '%b %d, %Y'), reverse=True)
+            # Combine new fight with existing fights
+            all_fights = new_fights + existing_fights
             
             # Take only the 5 most recent fights
             final_fights = all_fights[:MAX_FIGHTS]
             
-            # Delete existing fights and store the new set
+            # Delete existing fights
             delete_fighter_fights(fighter_name)
             logger.info(f"Deleted existing fights for {fighter_name}")
             
-            # Store the final set of fights
+            # Store the final set of fights in order (newest first)
             success_count = 0
             for fight_data in final_fights:
+                logger.info(f"Storing fight for {fighter_name}: {fight_data['event']} vs {fight_data['opponent']} ({fight_data['fight_date']})")
                 if store_fight_data(fighter_name, fight_data['fight_url'], fight_data['fight_date']):
                     success_count += 1
+                    logger.info(f"Successfully stored fight")
                 else:
-                    logger.warning(f"Failed to store fight vs {fight_data.get('opponent')} for {fighter_name}")
+                    logger.warning(f"Failed to store fight")
             
             logger.info(f"Stored {success_count}/{len(final_fights)} fights for {fighter_name}")
             return success_count > 0
@@ -959,13 +1268,15 @@ def update_fighter_latest_fight(fighter_name, fighter_url, recent_only=False):
             delete_fighter_fights(fighter_name)
             logger.info(f"Deleted existing fights for {fighter_name}")
             
-            # Store all fight data
+            # Store all fight data in order (newest first)
             success_count = 0
             for fight_data in fight_data_list:
+                logger.info(f"Storing fight for {fighter_name}: {fight_data['event']} vs {fight_data['opponent']} ({fight_data['fight_date']})")
                 if store_fight_data(fighter_name, fight_data['fight_url'], fight_data['fight_date']):
                     success_count += 1
+                    logger.info(f"Successfully stored fight")
                 else:
-                    logger.warning(f"Failed to store fight vs {fight_data.get('opponent')} for {fighter_name}")
+                    logger.warning(f"Failed to store fight")
             
             logger.info(f"Stored {success_count}/{len(fight_data_list)} fights for {fighter_name}")
             return success_count > 0
@@ -976,62 +1287,85 @@ def update_fighter_latest_fight(fighter_name, fighter_url, recent_only=False):
         traceback.print_exc()
         return False
 
-def process_recent_event():
-    """Process fighters from the most recent UFC event."""
-    logger.info("Starting to process fighters from the most recent UFC event")
+def process_recent_event(num_events=1):
+    """Process fighters from the most recent UFC events."""
+    logger.info(f"Starting to process fighters from the {num_events} most recent UFC events")
     
-    # Fetch the most recent event
-    latest_event = fetch_most_recent_event()
-    if not latest_event:
-        logger.error("Failed to fetch the most recent event")
-        return
-    
-    # Unpack the tuple returned by fetch_most_recent_event
-    event_url, event_name, event_date = latest_event
-    
-    logger.info(f"Processing event: {event_name} ({event_date}) - {event_url}")
-    
-    # Extract fighters from the event
-    fighter_urls = extract_fighters_from_event(event_url)
-    if not fighter_urls:
-        logger.error("No fighters found in the most recent event")
-        return
-    
-    logger.info(f"Found {len(fighter_urls)} fighters in the event")
-    
-    # Get existing fighter data to find fighter names from URLs
+    # Get fighters from Supabase first
     try:
-        # Get fighters from Supabase
         response = supabase.table("fighters").select("fighter_name, fighter_url").execute()
         fighters_dict = {}
-        
         if response.data:
             fighters_dict = {row["fighter_url"]: row["fighter_name"] for row in response.data}
     except Exception as e:
         logger.error(f"Error getting fighters from Supabase: {e}")
         return
     
-    # Process each fighter
-    processed_count = 0
+    total_processed = 0
+    events_processed = 0
     
-    logger.info(f"Starting to process {len(fighter_urls)} fighters' most recent fights...")
-    for fighter_url in fighter_urls:
-        # Get fighter name from the dictionary
-        fighter_name = fighters_dict.get(fighter_url)
-        if not fighter_name:
-            logger.warning(f"Fighter URL {fighter_url} not found in database. Skipping.")
+    # Keep track of processed events to avoid duplicates
+    processed_events = set()
+    
+    while events_processed < num_events:
+        # Fetch the most recent event
+        latest_event = fetch_most_recent_event()
+        if not latest_event:
+            logger.error("Failed to fetch the most recent event")
+            break
+        
+        # Unpack the tuple returned by fetch_most_recent_event
+        event_url, event_name, event_date = latest_event
+        
+        # Skip if we've already processed this event
+        if event_url in processed_events:
+            logger.info(f"Already processed event: {event_name}. Moving to next event.")
             continue
         
-        # Update the fighter's most recent fight only
-        updated = update_fighter_latest_fight(fighter_name, fighter_url, recent_only=True)
+        processed_events.add(event_url)
+        logger.info(f"Processing event: {event_name} ({event_date}) - {event_url}")
         
-        if updated:
-            processed_count += 1
-            logger.info(f"Successfully updated most recent fight for {fighter_name}")
-        else:
-            logger.warning(f"Failed to update most recent fight for {fighter_name}")
+        # Extract fighters from the event
+        fighter_urls = extract_fighters_from_event(event_url)
+        if not fighter_urls:
+            logger.error(f"No fighters found in event: {event_name}")
+            continue
+        
+        logger.info(f"Found {len(fighter_urls)} fighters in the event")
+        
+        # Process each fighter
+        processed_count = 0
+        for fighter_url in fighter_urls:
+            # Get fighter name from the dictionary
+            fighter_name = fighters_dict.get(fighter_url)
+            if not fighter_name:
+                logger.warning(f"Fighter URL {fighter_url} not found in database. Skipping.")
+                continue
+            
+            # Update the fighter's most recent fight only
+            updated = update_fighter_latest_fight(fighter_name, fighter_url, recent_only=True)
+            
+            if updated:
+                processed_count += 1
+                logger.info(f"Successfully updated most recent fight for {fighter_name}")
+            else:
+                logger.warning(f"Failed to update most recent fight for {fighter_name}")
+        
+        total_processed += processed_count
+        events_processed += 1
+        logger.info(f"Processed {processed_count}/{len(fighter_urls)} fighters from {event_name}")
+        logger.info(f"Total events processed: {events_processed}/{num_events}")
     
-    logger.info(f"Processed {processed_count}/{len(fighter_urls)} fighters from {event_name}")
+    logger.info(f"Completed processing {events_processed} events. Total fighters processed: {total_processed}")
+
+def process_recent_events(num_events: int) -> bool:
+    """Process recent events wrapper function"""
+    try:
+        process_recent_event(num_events)
+        return True
+    except Exception as e:
+        logger.error(f"Error processing recent events: {e}")
+        return False
 
 ###############################################################################
 # MAIN
@@ -1039,6 +1373,12 @@ def process_recent_event():
 def process_fighter(fighter_name: str, fighter_url: str, mode: str = 'all') -> bool:
     """Process a fighter's fights"""
     try:
+        if not fighter_name or not fighter_url:
+            logger.error("Fighter name and URL are required")
+            return False
+
+        logger.info(f"Processing fighter: {fighter_name} ({fighter_url})")
+
         # Get all fight links for the fighter
         fight_links = get_fight_links_top5(fighter_url)
         if not fight_links:
@@ -1047,98 +1387,287 @@ def process_fighter(fighter_name: str, fighter_url: str, mode: str = 'all') -> b
 
         logger.info(f"Found {len(fight_links)} fights for {fighter_name}")
 
-        # Delete existing fights for this fighter
+        # Delete only this fighter's existing fights
         delete_fighter_fights(fighter_name)
+        logger.info(f"Deleted existing fights for {fighter_name}")
 
         # Process each fight
         success_count = 0
         for date_str, fight_url in fight_links:
-            logger.info(f"Selected fight: {date_str} - {fight_url}")
+            logger.info(f"Processing fight: {date_str} - {fight_url}")
+            
+            # Validate fight URL
+            if not fight_url or not fight_url.startswith("http"):
+                logger.error(f"Invalid fight URL: {fight_url}")
+                continue
 
-            if store_fight_data(fighter_name, fight_url, date_str):
-                success_count += 1
+            # Store fight data with retries
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if store_fight_data(fighter_name, fight_url, date_str):
+                        success_count += 1
+                        logger.info(f"Successfully stored fight {success_count}/{len(fight_links)}")
+                        break
+                    else:
+                        logger.warning(f"Failed to store fight data (attempt {attempt + 1}/{max_retries})")
+                        if attempt < max_retries - 1:
+                            time.sleep(2)  # Wait before retry
+                except Exception as e:
+                    logger.error(f"Error storing fight (attempt {attempt + 1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2)
 
         logger.info(f"Successfully processed {success_count}/{len(fight_links)} fights for {fighter_name}")
+        
+        # Verify the fights were stored
+        if success_count == 0:
+            logger.error(f"Failed to store any fights for {fighter_name}")
+            return False
+            
         return success_count > 0
+
     except Exception as e:
         logger.error(f"Error processing fighter {fighter_name}: {e}")
         return False
 
-def main() -> None:
-    """Main function to run the scraper."""
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="UFC Last 5 Fights Scraper")
-    parser.add_argument("--mode", choices=["all", "recent", "fighter"], default="recent",
-                      help="Mode: all=all fighters (5 fights), recent=latest event (1 fight), fighter=specific fighter (5 fights)")
-    parser.add_argument("--fighter", type=str, default=None,
-                      help="Fighter name (required in fighter mode)")
-    
-    args = parser.parse_args()
-    
-    # Different modes
-    if args.mode == "all":
-        logger.info("Running in ALL mode (getting all 5 fights)")
-        # First, truncate and reset the fighter_last_5_fights table
-        logger.info("Truncating fighter_last_5_fights table and resetting ID sequence before processing")
-        recreate_last5_table()
-        
-        # Get all fighters from database
-        fighters = get_fighters_in_db_order()
-        if not fighters:
-            logger.error("No fighters found in database. Exiting.")
-            return
-        logger.info(f"Found {len(fighters)} fighters in database")
-        
-        # Process each fighter
-        success_count = 0
-        failure_count = 0
-        for fighter_name, fighter_url in fighters:
-            logger.info(f"Processing fighter: {fighter_name}")
+def process_fighter_batch(fighters_batch):
+    """Process a batch of fighters concurrently"""
+    success_count = 0
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_fighter = {
+            executor.submit(process_fighter, name, url): name 
+            for name, url in fighters_batch
+        }
+        for future in as_completed(future_to_fighter):
+            fighter_name = future_to_fighter[future]
             try:
-                # Update all 5 fights for this fighter
-                if process_fighter(fighter_name, fighter_url, mode='all'):
-                    logger.info(f"Successfully updated {fighter_name}'s last 5 fights")
+                if future.result():
                     success_count += 1
+                    logger.info(f"Successfully processed fighter: {fighter_name}")
                 else:
-                    logger.warning(f"Failed to update {fighter_name}'s last 5 fights")
-                    failure_count += 1
+                    logger.warning(f"Failed to process fighter: {fighter_name}")
             except Exception as e:
                 logger.error(f"Error processing fighter {fighter_name}: {e}")
-                failure_count += 1
+    return success_count
+
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="UFC Last 5 Fights Scraper")
+    parser.add_argument("--mode", choices=["all", "recent", "fighter"], default="recent",
+                      help="Mode: all=all fighters (5 fights), recent=latest event(s) (1 fight), fighter=specific fighter (5 fights)")
+    parser.add_argument("--fighter", type=str, default=None,
+                      help="Fighter name (required in fighter mode)")
+    parser.add_argument("--num-events", type=int, default=1,
+                      help="Number of recent events to process (only used in recent mode)")
+    parser.add_argument("--batch-size", type=int, default=50,
+                      help="Number of fighters to process in parallel (only used in all mode)")
+    return parser.parse_args()
+
+def get_fighter_url(fighter_name: str) -> str:
+    """Get fighter's URL from the database"""
+    try:
+        supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Failed to get Supabase client")
+            return None
+
+        # Search for fighter in database
+        response = supabase.table('fighters').select('fighter_url').ilike('fighter_name', f'%{fighter_name}%').execute()
+        if not response.data:
+            logger.error(f"Fighter {fighter_name} not found in database")
+            return None
+
+        # Return the first match's URL
+        return response.data[0]['fighter_url']
+
+    except Exception as e:
+        logger.error(f"Error getting fighter URL: {e}")
+        return None
+
+def process_all_fighters(batch_size: int) -> bool:
+    """Process all fighters in batches by alphabet"""
+    try:
+        # First, ensure the table is completely empty and reset sequence
+        logger.info("Clearing all existing fight records")
+        supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Failed to get Supabase client")
+            return False
+
+        # Delete all records and reset sequence
+        try:
+            # First delete all records
+            response = supabase.table('fighter_last_5_fights').delete().neq('id', 0).execute()
+            logger.info("Successfully deleted all records")
+
+            # Reset sequence by inserting and deleting a dummy record
+            dummy_data = {
+                'fighter_name': 'DUMMY_RESET',
+                'fight_url': 'DUMMY_URL',
+                'kd': '0',
+                'sig_str': '0',
+                'sig_str_pct': '0%',
+                'total_str': '0',
+                'head_str': '0',
+                'body_str': '0',
+                'leg_str': '0',
+                'takedowns': '0',
+                'td_pct': '0%',
+                'ctrl': '0:00',
+                'result': 'N/A',
+                'method': 'N/A',
+                'opponent': 'N/A',
+                'fight_date': 'Jan 1, 2000',
+                'event': 'N/A',
+                'round': '0',
+                'time': '0:00'
+            }
+            
+            # Insert dummy record
+            response = supabase.table('fighter_last_5_fights').insert(dummy_data).execute()
+            if not response.data:
+                logger.error("Failed to insert dummy record")
+                return False
+            
+            # Delete dummy record
+            response = supabase.table('fighter_last_5_fights').delete().eq('fighter_name', 'DUMMY_RESET').execute()
+            if not response.data:
+                logger.error("Failed to delete dummy record")
+                return False
+            
+            logger.info("Successfully reset sequence")
+
+        except Exception as e:
+            logger.error(f"Error clearing table and resetting sequence: {e}")
+            return False
+
+        # Process fighters alphabetically from UFC stats
+        total_success = 0
+        total_fighters = 0
+        base_url = "http://ufcstats.com/statistics/fighters?char={}&page=all"
         
-        logger.info(f"All fighters processing completed. Success: {success_count}, Failed: {failure_count}")
-        
-    elif args.mode == "fighter":
-        # Process a specific fighter (all 5 fights)
+        # Process A to Z
+        for char in 'abcdefghijklmnopqrstuvwxyz':
+            url = base_url.format(char)
+            logger.info(f"Processing fighters starting with '{char.upper()}'")
+            
+            try:
+                # Add delay between letters to avoid rate limiting
+                time.sleep(2)
+                
+                session = requests.Session()
+                session.headers.update(REQUEST_HEADERS)
+                
+                # Get fighters page with retries
+                for attempt in range(RETRY_ATTEMPTS):
+                    try:
+                        response = session.get(url, timeout=REQUEST_TIMEOUT)
+                        response.raise_for_status()
+                        break
+                    except Exception as e:
+                        if attempt == RETRY_ATTEMPTS - 1:
+                            raise
+                        time.sleep(RETRY_SLEEP * (attempt + 1))
+                
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Find all fighter rows
+                rows = soup.select("table.b-statistics__table tbody tr")
+                if not rows:
+                    logger.warning(f"No fighters found for letter {char.upper()}")
+                    continue
+
+                # Extract fighters from this page
+                fighters_batch = []
+                for row in rows[1:]:  # Skip header row
+                    # Get both first and last name cells
+                    first_name_cell = row.select_one("td:nth-child(1) a")
+                    last_name_cell = row.select_one("td:nth-child(2) a")
+                    
+                    if first_name_cell and last_name_cell and 'href' in first_name_cell.attrs:
+                        fighter_url = first_name_cell['href'].strip()
+                        first_name = first_name_cell.get_text(strip=True)
+                        last_name = last_name_cell.get_text(strip=True)
+                        fighter_name = f"{first_name} {last_name}"
+                        
+                        if fighter_url and fighter_name:
+                            fighters_batch.append((fighter_name, fighter_url))
+                
+                logger.info(f"Found {len(fighters_batch)} fighters for letter {char.upper()}")
+                total_fighters += len(fighters_batch)
+                
+                # Process each fighter individually with proper delays
+                if fighters_batch:
+                    for fighter_name, fighter_url in fighters_batch:
+                        # Add delay between fighters to avoid rate limiting
+                        time.sleep(1)
+                        
+                        logger.info(f"Processing fighter: {fighter_name}")
+                        try:
+                            # Use the same process_fighter function that works in fighter mode
+                            if process_fighter(fighter_name, fighter_url, 'all'):
+                                total_success += 1
+                                logger.info(f"Successfully processed fighter: {fighter_name}")
+                            else:
+                                logger.warning(f"Failed to process fighter: {fighter_name}")
+                        except Exception as e:
+                            logger.error(f"Error processing fighter {fighter_name}: {e}")
+                            # Add extra delay after errors
+                            time.sleep(5)
+                            continue
+                
+            except Exception as e:
+                logger.error(f"Error processing letter {char.upper()}: {e}")
+                # Add extra delay after errors
+                time.sleep(10)
+                continue
+
+        logger.info(f"Total fighters successfully processed: {total_success}/{total_fighters}")
+        return total_success > 0
+
+    except Exception as e:
+        logger.error(f"Error processing all fighters: {e}")
+        return False
+
+def main():
+    """Main entry point"""
+    args = parse_args()
+    logger.info("UFC Last 5 Fights Scraper - Supabase Edition")
+    logger.info(f"Running in {args.mode.upper()} mode")
+
+    # Process based on mode
+    if args.mode == 'fighter':
         if not args.fighter:
-            logger.error("Fighter name is required in fighter mode. Exiting.")
+            logger.error("Fighter name is required in fighter mode")
             return
             
-        fighter_name = args.fighter
-        logger.info(f"Running in FIGHTER mode for {fighter_name} (getting all 5 fights)")
-        
-        # Get fighter from database
-        fighter_response = supabase.table("fighters").select("*").eq("fighter_name", fighter_name).execute()
-        if not fighter_response.data or len(fighter_response.data) == 0:
-            logger.error(f"Fighter {fighter_name} not found in database. Exiting.")
-            return
-            
-        fighter = fighter_response.data[0]
-        fighter_url = fighter.get("fighter_url")
-        
+        # Get fighter URL
+        fighter_url = get_fighter_url(args.fighter)
         if not fighter_url:
-            logger.error(f"No URL found for fighter {fighter_name}. Exiting.")
+            logger.error(f"Could not find fighter URL for {args.fighter}")
             return
             
-        # Update all 5 fights for this fighter
-        if process_fighter(fighter_name, fighter_url, mode='all'):
-            logger.info(f"Successfully updated {fighter_name}'s last 5 fights")
-        else:
-            logger.error(f"Failed to update {fighter_name}'s last 5 fights")
+        # Process the fighter
+        if not process_fighter(args.fighter, fighter_url, args.mode):
+            logger.error(f"Failed to process fighter {args.fighter}")
+            return
             
-    else:  # recent mode
-        # Process fighters from the most recent event (most recent fight only)
-        process_recent_event()
+    elif args.mode == 'recent':
+        if not args.num_events:
+            logger.error("Number of events is required in recent mode")
+            return
+            
+        # Process recent events
+        if not process_recent_events(args.num_events):
+            logger.error("Failed to process recent events")
+            return
+            
+    elif args.mode == 'all':
+        # Process all fighters - table clearing is now handled inside process_all_fighters
+        if not process_all_fighters(args.batch_size):
+            logger.error("Failed to process all fighters")
+            return
         
     logger.info("Script execution completed!")
 
