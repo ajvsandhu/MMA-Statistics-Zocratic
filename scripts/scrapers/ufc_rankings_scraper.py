@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 import requests
 from bs4 import BeautifulSoup
-from backend.supabase_client import SupabaseClient
+from backend.api.database import get_supabase_client
 
 # Configure import paths
 if __name__ == "__main__":
@@ -77,55 +77,11 @@ WEIGHT_CLASSES = {
 # Cache file location
 CACHED_RANKINGS_PATH = os.path.join(DATA_DIR, "cached_rankings.json")
 
-def get_supabase_client():
-    """Get a Supabase client instance"""
-    try:
-        # Load environment variables
-        load_dotenv()
-        
-        # Get Supabase credentials
-        SUPABASE_URL = os.getenv("SUPABASE_URL")
-        SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-        
-        if not SUPABASE_URL or not SUPABASE_KEY:
-            raise ValueError("Supabase URL or Key not found in environment variables")
-            
-        # Create and return client
-        return SupabaseClient(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        logger.error(f"Error creating Supabase client: {str(e)}")
-        raise
-
 def cache_rankings(rankings: Dict[str, Any]) -> bool:
-    """
-    Cache the rankings to a file for future use.
-    
-    Args:
-        rankings: Dictionary containing fighter rankings data
-        
-    Returns:
-        bool: True if caching was successful, False otherwise
-    """
+    """Cache rankings in a local file"""
     try:
-        if not rankings:
-            return False
-            
-        # Convert the rankings to a serializable format
-        serializable_rankings = {}
-        for name, data in rankings.items():
-            serializable_rankings[name] = data
-        
-        # Add timestamp
-        data_to_save = {
-            'timestamp': datetime.now().isoformat(),
-            'rankings': serializable_rankings
-        }
-        
-        # Save to file
-        with open(CACHED_RANKINGS_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data_to_save, f, indent=2)
-            
-        logger.info(f"Cached {len(rankings)} rankings to {CACHED_RANKINGS_PATH}")
+        with open(CACHED_RANKINGS_PATH, 'w') as f:
+            json.dump(rankings, f)
         return True
     except Exception as e:
         logger.error(f"Error caching rankings: {str(e)}")
@@ -708,63 +664,21 @@ def update_fighter_rankings(supabase, rankings_data):
         return 0, 0, 0
 
 def main():
-    """
-    Main function for the UFC rankings scraper.
-    
-    This function:
-    1. Fetches rankings from UFC website (or uses cache if recent)
-    2. Updates the database with the latest rankings
-    3. Logs the results
-    """
-    logger.info("Starting UFC rankings scraper")
-    
+    """Main function to run the rankings scraper"""
     try:
-        # Get Supabase connection
+        # Get database client
         supabase = get_supabase_client()
         
-        # Load cached rankings if available and recent
-        cached_rankings = load_cached_rankings()
+        # Ensure fighters table has ranking column
+        ensure_fighters_table_has_ranking_column(supabase)
         
-        if args.force_refresh or not cached_rankings:
-            logger.info("Fetching fresh rankings from UFC website")
-            rankings = fetch_ufc_rankings()
-            
-            if rankings:
-                # Cache the new rankings
-                cache_rankings(rankings)
-            else:
-                if cached_rankings:
-                    logger.warning("Failed to fetch fresh rankings, using cached data")
-                    rankings = cached_rankings
-                else:
-                    logger.error("Failed to fetch rankings and no cache available")
-                    return
-        else:
-            logger.info("Using cached rankings data")
-            rankings = cached_rankings
-            
-        # Update the database with the rankings
-        success, failed, not_found = update_fighter_rankings(supabase, rankings)
+        # Fetch and update rankings
+        fetch_and_update_rankings()
         
-        logger.info(f"Rankings update complete:")
-        logger.info(f" - {success} fighters updated successfully")
-        logger.info(f" - {failed} updates failed")
-        logger.info(f" - {not_found} fighters not found in database")
-        
+        logger.info("Rankings update completed successfully")
     except Exception as e:
         logger.error(f"Error in main function: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-    # Set up argument parser
-    import argparse
-    parser = argparse.ArgumentParser(description='UFC Rankings Scraper')
-    parser.add_argument('--force-refresh', action='store_true', help='Force refresh of rankings data')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    args = parser.parse_args()
-    
-    # Set debug level if requested
-    if args.debug:
-        logger.setLevel(logging.DEBUG)
-        
-    # When run directly, fetch and update rankings
     main() 
