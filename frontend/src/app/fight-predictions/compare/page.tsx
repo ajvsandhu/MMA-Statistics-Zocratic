@@ -446,7 +446,7 @@ export default function ComparePage() {
                   {/* Mobile Layout */}
                   <div className="space-y-4">
                     {/* Fighters Side by Side */}
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2 relative">
                       {/* Fighter 1 */}
                       <div className="flex flex-col">
                         <h3 className="text-sm font-semibold mb-1">Fighter 1</h3>
@@ -491,9 +491,9 @@ export default function ComparePage() {
                       </div>
 
                       {/* VS Badge */}
-                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-40">
-                        <div className="px-2 py-0.5 rounded-full bg-accent/10 backdrop-blur-sm border border-border shadow-xl">
-                          <span className="text-xs font-bold text-muted-foreground">VS</span>
+                      <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2 z-50">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background shadow-xl border border-border">
+                          <span className="text-xs font-bold text-foreground">VS</span>
                         </div>
                       </div>
 
