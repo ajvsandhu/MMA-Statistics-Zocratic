@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { FighterStats } from "@/types/fighter"
+import React from "react"
 
 /**
  * Combines multiple class names using clsx and tailwind-merge
@@ -178,3 +179,19 @@ export const safeDisplayValue = (value: unknown, defaultValue: string = 'N/A'): 
   }
   return String(value);
 };
+
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(false)
+  
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  return isMobile
+}

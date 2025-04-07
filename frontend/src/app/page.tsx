@@ -7,8 +7,7 @@ import { ArrowRight } from "lucide-react"
 import { useState, useEffect } from "react"
 import { API_URL, API_VERSION, ENDPOINTS } from "@/lib/api-config"
 import { Badge } from "@/components/ui/badge"
-import { formatFighterUrl } from "@/lib/utils"
-import { useMediaQuery } from "@/hooks/use-media-query"
+import { formatFighterUrl, useIsMobile } from "@/lib/utils"
 import { fadeAnimation, slideUpAnimation, marqueeConfig } from "@/lib/animations"
 
 const FEATURED_FIGHTERS = [
@@ -21,7 +20,7 @@ const FEATURED_FIGHTERS = [
 export default function HomePage() {
   const [fightersCount, setFightersCount] = useState<number>(0)
   const [featuredFighters, setFeaturedFighters] = useState(FEATURED_FIGHTERS)
-  const isMobile = useMediaQuery('(max-width: 768px)')
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     const fetchData = async () => {

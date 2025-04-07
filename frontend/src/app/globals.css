@@ -70,8 +70,22 @@
     @apply border-border;
   }
 
+  html, body {
+    overflow: hidden;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  #__next {
+    height: 100%;
+    overflow: hidden;
   }
 
   /* Scrollbar Styling */
@@ -81,23 +95,22 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--scrollbar-bg);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
+    background: var(--border);
     border-radius: 4px;
-    transition: background-color 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
+    background: var(--muted-foreground);
   }
 
   /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-bg);
+    scrollbar-color: var(--border) transparent;
   }
 }
 
@@ -232,7 +245,7 @@
   }
 }
 
-/* Global styles */
+/* Base styles */
 html {
   scroll-behavior: smooth;
   background: hsl(var(--background));
@@ -240,35 +253,4 @@ html {
 
 body {
   min-height: 100vh;
-  overflow-x: hidden;
-}
-
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-@media (max-width: 768px) {
-  :root {
-    --marquee-duration: 30s;
-  }
-}
-
-@media (min-width: 769px) {
-  :root {
-    --marquee-duration: 45s;
-  }
-}
-
-/* Optimize animations for mobile */
-@media (max-width: 768px) {
-  * {
-    animation-duration: 0.2s !important;
-    transition-duration: 0.2s !important;
-  }
-
-  .animate-marquee {
-    animation-duration: var(--marquee-duration) !important;
-  }
 }

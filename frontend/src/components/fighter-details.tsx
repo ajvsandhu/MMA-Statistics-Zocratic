@@ -29,12 +29,38 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
+import { useIsMobile } from "@/lib/utils"
 
 // Constants
 const DEFAULT_PLACEHOLDER_IMAGE = '/placeholder-fighter.png'
 const DEFAULT_VALUE = "0"
 const DEFAULT_PERCENTAGE = "0%"
 const UNRANKED_VALUE = 99
+
+// Constants for styling
+const MOBILE_STYLES = {
+  statsGrid: "grid-cols-1 gap-2 text-sm",
+  statsCard: "p-2",
+  statsTitle: "text-base",
+  statsValue: "text-lg",
+  statsLabel: "text-xs",
+  chartHeight: "h-[200px]",
+  imageSize: "w-32 h-32",
+  headerText: "text-2xl",
+  subText: "text-sm"
+};
+
+const DESKTOP_STYLES = {
+  statsGrid: "grid-cols-2 gap-4",
+  statsCard: "p-4",
+  statsTitle: "text-lg",
+  statsValue: "text-2xl",
+  statsLabel: "text-sm",
+  chartHeight: "h-[300px]",
+  imageSize: "w-64 h-64",
+  headerText: "text-3xl",
+  subText: "text-base"
+};
 
 // Utility functions
 const safeParseFloat = (value: string | undefined): number => {
@@ -326,62 +352,46 @@ const calculateAge = (dob: string): string => {
 
 // Add this new component for the fighter header
 const FighterHeader = ({ stats, imageError, setImageError }: { 
-  stats: FighterStats | null, 
-  imageError: boolean, 
-  setImageError: (error: boolean) => void 
+  stats: FighterStats;
+  imageError: boolean;
+  setImageError: (error: boolean) => void;
 }) => {
-  if (!stats) return null;
+  const isMobile = useIsMobile();
+  const styles = isMobile ? MOBILE_STYLES : DESKTOP_STYLES;
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-br from-background/90 to-background/60 backdrop-blur-xl border border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300"
+      className="relative"
     >
-      <div className="absolute inset-0 bg-grid-white/[0.03] -z-10" />
-      <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent -z-10" />
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 p-4 md:p-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-center">
         {/* Fighter Image */}
-        <div className="relative w-full max-w-[200px] sm:max-w-[240px] mx-auto md:max-w-none aspect-[3/4] sm:aspect-[4/5] md:col-span-1">
+        <div className="flex justify-center">
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="relative w-full h-full rounded-xl overflow-hidden ring-2 ring-white/20 shadow-xl hover:ring-white/30 transition-all duration-300"
+            className={cn(
+              "relative overflow-hidden",
+              isMobile ? "rounded-full ring-2 ring-primary/20" : "",
+              styles.imageSize
+            )}
           >
             {!imageError ? (
-              stats.tap_link ? (
-                <a 
-                  href={stats.tap_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group block w-full h-full"
-                >
-                  <img 
+              <Image
                     src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
                     alt={stats.name}
-                    className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                width={isMobile ? 128 : 256}
+                height={isMobile ? 128 : 256}
+                className={cn(
+                  "object-cover w-full h-full",
+                  !isMobile && "rounded-lg"
+                )}
                     onError={() => setImageError(true)}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute inset-x-0 bottom-0 p-4 text-center">
-                      <span className="text-sm font-medium text-white/90">View on Tapology</span>
-                    </div>
-                  </div>
-                </a>
-              ) : (
-                <img 
-                  src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
-                  alt={stats.name}
-                  className="w-full h-full object-cover object-center"
-                  onError={() => setImageError(true)}
-                />
-              )
+                priority
+              />
             ) : (
               <div className="w-full h-full bg-background/60 flex items-center justify-center">
-                <span className="text-muted-foreground">No image available</span>
+                <span className="text-muted-foreground">No image</span>
               </div>
             )}
           </motion.div>
@@ -393,29 +403,32 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="space-y-4"
+            className="space-y-2 md:space-y-4"
           >
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/80">
+              <h2 className={cn(
+                "font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/80",
+                styles.headerText
+              )}>
                 {stats.name}
               </h2>
               {stats.nickname && (
-                <p className="text-lg md:text-xl text-primary/90 mt-1">"{stats.nickname}"</p>
+                <p className={cn("text-primary/90 mt-1", styles.subText)}>"{stats.nickname}"</p>
               )}
-              <div className="flex items-center justify-center md:justify-start gap-3 mt-3">
-                <p className="text-xl md:text-2xl font-semibold">{stats.record}</p>
+              <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
+                <p className={cn("font-semibold", styles.headerText)}>{stats.record}</p>
                 {Number(stats.ranking) !== 99 && stats.ranking !== '99' && (
-                  <Badge variant="secondary" className="px-3 py-1 text-sm font-medium bg-accent/20 ring-1 ring-white/20">
+                  <Badge variant="secondary" className={cn("px-2 py-0.5 font-medium bg-accent/20 ring-1 ring-white/20", styles.subText)}>
                     {formatRanking(String(stats.ranking))}
                   </Badge>
                 )}
               </div>
               {stats.weight_class && (
-                <p className="text-base md:text-lg text-muted-foreground mt-1">{stats.weight_class}</p>
+                <p className={cn("text-muted-foreground mt-1", styles.subText)}>{stats.weight_class}</p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
                 { label: 'Height', value: stats.height || 'N/A', icon: '📏' },
                 { label: 'Weight', value: stats.weight || 'N/A', icon: '⚖️' },
@@ -429,13 +442,16 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="bg-background/60 backdrop-blur-sm p-2 md:p-3 rounded-lg ring-1 ring-white/20 transition-all duration-300 hover:bg-background/80 hover:ring-white/30 hover:shadow-lg"
+                  className={cn(
+                    "bg-background/60 backdrop-blur-sm rounded-lg ring-1 ring-white/20 transition-all duration-300 hover:bg-background/80 hover:ring-white/30 hover:shadow-lg",
+                    styles.statsCard
+                  )}
                 >
-                  <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                  <div className="flex items-center justify-center md:justify-start gap-1">
                     <span role="img" aria-label={label}>{icon}</span>
-                    <p className="text-xs md:text-sm text-muted-foreground">{label}</p>
+                    <p className={cn("text-muted-foreground", styles.statsLabel)}>{label}</p>
                   </div>
-                  <p className="text-sm md:text-base font-medium truncate">{value}</p>
+                  <p className={cn("font-medium truncate text-center md:text-left", styles.statsLabel)}>{value}</p>
                 </motion.div>
               ))}
             </div>
@@ -465,6 +481,8 @@ const FightHistoryView = ({
   selectedFight: Fight | null, 
   setSelectedFight: (fight: Fight | null) => void 
 }) => {
+  const isMobile = useIsMobile();
+
   return (
     <div className="space-y-4 relative">
       <h4 className="text-xl font-medium tracking-tight mb-6">
@@ -515,7 +533,10 @@ const FightHistoryView = ({
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="overflow-y-auto">
+                <div className={cn(
+                  "overflow-y-auto",
+                  isMobile ? "max-h-[70vh]" : ""
+                )}>
                   <div className="p-4 md:p-6">
                     <div className="grid md:grid-cols-2 gap-4 md:gap-6">
                       {/* Fight Details */}
@@ -716,6 +737,139 @@ const responsiveContainerStyles = {
   '@media (max-width: 640px)': {
     minHeight: '140px',
   },
+};
+
+const StatsView = ({ stats, chartData }: { stats: FighterStats; chartData: ChartDataSet }) => {
+  const isMobile = useIsMobile();
+  const styles = isMobile ? MOBILE_STYLES : DESKTOP_STYLES;
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      {/* Striking Stats */}
+      <Card className="overflow-hidden bg-background/60 backdrop-blur-xl border-white/20">
+        <CardHeader className="border-b border-white/10 py-2 md:py-3">
+          <CardTitle className={cn("flex items-center justify-center gap-2 text-center w-full", styles.statsTitle)}>
+            <span role="img" aria-label="Striking" className="flex-shrink-0">🥊</span>
+            <span className="flex-shrink-0">Striking Statistics</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className={cn("p-2 md:p-4", styles.statsCard)}>
+          <div className={cn("grid gap-2 md:gap-4", styles.statsGrid)}>
+            {[
+              { label: "Strikes Landed/min", value: safeParseFloat(stats.slpm).toFixed(1), desc: "Striking Output" },
+              { label: "Strike Accuracy", value: `${safeParseFloat(stats.str_acc).toFixed(1)}%`, desc: "Strike Success Rate" },
+              { label: "Strikes Absorbed/min", value: safeParseFloat(stats.sapm).toFixed(1), desc: "Strikes Received" },
+              { label: "Strike Defense", value: `${safeParseFloat(stats.str_def).toFixed(1)}%`, desc: "Strike Evasion Rate" }
+            ].map((stat, index) => (
+              <div 
+                key={stat.label} 
+                className="space-y-1 p-2 md:p-3 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300"
+              >
+                <p className={cn("text-muted-foreground", styles.statsLabel)}>{stat.label}</p>
+                <p className={cn("font-bold", styles.statsValue)}>{stat.value}</p>
+                <p className={cn("text-muted-foreground", styles.statsLabel)}>{stat.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Charts */}
+          <div className="mt-4 space-y-4">
+            {/* Strike Distribution Chart */}
+            <div className={styles.chartHeight}>
+              <h4 className={cn("mb-2 font-medium", styles.statsLabel)}>Strike Distribution</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.strikeDistribution}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
+                  <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="hsl(var(--primary))">
+                    {chartData.strikeDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--primary))' : 'hsl(var(--primary)/0.7)'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Strike Accuracy Chart */}
+            <div className={styles.chartHeight}>
+              <h4 className={cn("mb-2 font-medium", styles.statsLabel)}>Strike Accuracy</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.strikeAccuracyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
+                  <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Grappling Stats */}
+      <Card className="overflow-hidden bg-background/60 backdrop-blur-xl border-white/20">
+        <CardHeader className="border-b border-white/10 py-2 md:py-3">
+          <CardTitle className={cn("flex items-center justify-center gap-2 text-center w-full", styles.statsTitle)}>
+            <span role="img" aria-label="Grappling" className="flex-shrink-0">🤼</span>
+            <span className="flex-shrink-0">Grappling Statistics</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className={cn("p-2 md:p-4", styles.statsCard)}>
+          <div className={cn("grid gap-2 md:gap-4", styles.statsGrid)}>
+            {[
+              { label: "Takedowns/15min", value: safeParseFloat(stats.td_avg).toFixed(1), desc: "Grappling Frequency" },
+              { label: "Takedown Accuracy", value: `${safeParseFloat(stats.td_acc).toFixed(1)}%`, desc: "Takedown Success Rate" },
+              { label: "Takedown Defense", value: `${safeParseFloat(stats.td_def).toFixed(1)}%`, desc: "Takedown Prevention" },
+              { label: "Submissions/15min", value: safeParseFloat(stats.sub_avg).toFixed(1), desc: "Submission Threat" }
+            ].map((stat, index) => (
+              <div 
+                key={stat.label} 
+                className="space-y-1 p-2 md:p-3 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300"
+              >
+                <p className={cn("text-muted-foreground", styles.statsLabel)}>{stat.label}</p>
+                <p className={cn("font-bold", styles.statsValue)}>{stat.value}</p>
+                <p className={cn("text-muted-foreground", styles.statsLabel)}>{stat.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Grappling Charts */}
+          <div className="mt-4 space-y-4">
+            {/* Grappling Stats Chart */}
+            <div className={styles.chartHeight}>
+              <h4 className={cn("mb-2 font-medium", styles.statsLabel)}>Grappling Performance</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.grappleData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
+                  <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Grappling Accuracy Chart */}
+            <div className={styles.chartHeight}>
+              <h4 className={cn("mb-2 font-medium", styles.statsLabel)}>Grappling Accuracy</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.grappleAccuracyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
+                  <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 };
 
 export function FighterDetails({ fighterName }: FighterDetailsProps) {
@@ -937,6 +1091,8 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
 
   // Overview tab content
   const OverviewView = () => {
+    const isMobile = useIsMobile();
+    
     // Use getStat function to safely access properties
     const offense = [
       { label: "Strikes Landed per Min", value: getStat(stats?.slpm) },
@@ -963,7 +1119,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Radar Chart */}
               <div className="h-[300px]">
-                <ResponsiveContainer {...responsiveContainerStyles}>
+                <ResponsiveContainer width="100%" height="100%">
                   <RadarChart data={chartData.overallStats}>
                     <PolarGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.2} />
                     <PolarAngleAxis 
@@ -983,16 +1139,28 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
               </div>
 
               {/* Quick Stats */}
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold">Quick Stats</h3>
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <h3 className={cn(
+                  "font-semibold",
+                  isMobile ? "text-base" : "text-lg"
+                )}>Quick Stats</h3>
+                <div className="grid grid-cols-2 gap-2">
                   {fightStats.map((category) => (
-                    <div key={category.category} className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground">{category.category}</h4>
+                    <div key={category.category} className="space-y-2">
+                      <h4 className={cn(
+                        "font-medium text-muted-foreground",
+                        isMobile ? "text-xs" : "text-sm"
+                      )}>{category.category}</h4>
                       {category.stats.map((stat) => (
-                        <div key={stat.label} className="flex justify-between items-center">
-                          <span className="text-sm">{stat.label}</span>
-                          <span className="font-semibold">{stat.value}</span>
+                        <div key={stat.label} className="flex justify-between items-center gap-2">
+                          <span className={cn(
+                            "text-muted-foreground",
+                            isMobile ? "text-xs" : "text-sm"
+                          )}>{stat.label}</span>
+                          <span className={cn(
+                            "font-semibold",
+                            isMobile ? "text-xs" : "text-sm"
+                          )}>{stat.value}</span>
                         </div>
                       ))}
                     </div>
@@ -1042,256 +1210,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
                     key="stats"
                     className="space-y-6 md:space-y-8 [&>*]:animate-in [&>*]:fade-in-50 [&>*]:duration-500"
                   >
-                    {/* Striking Stats */}
-                    <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                      <Card className="overflow-hidden bg-background/60 backdrop-blur-xl border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300">
-                        <CardHeader className="border-b border-white/10 py-3">
-                          <CardTitle className="flex items-center justify-center gap-2 text-center w-full">
-                            <span role="img" aria-label="Striking" className="flex-shrink-0 text-lg">🥊</span>
-                            <span className="flex-shrink-0 text-lg">Striking Statistics</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 md:p-6 flex flex-col gap-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Strikes Landed/min</p>
-                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.slpm).toFixed(1)}</p>
-                              <p className="text-xs md:text-sm text-muted-foreground">Striking Output</p>
-                            </div>
-                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Strike Accuracy</p>
-                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.str_acc).toFixed(1)}</p>
-                              <p className="text-xs md:text-sm text-muted-foreground">Strike Success Rate</p>
-                            </div>
-                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Strikes Absorbed/min</p>
-                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.sapm).toFixed(1)}</p>
-                              <p className="text-xs md:text-sm text-muted-foreground">Strikes Received</p>
-                            </div>
-                            <div className="space-y-2 p-3 md:p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Strike Defense</p>
-                              <p className="text-2xl md:text-3xl font-bold">{safeParseFloat(stats.str_def).toFixed(1)}</p>
-                              <p className="text-xs md:text-sm text-muted-foreground">Strike Evasion Rate</p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-col gap-4">
-                            {/* Charts Section */}
-                            <div className="grid grid-cols-1 gap-4">
-                              {/* Strike Distribution Chart */}
-                              <div className="flex flex-col gap-2">
-                                <h4 className="text-sm font-medium">Strike Distribution</h4>
-                                <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
-                                  <ResponsiveContainer {...responsiveContainerStyles}>
-                                    <BarChart 
-                                      data={chartData.strikeDistribution} 
-                                      layout="vertical"
-                                      margin={{ top: 5, right: 5, bottom: 5, left: 5 }}
-                                    >
-                                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                      <XAxis type="number" domain={[0, 'dataMax + 1']} />
-                                      <YAxis 
-                                        dataKey="name" 
-                                        type="category" 
-                                        tick={{ 
-                                          fill: 'currentColor', 
-                                          fontSize: 12,
-                                          dy: 0
-                                        }}
-                                        width={120}
-                                        tickMargin={4}
-                                        axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                      />
-                                      <Tooltip
-                                        content={({ payload, label }) => {
-                                          if (payload && payload.length && payload[0].value != null) {
-                                            const value = Number(payload[0].value);
-                                            const percentage = payload[0].payload.percentage;
-                                            return (
-                                              <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                                <p className="font-medium">{label}</p>
-                                                <p className="text-sm">{`${value.toFixed(1)} strikes/min (${percentage.toFixed(1)}%)`}</p>
-                                              </div>
-                                            );
-                                          }
-                                          return null;
-                                        }}
-                                      />
-                                      <Bar dataKey="value" fill="#3b82f6">
-                                        {chartData.strikeDistribution.map((entry, index) => (
-                                          <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : '#3b82f6'} />
-                                        ))}
-                                      </Bar>
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              </div>
-
-                              {/* Strike Output Chart */}
-                              <div className="flex flex-col gap-2">
-                                <h4 className="text-sm font-medium">Strike Output</h4>
-                                <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
-                                  <ResponsiveContainer {...responsiveContainerStyles}>
-                                    <BarChart data={chartData.strikeData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                      <XAxis 
-                                        dataKey="name" 
-                                        tick={{ fill: 'currentColor', fontSize: 12 }}
-                                        axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                      />
-                                      <YAxis 
-                                        domain={[0, 'dataMax + 2']}
-                                        tick={{ fill: 'currentColor', fontSize: 12 }}
-                                        axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                      />
-                                      <Tooltip
-                                        content={({ payload, label }) => {
-                                          if (payload && payload.length && payload[0].value != null) {
-                                            const value = Number(payload[0].value);
-                                            return (
-                                              <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                                <p className="font-medium">{label}</p>
-                                                <p className="text-sm">{`${value.toFixed(1)} strikes/min`}</p>
-                                              </div>
-                                            );
-                                          }
-                                          return null;
-                                        }}
-                                      />
-                                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                        {chartData.strikeData.map((entry, index) => (
-                                          <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                      </Bar>
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </ErrorBoundary>
-
-                    {/* Grappling Stats */}
-                    <ErrorBoundary FallbackComponent={ChartErrorFallback}>
-                      <Card className="overflow-hidden bg-background/60 backdrop-blur-xl border-white/20 shadow-xl hover:shadow-2xl transition-all duration-300">
-                        <CardHeader className="border-b border-white/10 py-3">
-                          <CardTitle className="flex items-center justify-center gap-2 text-center w-full">
-                            <span role="img" aria-label="Grappling" className="flex-shrink-0 text-lg">🤼</span>
-                            <span className="flex-shrink-0 text-lg">Grappling Statistics</span>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 md:p-6 flex flex-col gap-6">
-                          <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Takedowns per 15 min</p>
-                              <p className="text-3xl font-bold">{safeParseFloat(stats.td_avg).toFixed(1)}</p>
-                              <p className="text-sm text-muted-foreground">Grappling Frequency</p>
-                            </div>
-                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Takedown Accuracy</p>
-                              <p className="text-3xl font-bold">{safeParseFloat(stats.td_acc).toFixed(1)}</p>
-                              <p className="text-sm text-muted-foreground">Takedown Success Rate</p>
-                            </div>
-                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Takedown Defense</p>
-                              <p className="text-3xl font-bold">{safeParseFloat(stats.td_def).toFixed(1)}</p>
-                              <p className="text-sm text-muted-foreground">Takedown Prevention</p>
-                            </div>
-                            <div className="space-y-2 p-4 bg-accent/20 rounded-lg ring-1 ring-white/10 hover:ring-white/20 transition-all duration-300">
-                              <p className="text-sm text-muted-foreground">Submissions per 15 min</p>
-                              <p className="text-3xl font-bold">{safeParseFloat(stats.sub_avg).toFixed(1)}</p>
-                              <p className="text-sm text-muted-foreground">Submission Threat</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-4">
-                            {/* Grappling Output Chart */}
-                            <div className="flex flex-col gap-2">
-                              <h4 className="text-sm font-medium">Grappling Output</h4>
-                              <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
-                                <ResponsiveContainer {...responsiveContainerStyles}>
-                                  <BarChart data={chartData.grappleData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                    <XAxis 
-                                      dataKey="name" 
-                                      tick={{ fill: 'currentColor', fontSize: 12 }}
-                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                    />
-                                    <YAxis 
-                                      domain={[0, 5]}
-                                      tick={{ fill: 'currentColor', fontSize: 12 }}
-                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                    />
-                                    <Tooltip
-                                      content={({ payload, label }) => {
-                                        if (payload && payload.length && payload[0].value != null) {
-                                          const value = Number(payload[0].value);
-                                          return (
-                                            <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                              <p className="font-medium">{label}</p>
-                                              <p className="text-sm">{`${value.toFixed(1)} per 15min`}</p>
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      }}
-                                    />
-                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                      {chartData.grappleData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                      ))}
-                                    </Bar>
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </div>
-
-                            {/* Grappling Accuracy Chart */}
-                            <div className="flex flex-col gap-2">
-                              <h4 className="text-sm font-medium">Grappling Accuracy</h4>
-                              <div className="h-[160px] bg-accent/20 rounded-lg ring-1 ring-white/10 p-4">
-                                <ResponsiveContainer {...responsiveContainerStyles}>
-                                  <BarChart data={chartData.grappleAccuracyData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                                    <XAxis 
-                                      dataKey="name" 
-                                      tick={{ fill: 'currentColor', fontSize: 12 }}
-                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                    />
-                                    <YAxis 
-                                      domain={[0, 100]}
-                                      tick={{ fill: 'currentColor', fontSize: 12 }}
-                                      axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
-                                      tickFormatter={(value) => `${value}%`}
-                                    />
-                                    <Tooltip
-                                      content={({ payload, label }) => {
-                                        if (payload && payload.length && payload[0].value != null) {
-                                          const value = Number(payload[0].value);
-                                          return (
-                                            <div className="bg-background/95 p-2 rounded-lg border shadow-sm">
-                                              <p className="font-medium">{label}</p>
-                                              <p className="text-sm">{`${value}%`}</p>
-                                            </div>
-                                          );
-                                        }
-                                        return null;
-                                      }}
-                                    />
-                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                      {chartData.grappleAccuracyData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                      ))}
-                                    </Bar>
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </ErrorBoundary>
+                    <StatsView stats={stats} chartData={chartData} />
                   </TabsContent>
 
                   <TabsContent 
