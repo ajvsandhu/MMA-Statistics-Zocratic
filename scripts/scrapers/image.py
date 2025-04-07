@@ -24,12 +24,17 @@ def update_image_urls():
         # Initialize database connection
         supabase = get_supabase_client()
         
-        # Fetch all fighters using pagination to get beyond the 1000 record limit
-        page_size = 1000
+        # First, get total count
+        count_response = supabase.table('fighters').select('count', count='exact').execute()
+        total_count = count_response.count
+        print(f"[INFO] Total fighters in database: {total_count}")
+        
+        # Fetch all fighters using proper pagination
+        page_size = 1000  # Maximum allowed by Supabase
         all_fighters = []
         page = 0
         
-        while True:
+        while len(all_fighters) < total_count:
             # Fetch a page of fighters
             response = supabase.table('fighters') \
                 .select('fighter_name') \
@@ -38,22 +43,23 @@ def update_image_urls():
             
             # Add fighters to our list
             fighters_page = response.data
-            all_fighters.extend(fighters_page)
-            
-            # If we got fewer results than the page size, we've reached the end
-            if len(fighters_page) < page_size:
+            if not fighters_page:  # No more results
                 break
                 
+            all_fighters.extend(fighters_page)
+            print(f"[INFO] Fetched page {page + 1}: {len(fighters_page)} fighters (Total: {len(all_fighters)}/{total_count})")
+            
             # Move to next page
             page += 1
         
-        print(f"[INFO] Found {len(all_fighters)} fighters in the database to process.")
+        total_fighters = len(all_fighters)
+        print(f"[INFO] Successfully fetched all {total_fighters} fighters from the database.")
         
-        # Process in batches
+        # Process in smaller batches to avoid rate limits
         batch_size = 50
         success_count = 0
         
-        for i in range(0, len(all_fighters), batch_size):
+        for i in range(0, total_fighters, batch_size):
             batch = all_fighters[i:i+batch_size]
             for fighter in batch:
                 fighter_name = fighter['fighter_name']
@@ -69,9 +75,9 @@ def update_image_urls():
                 except Exception as e:
                     print(f"[ERROR] Failed to update {fighter_name}: {str(e)}")
             
-            print(f"[INFO] Processed {min(i + batch_size, len(all_fighters))}/{len(all_fighters)} fighters...")
+            print(f"[INFO] Processed {min(i + batch_size, total_fighters)}/{total_fighters} fighters...")
         
-        print(f"[DONE] Successfully updated image URLs for {success_count} fighters with stickman placeholder")
+        print(f"[DONE] Successfully updated image URLs for {success_count}/{total_fighters} fighters with stickman placeholder")
     except Exception as e:
         print(f"[ERROR] Failed to update image URLs: {str(e)}")
 

@@ -40,4 +40,5 @@ pytest-asyncio>=0.23.0
 
 # Text processing
 thefuzz>=0.20.0
-python-Levenshtein>=0.23.0 
+python-Levenshtein>=0.21.1
+fuzzywuzzy==0.18.0 
