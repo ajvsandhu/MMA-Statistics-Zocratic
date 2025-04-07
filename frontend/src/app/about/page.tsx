@@ -8,7 +8,7 @@ import { useIsMobile } from "@/lib/utils"
 
 export default function AboutPage() {
   const [activeSection, setActiveSection] = useState(0)
-  const sections = ["Overview", "Features", "Tech Stack"]
+  const sections = ["Overview", "Features", "Stay Tuned"]
   const containerRef = useRef<HTMLDivElement>(null)
   const [isManualScroll, setIsManualScroll] = useState(false)
   const [direction, setDirection] = useState(0)
@@ -344,7 +344,7 @@ export default function AboutPage() {
                           transition={{ duration: 0.6 }}
                           className="text-4xl font-bold text-foreground mb-6"
                         >
-                          Tech Stack
+                          Stay Tuned
                         </motion.h2>
                         <motion.p
                           initial={{ opacity: 0, y: 20 }}
@@ -352,25 +352,29 @@ export default function AboutPage() {
                           transition={{ duration: 0.6, delay: 0.1 }}
                           className="text-xl text-muted-foreground"
                         >
-                          Built with cutting-edge technologies to ensure reliability, speed, and scalability.
+                          We're actively developing new features and improvements to enhance your fight analysis experience.
                         </motion.p>
                       </div>
 
-                      <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {[
                           {
-                            category: "Frontend",
-                            items: ["Next.js 14", "TailwindCSS", "Framer Motion"]
+                            title: "Event Analysis",
+                            description: "Coming soon: Comprehensive analysis of upcoming UFC events with detailed breakdowns and predictions for every fight on the card."
                           },
                           {
-                            category: "Backend",
-                            items: ["FastAPI", "Python", "SQLAlchemy"]
+                            title: "Fighter Career Insights",
+                            description: "Deep dive into fighter careers with trend analysis, style matchups, and performance evolution over time."
                           },
                           {
-                            category: "Infrastructure",
-                            items: ["Supabase", "Vercel", "GitHub"]
+                            title: "Advanced Statistics",
+                            description: "New metrics and visualizations to better understand fighter performance, including dynamic striking maps and grappling position analysis."
+                          },
+                          {
+                            title: "Community Features",
+                            description: "Share your predictions, discuss matchups, and compete with other fight analysts in our upcoming community section."
                           }
-                        ].map((stack, idx) => (
+                        ].map((feature, idx) => (
                           <motion.div
                             key={idx}
                             initial={{ opacity: 0, y: 20 }}
@@ -383,16 +387,23 @@ export default function AboutPage() {
                           >
                             <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
                             <div className="relative space-y-4 p-4">
-                              <h3 className="text-2xl font-semibold text-foreground">{stack.category}</h3>
-                              <ul className="space-y-3">
-                                {stack.items.map((item, itemIndex) => (
-                                  <li key={itemIndex} className="text-muted-foreground text-lg">{item}</li>
-                                ))}
-                              </ul>
+                              <h3 className="text-2xl font-semibold text-foreground">{feature.title}</h3>
+                              <p className="text-muted-foreground text-lg">{feature.description}</p>
                             </div>
                           </motion.div>
                         ))}
                       </div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.5 }}
+                        className="text-center max-w-2xl mx-auto"
+                      >
+                        <p className="text-muted-foreground text-lg">
+                          Follow our updates as we continue to improve and expand the platform with new features and insights.
+                        </p>
+                      </motion.div>
                     </div>
                   )}
                 </motion.div>

@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils"
 import { FighterStats, Prediction } from "@/types/fighter"
 import { getAnimationVariants, fadeAnimation } from '@/lib/animations'
 import { useIsMobile } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
 export default function ComparePage() {
   const { toast } = useToast();
@@ -24,6 +25,7 @@ export default function ComparePage() {
   const [isPredicting, setIsPredicting] = useState(false);
   const [showPredictionModal, setShowPredictionModal] = useState(false);
   const isMobile = useIsMobile()
+  const [activeTab, setActiveTab] = useState("physical")
   
   const animationVariants = getAnimationVariants(isMobile)
 
@@ -44,6 +46,25 @@ export default function ComparePage() {
       
       const data = await response.json();
       
+      // Format DOB if it exists
+      let formattedDob = '';
+      if (data?.DOB || data?.dob) {
+        const rawDob = data?.DOB || data?.dob;
+        try {
+          // Try to parse the date in various formats
+          const date = new Date(rawDob);
+          if (!isNaN(date.getTime())) {
+            formattedDob = date.toISOString().split('T')[0]; // Convert to YYYY-MM-DD
+          } else {
+            console.warn('Invalid date format received:', rawDob);
+            formattedDob = rawDob; // Keep original if parsing fails
+          }
+        } catch (error) {
+          console.error('Error formatting DOB:', error);
+          formattedDob = rawDob;
+        }
+      }
+      
       const sanitizedData: FighterStats = {
         name: data?.fighter_name || data?.name || cleanName || '',
         image_url: data?.image_url || '',
@@ -52,7 +73,7 @@ export default function ComparePage() {
         weight: data?.Weight || data?.weight || '',
         reach: data?.Reach || data?.reach || '',
         stance: data?.STANCE || data?.stance || '',
-        dob: data?.dob || data?.date_of_birth || '',
+        dob: formattedDob || '',
         slpm: data?.SLpM || data?.SLPM || data?.slpm || '0',
         str_acc: data?.['Str. Acc.'] || data?.str_acc || '0%',
         sapm: data?.SApM || data?.SAPM || data?.sapm || '0',
@@ -197,8 +218,14 @@ export default function ComparePage() {
     getPrediction(fighter1Name, fighter2Name);
   };
 
-  const FighterCard = ({ fighter, onRemove }: { fighter: FighterStats, onRemove: () => void }) => (
-    <div className="relative aspect-[3/2] rounded-xl overflow-hidden shadow-xl group bg-card">
+  const FighterCard = ({ fighter, onRemove }: { fighter: FighterStats, onRemove: () => void }) => {
+    const isMobile = useIsMobile();
+    
+    return (
+      <div className={cn(
+        "relative rounded-xl overflow-hidden shadow-xl group bg-card",
+        isMobile ? "aspect-[3/2]" : "aspect-[2/3]" // Taller on desktop
+      )}>
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-80 z-10" />
       
       <div className="absolute inset-0">
@@ -247,6 +274,7 @@ export default function ComparePage() {
       </div>
     </div>
   );
+  };
 
   const ComparisonRow = ({ label, value1, value2, higherIsBetter = true, unit = '', isPhysicalStat = false }: { 
     label: string;
@@ -302,8 +330,10 @@ export default function ComparePage() {
       <div className="relative group">
         <div className="grid grid-cols-[1fr,auto,1fr] gap-2 py-1.5 items-center hover:bg-accent/5 rounded-lg">
           <div className="relative min-h-[24px]">
-            <div
-              style={{ width: `${width1}%` }}
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${width1}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
               className={cn(
                 "absolute top-0 left-0 h-full rounded-l-md opacity-10",
                 color1.includes("green") ? "bg-green-500" : 
@@ -312,14 +342,19 @@ export default function ComparePage() {
               )}
             />
             <div className="relative flex items-center justify-center">
-              <div className={cn("font-medium", color1)}>
+              <motion.div 
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={cn("font-medium", color1)}
+              >
                 {formatValue(value1)}
-              </div>
               {num1 !== num2 && isFirstBetter && (
                 <span className="ml-1 text-[10px] font-medium text-green-500">
                   (+{diff})
                 </span>
               )}
+              </motion.div>
             </div>
           </div>
 
@@ -328,8 +363,10 @@ export default function ComparePage() {
           </div>
 
           <div className="relative min-h-[24px]">
-            <div
-              style={{ width: `${width2}%` }}
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${width2}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
               className={cn(
                 "absolute top-0 right-0 h-full rounded-r-md opacity-10",
                 color2.includes("green") ? "bg-green-500" : 
@@ -338,14 +375,19 @@ export default function ComparePage() {
               )}
             />
             <div className="relative flex items-center justify-center">
-              <div className={cn("font-medium", color2)}>
+              <motion.div 
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={cn("font-medium", color2)}
+              >
                 {formatValue(value2)}
-              </div>
               {num1 !== num2 && !isFirstBetter && (
                 <span className="ml-1 text-[10px] font-medium text-green-500">
                   (+{diff})
                 </span>
               )}
+              </motion.div>
             </div>
           </div>
         </div>
@@ -375,26 +417,26 @@ export default function ComparePage() {
     <div className="fixed inset-0 pt-[65px] overflow-hidden">
       <div className="absolute inset-0 top-[65px] overflow-hidden">
         <div className="h-full px-2 sm:px-4 lg:px-8 overflow-y-auto scrollbar-none pb-safe">
-          <motion.div 
-            className="h-full flex flex-col pt-4 sm:pt-8 max-w-[1400px] mx-auto"
-            {...(isMobile ? fadeAnimation : animationVariants.page)}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between h-12 mb-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => router.push('/fight-predictions')}
-                  className="gap-1 px-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span className="sr-only sm:not-sr-only">Back</span>
-                </Button>
-                <h2 className="text-lg sm:text-xl font-bold">Fighter Comparison</h2>
-              </div>
+        <motion.div 
+          className="h-full flex flex-col pt-4 sm:pt-8 max-w-[1400px] mx-auto"
+          {...(isMobile ? fadeAnimation : animationVariants.page)}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between h-12 mb-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/fight-predictions')}
+                className="gap-1 px-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="sr-only sm:not-sr-only">Back</span>
+              </Button>
+              <h2 className="text-lg sm:text-xl font-bold">Fighter Comparison</h2>
             </div>
+          </div>
 
-            {/* Main Content */}
+          {/* Main Content */}
             <div className={cn(
               "flex-1 overflow-visible",
               isMobile ? "flex flex-col space-y-4" : "grid grid-cols-[350px,1fr,350px] gap-6"
@@ -531,88 +573,126 @@ export default function ComparePage() {
                     {fighter1 && fighter2 ? (
                       <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl">
                         <CardContent className="p-3">
-                          <div className="space-y-2">
-                            {/* Physical Stats */}
-                            <div>
-                              <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Physical Attributes</h4>
-                              <div className="space-y-1">
-                                <SimpleComparisonRow
-                                  label="Height"
-                                  value1={fighter1.height}
-                                  value2={fighter2.height}
-                                />
-                                <SimpleComparisonRow
-                                  label="Weight"
-                                  value1={fighter1.weight}
-                                  value2={fighter2.weight}
-                                />
-                                <SimpleComparisonRow
-                                  label="Reach"
-                                  value1={fighter1.reach}
-                                  value2={fighter2.reach}
-                                />
-                                <SimpleComparisonRow
-                                  label="Stance"
-                                  value1={fighter1.stance}
-                                  value2={fighter2.stance}
-                                />
-                              </div>
-                            </div>
+                          <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
+                            <TabsList className="w-full grid grid-cols-3 h-8">
+                              <TabsTrigger value="physical" className="text-xs">Physical</TabsTrigger>
+                              <TabsTrigger value="striking" className="text-xs">Striking</TabsTrigger>
+                              <TabsTrigger value="grappling" className="text-xs">Grappling</TabsTrigger>
+                            </TabsList>
+                            <motion.div
+                              key={activeTab}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="pt-3"
+                            >
+                              <TabsContent value="physical" className="mt-0">
+                                <div className="space-y-1">
+                                  <SimpleComparisonRow
+                                    label="Height"
+                                    value1={fighter1.height}
+                                    value2={fighter2.height}
+                                  />
+                                  <SimpleComparisonRow
+                                    label="Weight"
+                                    value1={fighter1.weight}
+                                    value2={fighter2.weight}
+                                  />
+                                  <SimpleComparisonRow
+                                    label="Reach"
+                                    value1={fighter1.reach}
+                                    value2={fighter2.reach}
+                                  />
+                                  <SimpleComparisonRow
+                                    label="Stance"
+                                    value1={fighter1.stance}
+                                    value2={fighter2.stance}
+                                  />
+                                  <SimpleComparisonRow
+                                    label="Age"
+                                    value1={calculateAge(fighter1.dob)}
+                                    value2={calculateAge(fighter2.dob)}
+                                  />
+                                  <SimpleComparisonRow
+                                    label="Experience"
+                                    value1={calculateExperience(fighter1.record)}
+                                    value2={calculateExperience(fighter2.record)}
+                                  />
+                                </div>
+                              </TabsContent>
 
-                            <Separator className="bg-border/50" />
+                              <TabsContent value="striking" className="mt-0">
+                                <div className="space-y-1">
+                                  <ComparisonRow
+                                    label="Strikes/Min"
+                                    value1={fighter1.slpm}
+                                    value2={fighter2.slpm}
+                                    unit=""
+                                  />
+                                  <ComparisonRow
+                                    label="Accuracy"
+                                    value1={fighter1.str_acc}
+                                    value2={fighter2.str_acc}
+                                    unit="%"
+                                  />
+                                  <ComparisonRow
+                                    label="Defense"
+                                    value1={fighter1.str_def}
+                                    value2={fighter2.str_def}
+                                    unit="%"
+                                  />
+                                  <ComparisonRow
+                                    label="Absorbed/Min"
+                                    value1={fighter1.sapm}
+                                    value2={fighter2.sapm}
+                                    higherIsBetter={false}
+                                    unit=""
+                                  />
+                                  <ComparisonRow
+                                    label="Striking Differential"
+                                    value1={calculateStrikingDiff(fighter1)}
+                                    value2={calculateStrikingDiff(fighter2)}
+                                    unit=""
+                                  />
+                                </div>
+                              </TabsContent>
 
-                            {/* Striking Stats */}
-                            <div>
-                              <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Striking</h4>
-                              <div className="space-y-1">
-                                <ComparisonRow
-                                  label="Strikes/Min"
-                                  value1={fighter1.slpm}
-                                  value2={fighter2.slpm}
-                                  unit=""
-                                />
-                                <ComparisonRow
-                                  label="Accuracy"
-                                  value1={fighter1.str_acc}
-                                  value2={fighter2.str_acc}
-                                  unit="%"
-                                />
-                                <ComparisonRow
-                                  label="Defense"
-                                  value1={fighter1.str_def}
-                                  value2={fighter2.str_def}
-                                  unit="%"
-                                />
-                              </div>
-                            </div>
-
-                            <Separator className="bg-border/50" />
-
-                            {/* Grappling Stats */}
-                            <div>
-                              <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Grappling</h4>
-                              <div className="space-y-1">
-                                <ComparisonRow
-                                  label="TD/15 Min"
-                                  value1={fighter1.td_avg}
-                                  value2={fighter2.td_avg}
-                                  unit=""
-                                />
-                                <ComparisonRow
-                                  label="TD Accuracy"
-                                  value1={fighter1.td_acc}
-                                  value2={fighter2.td_acc}
-                                  unit="%"
-                                />
-                                <ComparisonRow
-                                  label="TD Defense"
-                                  value1={fighter1.td_def}
-                                  value2={fighter2.td_def}
-                                  unit="%"
-                                />
-                              </div>
-                            </div>
-                          </div>
+                              <TabsContent value="grappling" className="mt-0">
+                                <div className="space-y-1">
+                                  <ComparisonRow
+                                    label="TD/15 Min"
+                                    value1={fighter1.td_avg}
+                                    value2={fighter2.td_avg}
+                                    unit=""
+                                  />
+                                  <ComparisonRow
+                                    label="TD Accuracy"
+                                    value1={fighter1.td_acc}
+                                    value2={fighter2.td_acc}
+                                    unit="%"
+                                  />
+                                  <ComparisonRow
+                                    label="TD Defense"
+                                    value1={fighter1.td_def}
+                                    value2={fighter2.td_def}
+                                    unit="%"
+                                  />
+                                  <ComparisonRow
+                                    label="Sub/15 Min"
+                                    value1={fighter1.sub_avg}
+                                    value2={fighter2.sub_avg}
+                                    unit=""
+                                  />
+                                  <ComparisonRow
+                                    label="Ground Control"
+                                    value1={calculateGroundControl(fighter1)}
+                                    value2={calculateGroundControl(fighter2)}
+                                    unit="%"
+                                  />
+                                </div>
+                              </TabsContent>
+                            </motion.div>
+                          </Tabs>
                         </CardContent>
                       </Card>
                     ) : (
@@ -632,212 +712,237 @@ export default function ComparePage() {
               ) : (
                 // Desktop Layout (unchanged)
                 <>
-                  {/* Fighter 1 Column */}
-                  <div className="flex flex-col">
-                    <h3 className="text-base sm:text-lg font-semibold mb-1">Fighter 1</h3>
-                    <div className="relative z-30">
-                      <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} />
-                    </div>
+            {/* Fighter 1 Column */}
+            <div className="flex flex-col">
+              <h3 className="text-base sm:text-lg font-semibold mb-1">Fighter 1</h3>
+              <div className="relative z-30">
+                <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} />
+              </div>
                     <div className="mt-2">
-                      <AnimatePresence mode="wait">
-                        {fighter1 && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <FighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
+                <AnimatePresence mode="wait">
+                  {fighter1 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <FighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
 
-                  {/* Center Stats Column */}
-                  <div className="flex flex-col">
-                    {/* VS Badge and Predict Button */}
-                    <div className="flex flex-col items-center mb-2">
-                      <div className="px-2.5 py-0.5 rounded-full bg-accent/10 backdrop-blur-sm border border-border">
-                        <span className="text-sm font-bold text-muted-foreground">VS</span>
-                      </div>
-                      
-                      {fighter1 && fighter2 && (
-                        <Button
-                          size="sm"
-                          onClick={handlePredictClick}
-                          disabled={isPredicting}
-                          className="w-[200px] mt-2 shadow-lg"
-                        >
-                          {isPredicting ? (
-                            <>
-                              Predicting...
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                className="ml-1.5"
-                              >
-                                <Swords className="h-3.5 w-3.5" />
-                              </motion.div>
-                            </>
-                          ) : (
-                            <>
-                              Get Prediction
-                              <Swords className="ml-1.5 h-3.5 w-3.5" />
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Stats Comparison */}
-                    <div className="flex-1">
-                      {fighter1 && fighter2 ? (
+            {/* Center Stats Column */}
+            <div className="flex flex-col">
+              {/* VS Badge and Predict Button */}
+              <div className="flex flex-col items-center mb-2">
+                <div className="px-2.5 py-0.5 rounded-full bg-accent/10 backdrop-blur-sm border border-border">
+                  <span className="text-sm font-bold text-muted-foreground">VS</span>
+                </div>
+                
+                {fighter1 && fighter2 && (
+                  <Button
+                    size="sm"
+                    onClick={handlePredictClick}
+                    disabled={isPredicting}
+                    className="w-[200px] mt-2 shadow-lg"
+                  >
+                    {isPredicting ? (
+                      <>
+                        Predicting...
                         <motion.div
-                          initial={isMobile ? {} : { opacity: 0, y: 20 }}
-                          animate={isMobile ? {} : { opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3 }}
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="ml-1.5"
                         >
-                          <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl w-full">
-                            <CardContent className="p-3">
-                              <div className="space-y-2">
-                                {/* Physical Stats */}
-                                <div>
-                                  <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Physical Attributes</h4>
-                                  <div className="space-y-1">
-                                    <SimpleComparisonRow
-                                      label="Height"
-                                      value1={fighter1.height}
-                                      value2={fighter2.height}
-                                    />
-                                    <SimpleComparisonRow
-                                      label="Weight"
-                                      value1={fighter1.weight}
-                                      value2={fighter2.weight}
-                                    />
-                                    <SimpleComparisonRow
-                                      label="Reach"
-                                      value1={fighter1.reach}
-                                      value2={fighter2.reach}
-                                    />
-                                    <SimpleComparisonRow
-                                      label="Stance"
-                                      value1={fighter1.stance}
-                                      value2={fighter2.stance}
-                                    />
-                                  </div>
-                                </div>
-
-                                <Separator className="bg-border/50" />
-
-                                {/* Striking Stats */}
-                                <div>
-                                  <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Striking</h4>
-                                  <div className="space-y-1">
-                                    <ComparisonRow
-                                      label="Strikes Landed per Min"
-                                      value1={fighter1.slpm}
-                                      value2={fighter2.slpm}
-                                      unit=""
-                                    />
-                                    <ComparisonRow
-                                      label="Striking Accuracy"
-                                      value1={fighter1.str_acc}
-                                      value2={fighter2.str_acc}
-                                      unit="%"
-                                    />
-                                    <ComparisonRow
-                                      label="Strikes Absorbed per Min"
-                                      value1={fighter1.sapm}
-                                      value2={fighter2.sapm}
-                                      higherIsBetter={false}
-                                      unit=""
-                                    />
-                                    <ComparisonRow
-                                      label="Striking Defense"
-                                      value1={fighter1.str_def}
-                                      value2={fighter2.str_def}
-                                      unit="%"
-                                    />
-                                  </div>
-                                </div>
-
-                                <Separator className="bg-border/50" />
-
-                                {/* Grappling Stats */}
-                                <div>
-                                  <h4 className="text-xs font-medium mb-1 text-center text-muted-foreground">Grappling</h4>
-                                  <div className="space-y-1">
-                                    <ComparisonRow
-                                      label="Takedowns per 15 Min"
-                                      value1={fighter1.td_avg}
-                                      value2={fighter2.td_avg}
-                                      unit=""
-                                    />
-                                    <ComparisonRow
-                                      label="Takedown Accuracy"
-                                      value1={fighter1.td_acc}
-                                      value2={fighter2.td_acc}
-                                      unit="%"
-                                    />
-                                    <ComparisonRow
-                                      label="Takedown Defense"
-                                      value1={fighter1.td_def}
-                                      value2={fighter2.td_def}
-                                      unit="%"
-                                    />
-                                    <ComparisonRow
-                                      label="Submissions per 15 Min"
-                                      value1={fighter1.sub_avg}
-                                      value2={fighter2.sub_avg}
-                                      unit=""
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
+                          <Swords className="h-3.5 w-3.5" />
                         </motion.div>
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="text-center">
-                            <div className="text-muted-foreground">
-                              <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                              <p className="text-sm font-medium">
-                                Select two fighters to compare
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                      </>
+                    ) : (
+                      <>
+                        Get Prediction
+                        <Swords className="ml-1.5 h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
 
-                  {/* Fighter 2 Column */}
-                  <div className="flex flex-col">
-                    <h3 className="text-base sm:text-lg font-semibold mb-1">Fighter 2</h3>
-                    <div className="relative z-30">
-                      <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} />
-                    </div>
-                    <div className="mt-2">
-                      <AnimatePresence mode="wait">
-                        {fighter2 && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <FighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+              {/* Stats Comparison */}
+              <div className="flex-1">
+                {fighter1 && fighter2 ? (
+                  <motion.div
+                    initial={isMobile ? {} : { opacity: 0, y: 20 }}
+                    animate={isMobile ? {} : { opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                          <Card className="bg-card/95 backdrop-blur-xl border-border/50 shadow-xl w-full">
+                      <CardContent className="p-3">
+                              <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
+                                <TabsList className="w-full grid grid-cols-3 h-8">
+                                  <TabsTrigger value="physical" className="text-xs">Physical</TabsTrigger>
+                                  <TabsTrigger value="striking" className="text-xs">Striking</TabsTrigger>
+                                  <TabsTrigger value="grappling" className="text-xs">Grappling</TabsTrigger>
+                                </TabsList>
+                                <motion.div
+                                  key={activeTab}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="pt-3"
+                                >
+                                  <TabsContent value="physical" className="mt-0">
+                            <div className="space-y-1">
+                              <SimpleComparisonRow
+                                label="Height"
+                                value1={fighter1.height}
+                                value2={fighter2.height}
+                              />
+                              <SimpleComparisonRow
+                                label="Weight"
+                                value1={fighter1.weight}
+                                value2={fighter2.weight}
+                              />
+                              <SimpleComparisonRow
+                                label="Reach"
+                                value1={fighter1.reach}
+                                value2={fighter2.reach}
+                              />
+                              <SimpleComparisonRow
+                                label="Stance"
+                                value1={fighter1.stance}
+                                value2={fighter2.stance}
+                              />
+                              <SimpleComparisonRow
+                                label="Age"
+                                value1={calculateAge(fighter1.dob)}
+                                value2={calculateAge(fighter2.dob)}
+                              />
+                              <SimpleComparisonRow
+                                label="Experience"
+                                value1={calculateExperience(fighter1.record)}
+                                value2={calculateExperience(fighter2.record)}
+                              />
+                            </div>
+                                  </TabsContent>
+
+                                  <TabsContent value="striking" className="mt-0">
+                            <div className="space-y-1">
+                              <ComparisonRow
+                                        label="Strikes/Min"
+                                value1={fighter1.slpm}
+                                value2={fighter2.slpm}
+                                unit=""
+                              />
+                              <ComparisonRow
+                                        label="Accuracy"
+                                value1={fighter1.str_acc}
+                                value2={fighter2.str_acc}
+                                unit="%"
+                              />
+                              <ComparisonRow
+                                        label="Defense"
+                                        value1={fighter1.str_def}
+                                        value2={fighter2.str_def}
+                                        unit="%"
+                                      />
+                                      <ComparisonRow
+                                        label="Absorbed/Min"
+                                value1={fighter1.sapm}
+                                value2={fighter2.sapm}
+                                higherIsBetter={false}
+                                unit=""
+                              />
+                              <ComparisonRow
+                                label="Striking Differential"
+                                value1={calculateStrikingDiff(fighter1)}
+                                value2={calculateStrikingDiff(fighter2)}
+                                unit=""
+                              />
+                            </div>
+                                  </TabsContent>
+
+                                  <TabsContent value="grappling" className="mt-0">
+                            <div className="space-y-1">
+                              <ComparisonRow
+                                        label="TD/15 Min"
+                                value1={fighter1.td_avg}
+                                value2={fighter2.td_avg}
+                                unit=""
+                              />
+                              <ComparisonRow
+                                        label="TD Accuracy"
+                                value1={fighter1.td_acc}
+                                value2={fighter2.td_acc}
+                                unit="%"
+                              />
+                              <ComparisonRow
+                                        label="TD Defense"
+                                value1={fighter1.td_def}
+                                value2={fighter2.td_def}
+                                unit="%"
+                              />
+                              <ComparisonRow
+                                        label="Sub/15 Min"
+                                value1={fighter1.sub_avg}
+                                value2={fighter2.sub_avg}
+                                unit=""
+                              />
+                              <ComparisonRow
+                                label="Ground Control"
+                                value1={calculateGroundControl(fighter1)}
+                                value2={calculateGroundControl(fighter2)}
+                                unit="%"
+                              />
+                            </div>
+                                  </TabsContent>
+                                </motion.div>
+                              </Tabs>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-muted-foreground">
+                        <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" />
+                        <p className="text-sm font-medium">
+                          Select two fighters to compare
+                        </p>
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Fighter 2 Column */}
+            <div className="flex flex-col">
+              <h3 className="text-base sm:text-lg font-semibold mb-1">Fighter 2</h3>
+              <div className="relative z-30">
+                <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} />
+              </div>
+                    <div className="mt-2">
+                <AnimatePresence mode="wait">
+                  {fighter2 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <FighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
                 </>
               )}
-            </div>
-          </motion.div>
+          </div>
+        </motion.div>
         </div>
       </div>
 
@@ -955,4 +1060,261 @@ const formatRanking = (ranking: string | number | null | undefined): string => {
   if (rankNum === 1) return 'Champion';
   if (rankNum >= 2 && rankNum <= 16) return `#${rankNum - 1}`;
   return '';
+};
+
+const calculateAge = (dob: string): string => {
+  if (!dob) return 'N/A';
+  
+  try {
+    // Try to parse the date string
+    let birthDate: Date | null = null;
+    
+    // Remove any leading/trailing whitespace and handle special characters
+    const cleanDob = dob.trim().replace(/['"]/g, '');
+    
+    // Common date formats to try
+    const formats = [
+      // ISO format
+      /^\d{4}-\d{2}-\d{2}/,
+      // MM/DD/YYYY
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+      // DD/MM/YYYY
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+      // Month DD, YYYY
+      /^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/,
+      // DD Month YYYY
+      /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/
+    ];
+    
+    // Try each format
+    for (const format of formats) {
+      const match = cleanDob.match(format);
+      if (match) {
+        if (format === formats[0]) { // ISO format
+          birthDate = new Date(cleanDob);
+        } else if (format === formats[1]) { // MM/DD/YYYY
+          const [_, month, day, year] = match;
+          birthDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        } else if (format === formats[2]) { // DD/MM/YYYY
+          const [_, day, month, year] = match;
+          birthDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        } else if (format === formats[3]) { // Month DD, YYYY
+          const [_, month, day, year] = match;
+          birthDate = new Date(`${year}-${getMonthNumber(month)}-${day.padStart(2, '0')}`);
+        } else if (format === formats[4]) { // DD Month YYYY
+          const [_, day, month, year] = match;
+          birthDate = new Date(`${year}-${getMonthNumber(month)}-${day.padStart(2, '0')}`);
+        }
+        break;
+      }
+    }
+    
+    // If no format matched or date is invalid
+    if (!birthDate || isNaN(birthDate.getTime())) {
+      console.warn('Could not parse date:', dob);
+      return 'N/A';
+    }
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    // Validate the calculated age
+    if (age < 18 || age > 100) {
+      console.warn('Suspicious age calculated:', age, 'from DOB:', dob);
+      return 'N/A';
+    }
+    
+    return age.toString();
+  } catch (error) {
+    console.error('Error calculating age:', error, 'DOB:', dob);
+    return 'N/A';
+  }
+};
+
+// Helper function to convert month names to numbers
+const getMonthNumber = (month: string): string => {
+  const months: { [key: string]: string } = {
+    'jan': '01', 'january': '01',
+    'feb': '02', 'february': '02',
+    'mar': '03', 'march': '03',
+    'apr': '04', 'april': '04',
+    'may': '05',
+    'jun': '06', 'june': '06',
+    'jul': '07', 'july': '07',
+    'aug': '08', 'august': '08',
+    'sep': '09', 'september': '09',
+    'oct': '10', 'october': '10',
+    'nov': '11', 'november': '11',
+    'dec': '12', 'december': '12'
+  };
+  
+  const monthKey = month.toLowerCase().substring(0, 3);
+  return months[monthKey] || '01';
+};
+
+const calculateExperience = (record: string) => {
+  if (!record) return "N/A";
+  const matches = record.match(/\d+/g);
+  if (!matches) return "N/A";
+  const total = matches.reduce((sum, num) => sum + parseInt(num), 0);
+  return `${total} fights`;
+};
+
+const calculateFinishRate = (fighter: FighterStats) => {
+  if (!fighter.record || !fighter.slpm || !fighter.sub_avg) return "N/A";
+  const totalFights = parseInt(fighter.record.split('-')[0]);
+  const wins = totalFights - parseInt(fighter.record.split('-')[1]);
+  const finishRate = ((wins / totalFights) * 100).toFixed(1);
+  return `${finishRate}%`;
+};
+
+const calculateStrikeDiff = (fighter: FighterStats): string => {
+  const landed = safeParseNumber(fighter.slpm);
+  const absorbed = safeParseNumber(fighter.sapm);
+  const diff = landed - absorbed;
+  return diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1);
+};
+
+const calculateDurability = (fighter: FighterStats): string => {
+  const strikesAbsorbed = safeParseNumber(fighter.sapm);
+  const defense = safeParseNumber(fighter.str_def.replace('%', ''));
+  const tdDefense = safeParseNumber(fighter.td_def.replace('%', ''));
+  // Higher defense stats and lower strikes absorbed indicate better durability
+  const durability = ((defense + tdDefense) / 2) * (1 - Math.min(strikesAbsorbed / 10, 0.8));
+  return durability.toFixed(1);
+};
+
+const calculateCombatIQ = (fighter: FighterStats): string => {
+  const strikeAcc = safeParseNumber(fighter.str_acc.replace('%', ''));
+  const strikeDef = safeParseNumber(fighter.str_def.replace('%', ''));
+  const tdAcc = safeParseNumber(fighter.td_acc.replace('%', ''));
+  const tdDef = safeParseNumber(fighter.td_def.replace('%', ''));
+  // Balance of offensive accuracy and defensive success shows fight IQ
+  const combatIQ = (
+    (strikeAcc * 0.3) +  // Striking accuracy weight
+    (strikeDef * 0.3) +  // Strike defense weight
+    (tdAcc * 0.2) +      // Takedown accuracy weight
+    (tdDef * 0.2)        // Takedown defense weight
+  );
+  return combatIQ.toFixed(1);
+};
+
+const calculateDominance = (fighter: FighterStats): string => {
+  if (!fighter.str_acc || !fighter.slpm) return "N/A";
+  const strikingDominance = (
+    (parseFloat(fighter.str_acc) / 100) * 
+    parseFloat(fighter.slpm)
+  );
+  const grapplingDominance = (
+    (parseFloat(fighter.td_acc) / 100) * 
+    parseFloat(fighter.td_avg)
+  );
+  const dominanceScore = ((strikingDominance * 0.7 + grapplingDominance * 0.3) * 10).toFixed(1);
+  return dominanceScore;
+};
+
+const calculateEfficiency = (fighter: FighterStats): string => {
+  if (!fighter.str_acc || !fighter.slpm || !fighter.sapm || !fighter.td_acc || !fighter.td_avg) return "N/A";
+  const strikingEfficiency = (
+    (parseFloat(fighter.str_acc) / 100) * 
+    (1 - parseFloat(fighter.sapm) / 
+    (parseFloat(fighter.slpm) + 0.1))
+  );
+  const grapplingEfficiency = (
+    (parseFloat(fighter.td_acc) / 100) * 
+    parseFloat(fighter.td_avg)
+  );
+  const efficiencyScore = ((strikingEfficiency * 0.6 + grapplingEfficiency * 0.4) * 100).toFixed(1);
+  return `${efficiencyScore}%`;
+};
+
+const calculateNetStrikes = (fighter: FighterStats): string => {
+  const landed = safeParseNumber(fighter.slpm);
+  const absorbed = safeParseNumber(fighter.sapm);
+  return (landed - absorbed).toFixed(1);
+};
+
+const calculateTDSuccess = (fighter: FighterStats): string => {
+  const tdAcc = safeParseNumber(fighter.td_acc.replace('%', ''));
+  return `${tdAcc}`;
+};
+
+const calculateGroundThreat = (fighter: FighterStats): string => {
+  const tdAvg = safeParseNumber(fighter.td_avg);
+  const subAvg = safeParseNumber(fighter.sub_avg);
+  return (tdAvg + subAvg).toFixed(1);
+};
+
+const calculateStrikeRatio = (fighter: FighterStats): string => {
+  const landed = safeParseNumber(fighter.slpm);
+  const absorbed = safeParseNumber(fighter.sapm);
+  if (absorbed === 0) return landed.toFixed(1);
+  return (landed / absorbed).toFixed(1);
+};
+
+const calculateTDSuccessRate = (fighter: FighterStats): string => {
+  const tdAcc = safeParseNumber(fighter.td_acc.replace('%', ''));
+  const tdDef = safeParseNumber(fighter.td_def.replace('%', ''));
+  return ((tdAcc + tdDef) / 2).toFixed(0);
+};
+
+const calculateControlScore = (fighter: FighterStats): string => {
+  const tdAvg = safeParseNumber(fighter.td_avg);
+  const tdAcc = safeParseNumber(fighter.td_acc.replace('%', '')) / 100;
+  return (tdAvg * tdAcc * 2).toFixed(1);
+};
+
+const calculateStrikingDiff = (fighter: FighterStats): string => {
+  const landed = safeParseNumber(fighter.slpm);
+  const absorbed = safeParseNumber(fighter.sapm);
+  const diff = landed - absorbed;
+  return diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1);
+};
+
+const calculateDefenseRate = (fighter: FighterStats): string => {
+  const defense = safeParseNumber(fighter.str_def.replace('%', ''));
+  const absorbed = safeParseNumber(fighter.sapm);
+  const defenseRate = Math.max(0, defense * (1 - Math.min(absorbed / 10, 0.5)));
+  return defenseRate.toFixed(0);
+};
+
+const calculateTakedownRate = (fighter: FighterStats): string => {
+  const tdAvg = safeParseNumber(fighter.td_avg);
+  const tdAcc = safeParseNumber(fighter.td_acc.replace('%', '')) / 100;
+  return (tdAvg * tdAcc).toFixed(1);
+};
+
+const calculateGroundControl = (fighter: FighterStats): string => {
+  // Get base stats
+  const tdAvg = safeParseNumber(fighter.td_avg);
+  const tdAcc = safeParseNumber(fighter.td_acc.replace('%', '')) / 100;
+  const tdDef = safeParseNumber(fighter.td_def.replace('%', '')) / 100;
+  const subAvg = safeParseNumber(fighter.sub_avg);
+
+  // Calculate ground control score
+  // - Higher weight on TD average (frequency of getting fight to ground)
+  // - Consider TD accuracy (success in getting it there)
+  // - Add submission attempts (threat on ground)
+  // - Scale up for dominant grapplers
+  const baseScore = (tdAvg * 15) * tdAcc + (subAvg * 10);
+  
+  // Apply scaling for more accurate representation
+  let score = Math.min(100, baseScore);
+  
+  // Boost score if fighter shows strong wrestling metrics
+  if (tdAvg > 3.5 && tdAcc > 0.45) {
+    score = Math.min(100, score * 1.3); // 30% boost for dominant wrestlers
+  }
+  
+  // Additional boost if they have both good takedowns AND submission threats
+  if (tdAvg > 2 && subAvg > 1) {
+    score = Math.min(100, score * 1.2); // 20% boost for well-rounded grapplers
+  }
+
+  return Math.round(score).toString();
 }; 
