@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { getAnimationVariants } from '@/lib/animations'
-import { useMediaQuery } from '@/hooks/use-media-query'
+import { useIsMobile } from "@/lib/utils"
 
 export default function AboutPage() {
   const [activeSection, setActiveSection] = useState(0)
@@ -12,36 +12,42 @@ export default function AboutPage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [isManualScroll, setIsManualScroll] = useState(false)
   const [direction, setDirection] = useState(0)
-  const isMobile = useMediaQuery('(max-width: 768px)')
+  const isMobile = useIsMobile()
   const animationVariants = getAnimationVariants(isMobile)
 
   useEffect(() => {
-    const container = containerRef.current
+    const container = containerRef.current?.querySelector('div')
     if (!container) return
 
     let lastScrollTop = 0
     let touchStartY = 0
     let touchEndY = 0
+    let scrollTimeout: NodeJS.Timeout
 
     const handleWheel = (e: WheelEvent) => {
-      if (isManualScroll) return
-      e.preventDefault()
-      
-      const delta = e.deltaY
-      const newDirection = delta > 0 ? 1 : -1
-      
-      setDirection(newDirection)
-      const nextSection = activeSection + newDirection
-      
-      if (nextSection >= 0 && nextSection < sections.length) {
-        setIsManualScroll(true)
-        setActiveSection(nextSection)
-        container.scrollTo({
-          top: nextSection * window.innerHeight,
-          behavior: 'smooth'
-        })
-        setTimeout(() => setIsManualScroll(false), 800)
+      if (isManualScroll) {
+        e.preventDefault()
+        return
       }
+      
+      clearTimeout(scrollTimeout)
+      scrollTimeout = setTimeout(() => {
+        const delta = e.deltaY
+        const newDirection = delta > 0 ? 1 : -1
+        
+        setDirection(newDirection)
+        const nextSection = activeSection + newDirection
+        
+        if (nextSection >= 0 && nextSection < sections.length) {
+          setIsManualScroll(true)
+          setActiveSection(nextSection)
+          container.scrollTo({
+            top: nextSection * window.innerHeight,
+            behavior: 'smooth'
+          })
+          setTimeout(() => setIsManualScroll(false), 1000)
+        }
+      }, 50) // Debounce scroll events
     }
 
     const handleTouchStart = (e: TouchEvent) => {
@@ -73,7 +79,7 @@ export default function AboutPage() {
           top: nextSection * window.innerHeight,
           behavior: 'smooth'
         })
-        setTimeout(() => setIsManualScroll(false), 800)
+        setTimeout(() => setIsManualScroll(false), 1000)
       }
     }
 
@@ -83,6 +89,7 @@ export default function AboutPage() {
     container.addEventListener('touchend', handleTouchEnd, { passive: true })
 
     return () => {
+      clearTimeout(scrollTimeout)
       container.removeEventListener('wheel', handleWheel)
       container.removeEventListener('touchstart', handleTouchStart)
       container.removeEventListener('touchmove', handleTouchMove)
@@ -91,7 +98,7 @@ export default function AboutPage() {
   }, [activeSection, sections.length, isManualScroll])
 
   const scrollToSection = (index: number) => {
-    const container = containerRef.current
+    const container = containerRef.current?.querySelector('div')
     if (!container || isManualScroll) return
 
     setDirection(index > activeSection ? 1 : -1)
@@ -103,7 +110,7 @@ export default function AboutPage() {
       behavior: 'smooth'
     })
 
-    setTimeout(() => setIsManualScroll(false), 800)
+    setTimeout(() => setIsManualScroll(false), 1000)
   }
 
   return (
@@ -188,209 +195,211 @@ export default function AboutPage() {
 
       <div 
         ref={containerRef}
-        className="h-full w-full overflow-y-auto overflow-x-hidden scrollbar-none snap-y snap-mandatory"
+        className="h-screen w-full overflow-hidden"
       >
-        <AnimatePresence initial={false} mode="wait">
-          {sections.map((_, index) => (
-            <motion.section 
-              key={index}
-              id={`section-${index}`}
-              className="h-full w-full flex items-center justify-center relative snap-start"
-              initial={{ 
-                opacity: 0,
-                y: isMobile ? 0 : (direction > 0 ? 100 : -100)
-              }}
-              animate={{ 
-                opacity: 1,
-                y: 0,
-                transition: {
-                  duration: isMobile ? 0.2 : 0.6,
-                  ease: [0.16, 1, 0.3, 1]
-                }
-              }}
-              exit={{ 
-                opacity: 0,
-                y: isMobile ? 0 : (direction > 0 ? -100 : 100),
-                transition: {
-                  duration: isMobile ? 0.15 : 0.6,
-                  ease: [0.16, 1, 0.3, 1]
-                }
-              }}
-            >
-              <motion.div 
-                className="absolute inset-0 bg-gradient-to-b from-primary/5 via-primary/10 to-transparent"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 1 }}
-              />
-              <motion.div
-                className="container max-w-5xl px-4"
-                initial={{ opacity: 0, y: isMobile ? 0 : 40 }}
+        <div className="h-full w-full overflow-y-auto overflow-x-hidden scrollbar-none snap-y snap-mandatory">
+          <AnimatePresence initial={false} mode="wait">
+            {sections.map((_, index) => (
+              <motion.section 
+                key={index}
+                id={`section-${index}`}
+                className="h-screen w-full flex items-center justify-center relative snap-start"
+                initial={{ 
+                  opacity: 0,
+                  y: isMobile ? 0 : (direction > 0 ? 100 : -100)
+                }}
                 animate={{ 
-                  opacity: 1, 
+                  opacity: 1,
                   y: 0,
                   transition: {
-                    duration: isMobile ? 0.2 : 0.8,
-                    delay: isMobile ? 0.1 : 0.2,
+                    duration: isMobile ? 0.2 : 0.6,
+                    ease: [0.16, 1, 0.3, 1]
+                  }
+                }}
+                exit={{ 
+                  opacity: 0,
+                  y: isMobile ? 0 : (direction > 0 ? -100 : 100),
+                  transition: {
+                    duration: isMobile ? 0.15 : 0.6,
                     ease: [0.16, 1, 0.3, 1]
                   }
                 }}
               >
-                {index === 0 && (
-                  <div className="max-w-3xl mx-auto text-center space-y-8">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.6, delay: 0.3 }}
-                      className="inline-flex px-4 py-2 rounded-full bg-primary/10 backdrop-blur-sm"
-                    >
-                      <span className="text-primary text-sm font-medium">UFC FIGHTER DATA API</span>
-                    </motion.div>
-                    <motion.h1
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.4 }}
-                      className="text-5xl sm:text-7xl font-bold text-foreground"
-                    >
-                      Next Generation Fight Analytics
-                    </motion.h1>
-                    <motion.p
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.5 }}
-                      className="text-xl text-muted-foreground max-w-2xl mx-auto"
-                    >
-                      A comprehensive API and analytics platform for UFC fighter statistics, providing real-time access to
-                      fighter data, match outcomes, and performance metrics.
-                    </motion.p>
-                  </div>
-                )}
-
-                {index === 1 && (
-                  <div className="space-y-16">
-                    <div className="max-w-2xl mx-auto text-center">
-                      <motion.h2
+                <motion.div 
+                  className="absolute inset-0 bg-gradient-to-b from-primary/5 via-primary/10 to-transparent"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 1 }}
+                />
+                <motion.div
+                  className="container max-w-5xl px-4"
+                  initial={{ opacity: 0, y: isMobile ? 0 : 40 }}
+                  animate={{ 
+                    opacity: 1, 
+                    y: 0,
+                    transition: {
+                      duration: isMobile ? 0.2 : 0.8,
+                      delay: isMobile ? 0.1 : 0.2,
+                      ease: [0.16, 1, 0.3, 1]
+                    }
+                  }}
+                >
+                  {index === 0 && (
+                    <div className="max-w-3xl mx-auto text-center space-y-8">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.6, delay: 0.3 }}
+                        className="inline-flex px-4 py-2 rounded-full bg-primary/10 backdrop-blur-sm"
+                      >
+                        <span className="text-primary text-sm font-medium">UFC FIGHTER DATA API</span>
+                      </motion.div>
+                      <motion.h1
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                        className="text-4xl font-bold text-foreground mb-6"
+                        transition={{ duration: 0.6, delay: 0.4 }}
+                        className="text-5xl sm:text-7xl font-bold text-foreground"
                       >
-                        Key Features
-                      </motion.h2>
+                        Next Generation Fight Analytics
+                      </motion.h1>
                       <motion.p
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-xl text-muted-foreground"
+                        transition={{ duration: 0.6, delay: 0.5 }}
+                        className="text-xl text-muted-foreground max-w-2xl mx-auto"
                       >
-                        Discover the powerful features that make our UFC Fighter Data API the ultimate tool for fight analysis.
+                        A comprehensive API and analytics platform for UFC fighter statistics, providing real-time access to
+                        fighter data, match outcomes, and performance metrics.
                       </motion.p>
                     </div>
+                  )}
 
-                    <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                      {[
-                        {
-                          title: "Real-time Data",
-                          description: "Up-to-date fighter statistics and match outcomes, processed and available instantly"
-                        },
-                        {
-                          title: "Comprehensive Stats",
-                          description: "Detailed metrics covering every aspect of fighter performance and history"
-                        },
-                        {
-                          title: "RESTful API",
-                          description: "Well-documented endpoints for seamless integration with any application"
-                        },
-                        {
-                          title: "Advanced Analytics",
-                          description: "Sophisticated analysis tools for deep insights into fighter performance"
-                        }
-                      ].map((feature, idx) => (
-                        <motion.div
-                          key={idx}
+                  {index === 1 && (
+                    <div className="space-y-16">
+                      <div className="max-w-2xl mx-auto text-center">
+                        <motion.h2
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ 
-                            duration: 0.6,
-                            delay: idx * 0.1
-                          }}
-                          className="group relative"
+                          transition={{ duration: 0.6 }}
+                          className="text-4xl font-bold text-foreground mb-6"
                         >
-                          <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                          <div className="relative space-y-4 p-4">
-                            <h3 className="text-2xl font-semibold text-foreground">{feature.title}</h3>
-                            <p className="text-muted-foreground text-lg">{feature.description}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {index === 2 && (
-                  <div className="space-y-16">
-                    <div className="max-w-2xl mx-auto text-center">
-                      <motion.h2
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                        className="text-4xl font-bold text-foreground mb-6"
-                      >
-                        Tech Stack
-                      </motion.h2>
-                      <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.1 }}
-                        className="text-xl text-muted-foreground"
-                      >
-                        Built with cutting-edge technologies to ensure reliability, speed, and scalability.
-                      </motion.p>
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-                      {[
-                        {
-                          category: "Frontend",
-                          items: ["Next.js 14", "TailwindCSS", "Framer Motion"]
-                        },
-                        {
-                          category: "Backend",
-                          items: ["FastAPI", "Python", "SQLAlchemy"]
-                        },
-                        {
-                          category: "Infrastructure",
-                          items: ["Supabase", "Vercel", "GitHub"]
-                        }
-                      ].map((stack, idx) => (
-                        <motion.div
-                          key={idx}
+                          Key Features
+                        </motion.h2>
+                        <motion.p
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ 
-                            duration: 0.6,
-                            delay: idx * 0.1
-                          }}
-                          className="group relative"
+                          transition={{ duration: 0.6, delay: 0.1 }}
+                          className="text-xl text-muted-foreground"
                         >
-                          <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                          <div className="relative space-y-4 p-4">
-                            <h3 className="text-2xl font-semibold text-foreground">{stack.category}</h3>
-                            <ul className="space-y-3">
-                              {stack.items.map((item, itemIndex) => (
-                                <li key={itemIndex} className="text-muted-foreground text-lg">{item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </motion.div>
-                      ))}
+                          Discover the powerful features that make our UFC Fighter Data API the ultimate tool for fight analysis.
+                        </motion.p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                        {[
+                          {
+                            title: "Real-time Data",
+                            description: "Up-to-date fighter statistics and match outcomes, processed and available instantly"
+                          },
+                          {
+                            title: "Comprehensive Stats",
+                            description: "Detailed metrics covering every aspect of fighter performance and history"
+                          },
+                          {
+                            title: "RESTful API",
+                            description: "Well-documented endpoints for seamless integration with any application"
+                          },
+                          {
+                            title: "Advanced Analytics",
+                            description: "Sophisticated analysis tools for deep insights into fighter performance"
+                          }
+                        ].map((feature, idx) => (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ 
+                              duration: 0.6,
+                              delay: idx * 0.1
+                            }}
+                            className="group relative"
+                          >
+                            <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                            <div className="relative space-y-4 p-4">
+                              <h3 className="text-2xl font-semibold text-foreground">{feature.title}</h3>
+                              <p className="text-muted-foreground text-lg">{feature.description}</p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </motion.div>
-            </motion.section>
-          ))}
-        </AnimatePresence>
+                  )}
+
+                  {index === 2 && (
+                    <div className="space-y-16">
+                      <div className="max-w-2xl mx-auto text-center">
+                        <motion.h2
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.6 }}
+                          className="text-4xl font-bold text-foreground mb-6"
+                        >
+                          Tech Stack
+                        </motion.h2>
+                        <motion.p
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.6, delay: 0.1 }}
+                          className="text-xl text-muted-foreground"
+                        >
+                          Built with cutting-edge technologies to ensure reliability, speed, and scalability.
+                        </motion.p>
+                      </div>
+
+                      <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                        {[
+                          {
+                            category: "Frontend",
+                            items: ["Next.js 14", "TailwindCSS", "Framer Motion"]
+                          },
+                          {
+                            category: "Backend",
+                            items: ["FastAPI", "Python", "SQLAlchemy"]
+                          },
+                          {
+                            category: "Infrastructure",
+                            items: ["Supabase", "Vercel", "GitHub"]
+                          }
+                        ].map((stack, idx) => (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ 
+                              duration: 0.6,
+                              delay: idx * 0.1
+                            }}
+                            className="group relative"
+                          >
+                            <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                            <div className="relative space-y-4 p-4">
+                              <h3 className="text-2xl font-semibold text-foreground">{stack.category}</h3>
+                              <ul className="space-y-3">
+                                {stack.items.map((item, itemIndex) => (
+                                  <li key={itemIndex} className="text-muted-foreground text-lg">{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.section>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
       <style jsx global>{`

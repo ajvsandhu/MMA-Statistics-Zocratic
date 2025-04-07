@@ -26,7 +26,7 @@ import { formatFighterUrl } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from 'react'
 import { getAnimationVariants, fadeAnimation } from '@/lib/animations'
-import { useMediaQuery } from '@/hooks/use-media-query'
+import { useIsMobile } from "@/lib/utils"
 
 interface Fighter {
   name: string;
@@ -94,7 +94,7 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
   const wrapperRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const router = useRouter()
-  const isMobile = useMediaQuery('(max-width: 768px)')
+  const isMobile = useIsMobile()
   const animationVariants = getAnimationVariants(isMobile)
 
   // Load search history on mount
@@ -330,68 +330,55 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
   }
 
   return (
-    <div ref={wrapperRef} className="relative w-full" onKeyDown={handleKeyDown}>
-      <div className="flex gap-3">
-        <div className="relative group flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
+    <div ref={wrapperRef} className="relative w-full max-w-2xl">
+      <div className="relative flex items-center gap-2">
+        <div className="relative flex-1">
           <Input
             ref={inputRef}
+            type="text"
             placeholder="Search fighters..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setShowSuggestions(true)
+            }}
             onFocus={() => setShowSuggestions(true)}
+            onKeyDown={handleKeyDown}
             className={cn(
-              "w-full pl-11 pr-10 h-12",
-              "bg-white/10 dark:bg-white/5",
-              "hover:bg-white/15 dark:hover:bg-white/10",
-              "focus:bg-white/20 dark:focus:bg-white/15",
-              "border-white/20",
-              "ring-0",
-              "shadow-lg",
-              "rounded-2xl text-base text-foreground placeholder:text-muted-foreground"
+              "w-full pl-9 pr-4 h-10",
+              "bg-background/60 backdrop-blur-sm",
+              "border border-white/20 rounded-lg",
+              "placeholder:text-muted-foreground/70",
+              "focus:ring-1 focus:ring-primary/50",
+              "transition-all duration-200"
             )}
           />
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-background/20 dark:hover:bg-background/40"
-              onClick={() => setSearchTerm("")}
-            >
-              <X className="h-4 w-4 text-muted-foreground" />
-            </Button>
-          )}
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         </div>
-        
+
         <Popover open={showFilters} onOpenChange={setShowFilters}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               size="icon"
               className={cn(
-                "h-12 w-[5.5rem] rounded-2xl bg-background/50 hover:bg-background/80",
-                "border-white/20 text-foreground font-medium relative",
-                "shadow-lg backdrop-blur-sm",
-                activeFiltersCount > 0 && "ring-2 ring-white/20"
+                "relative shrink-0 h-10 w-10",
+                "bg-background/60 backdrop-blur-sm",
+                "border border-white/20 rounded-lg",
+                "hover:bg-accent/50",
+                "transition-all duration-200",
+                showFilters && "bg-accent/50"
               )}
             >
-              <span className="mr-1">Filters</span>
               <Filter className="h-4 w-4" />
-              {activeFiltersCount > 0 && (
-                <Badge
-                  variant="secondary"
-                  className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center bg-background/90 text-foreground text-xs"
-                >
-                  {activeFiltersCount}
-                </Badge>
+              {(filters.weightClass || filters.rankingType !== "all") && (
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary" />
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent 
-            className="w-[280px] p-4 rounded-lg border-border/10 bg-background/95 backdrop-blur-lg shadow-xl" 
-            align="end" 
-            sideOffset={4}
-            style={{ zIndex: 51 }}
+          <PopoverContent
+            align="end"
+            className="w-[280px] p-4 bg-background/95 backdrop-blur-xl border-white/20"
           >
             <div className="space-y-4">
               <div className="space-y-2">
@@ -439,78 +426,91 @@ export function FighterSearch({ onSelectFighter, clearSearch }: FighterSearchPro
         </Popover>
       </div>
 
-      {showSuggestions && (searchTerm.trim() || isLoading || error || searchHistory.length > 0) && (
-        <div className="absolute top-[calc(100%+0.5rem)] w-full z-50 rounded-lg border border-border/10 bg-background/95 backdrop-blur-lg text-foreground shadow-xl overflow-hidden">
-          <Command className="rounded-lg border-0" shouldFilter={false}>
-            {error && (
-              <p className="p-4 text-sm text-destructive/90 text-center">
-                {error}
-              </p>
+      <AnimatePresence>
+        {showSuggestions && (searchTerm || searchHistory.length > 0) && (
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            variants={fadeAnimation}
+            className={cn(
+              "absolute top-full left-0 right-0 mt-2 z-50",
+              "bg-background/95 backdrop-blur-xl",
+              "border border-white/20 rounded-lg shadow-xl",
+              "overflow-hidden"
             )}
-            {isLoading ? (
-              <div className="p-2 space-y-2">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="px-2 py-1.5">
-                    <Skeleton className="h-5 w-full" />
-                    <Skeleton className="h-4 w-2/3 mt-1" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                {searchTerm.trim() ? (
-                  <CommandGroup heading="Search Results">
-                    {validFighters.length === 0 ? (
-                      <CommandEmpty>No fighters found</CommandEmpty>
-                    ) : (
-                      validFighters.map((fighter, index) => (
-                        <CommandItem
-                          key={fighter}
-                          value={fighter}
-                          onSelect={() => handleFighterSelect(fighter)}
-                          className={cn(
-                            "cursor-pointer transition-colors",
-                            index === selectedIndex && "bg-accent"
-                          )}
-                        >
-                          {getFighterDisplayElement(fighter)}
-                        </CommandItem>
-                      ))
-                    )}
-                  </CommandGroup>
-                ) : searchHistory.length > 0 ? (
-                  <>
-                    <div className="flex items-center justify-between px-2 py-1.5">
-                      <span className="text-sm text-muted-foreground">Recent Searches</span>
-                      <button
-                        onClick={clearHistory}
-                        className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        Clear
-                      </button>
+          >
+            <Command className="rounded-lg border-0" shouldFilter={false}>
+              {error && (
+                <p className="p-4 text-sm text-destructive/90 text-center">
+                  {error}
+                </p>
+              )}
+              {isLoading ? (
+                <div className="p-2 space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="px-2 py-1.5">
+                      <Skeleton className="h-5 w-full" />
+                      <Skeleton className="h-4 w-2/3 mt-1" />
                     </div>
-                    <CommandGroup>
-                      {searchHistory.map((fighter, index) => (
-                        <CommandItem
-                          key={fighter}
-                          value={fighter}
-                          onSelect={() => handleFighterSelect(fighter)}
-                          className={cn(
-                            "cursor-pointer transition-colors",
-                            index === selectedIndex && "bg-accent"
-                          )}
-                        >
-                          {getFighterDisplayElement(fighter, true)}
-                        </CommandItem>
-                      ))}
+                  ))}
+                </div>
+              ) : (
+                <>
+                  {searchTerm.trim() ? (
+                    <CommandGroup heading="Search Results">
+                      {validFighters.length === 0 ? (
+                        <CommandEmpty>No fighters found</CommandEmpty>
+                      ) : (
+                        validFighters.map((fighter, index) => (
+                          <CommandItem
+                            key={fighter}
+                            value={fighter}
+                            onSelect={() => handleFighterSelect(fighter)}
+                            className={cn(
+                              "cursor-pointer transition-colors",
+                              index === selectedIndex && "bg-accent"
+                            )}
+                          >
+                            {getFighterDisplayElement(fighter)}
+                          </CommandItem>
+                        ))
+                      )}
                     </CommandGroup>
-                  </>
-                ) : null}
-              </>
-            )}
-          </Command>
-        </div>
-      )}
+                  ) : searchHistory.length > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between px-2 py-1.5">
+                        <span className="text-sm text-muted-foreground">Recent Searches</span>
+                        <button
+                          onClick={clearHistory}
+                          className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <CommandGroup>
+                        {searchHistory.map((fighter, index) => (
+                          <CommandItem
+                            key={fighter}
+                            value={fighter}
+                            onSelect={() => handleFighterSelect(fighter)}
+                            className={cn(
+                              "cursor-pointer transition-colors",
+                              index === selectedIndex && "bg-accent"
+                            )}
+                          >
+                            {getFighterDisplayElement(fighter, true)}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </Command>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 } 
