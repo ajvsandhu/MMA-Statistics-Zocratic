@@ -194,17 +194,12 @@ logger = logging.getLogger()
 while logger.handlers:
     logger.removeHandler(logger.handlers[0])
 
-LOG_PATH = os.path.join(os.path.dirname(__file__), "ufc_scraper.log")
-file_handler = FileHandler(LOG_PATH, mode="a", encoding="utf-8")
-formatter = Formatter(LOG_FORMAT)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-logger.setLevel(getattr(logging, LOG_LEVEL))
-
-# Also add a console handler for better visibility during execution
+# Only add console handler for logging
 console_handler = logging.StreamHandler()
+formatter = Formatter(LOG_FORMAT)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
+logger.setLevel(getattr(logging, LOG_LEVEL))
 
 logger.info("UFC Last 5 Fights Scraper - Supabase Edition")
 

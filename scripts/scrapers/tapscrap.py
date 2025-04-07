@@ -21,8 +21,84 @@ from threading import Lock
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote_plus
 
+# Check required packages
+required_packages = {
+    'requests': 'requests>=2.31.0',
+    'bs4': 'beautifulsoup4>=4.12.0',
+    'fuzzywuzzy': 'fuzzywuzzy==0.18.0',
+    'Levenshtein': 'python-Levenshtein>=0.21.1'
+}
+
+missing_packages = []
+for package, version in required_packages.items():
+    try:
+        if package == 'Levenshtein':
+            import Levenshtein
+        else:
+            __import__(package)
+    except ImportError:
+        missing_packages.append(version)
+
+if missing_packages:
+    print("Missing required packages. Please install:")
+    print("\npip install " + " ".join(missing_packages))
+    sys.exit(1)
+
 import requests
 from bs4 import BeautifulSoup
+from fuzzywuzzy import fuzz
+import Levenshtein  # Explicit import
+
+# Fix import by correctly adding the project root to sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+    print(f"Added {PROJECT_ROOT} to Python path")
+
+try:
+    from backend.api.database import get_supabase_client
+except ImportError as e:
+    print(f"Error importing database module: {e}")
+    print("Please ensure you're running the script from the project root directory")
+    sys.exit(1)
+
+# Headers for requests
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Connection': 'keep-alive',
+}
+
+# Add this constant at the top of the file with other constants
+DEFAULT_IMAGE_URL = "https://static1.cbrimages.com/wordpress/wp-content/uploads/2021/01/Captain-Rocks.jpg"
+
+def setup_logging():
+    """
+    Set up logging configuration with console handler only.
+    """
+    # Create formatters
+    console_formatter = logging.Formatter('%(message)s')
+    
+    # Configure root logger
+    logger = logging.getLogger()
+    
+    # Remove any existing handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(console_formatter)
+    
+    # Configure root logger
+    logger.setLevel(logging.INFO)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+# Set up logging
+logger = setup_logging()
 
 def parse_args() -> argparse.Namespace:
     """
@@ -55,31 +131,21 @@ def parse_args() -> argparse.Namespace:
         action='store_true',
         help='Include fighters with both image and Tapology link'
     )
+    parser.add_argument(
+        '--test',
+        action='store_true',
+        help='Run in test mode with a specific fighter'
+    )
+    parser.add_argument(
+        '--test-fighter',
+        type=str,
+        default="Jon Jones",
+        help='Specify the fighter name to test (default: Jon Jones)'
+    )
     return parser.parse_args()
-
-# Fix import by correctly adding the project root to sys.path
-# Get the absolute path to the project root directory
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-    print(f"Added {PROJECT_ROOT} to Python path")
-
-# Now import from backend should work
-from backend.api.database import get_supabase_client
 
 # Parse command line arguments
 args = parse_args()
-
-# Setup logging with timestamps
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("tapology_scraper.log"),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
 
 # List of User-Agents to rotate
 USER_AGENTS = [
@@ -111,20 +177,20 @@ PROXIES: List[Dict[str, str]] = [
 
 # Scraping configuration
 CONFIG = {
-    "base_delay": 3.0,           # Base delay between requests
-    "max_retries": 5,            # Maximum number of retry attempts
-    "backoff_factor": 2.0,       # Factor to increase delay between retries
-    "max_workers": 2,            # Maximum number of concurrent workers
-    "request_timeout": 15,       # Request timeout in seconds
-    "throttle_threshold": 3,     # Failures before increasing cooldown
-    "max_cooldown": 1800,        # Maximum cooldown in seconds (30 minutes)
-    "min_cooldown": 60,          # Minimum cooldown in seconds
-    "session_requests_limit": 50, # Requests before creating new session
-    "session_duration_limit": 1800,  # Session duration limit in seconds (30 min)
-    "state_save_interval": 20,   # Save state every N fighters processed
-    "max_failure_rate": 0.1,     # Maximum allowed failure rate
-    "max_consecutive_failures": 5, # Maximum allowed consecutive failures
-    "save_interval": 300,         # Save progress every N seconds
+    "base_delay": 10.0,           # Increased from 3.0 to 10.0 seconds
+    "max_retries": 10,            # Increased from 5 to 10 retries
+    "backoff_factor": 3.0,        # Increased from 2.0 to 3.0
+    "max_workers": 1,             # Reduced from 2 to 1 to be more conservative
+    "request_timeout": 30,        # Increased from 15 to 30 seconds
+    "throttle_threshold": 2,      # Reduced from 3 to 2 to be more sensitive to failures
+    "max_cooldown": 3600,         # Increased from 1800 to 3600 seconds (1 hour)
+    "min_cooldown": 120,          # Increased from 60 to 120 seconds
+    "session_requests_limit": 20,  # Reduced from 50 to 20 requests per session
+    "session_duration_limit": 900, # Reduced from 1800 to 900 seconds (15 minutes)
+    "state_save_interval": 10,    # Reduced from 20 to 10 fighters
+    "max_failure_rate": 0.05,     # Reduced from 0.1 to 0.05 (5% max failure rate)
+    "max_consecutive_failures": 3, # Reduced from 5 to 3
+    "save_interval": 600,         # Increased from 300 to 600 seconds
 }
 
 # Lock for thread-safe DB updates
@@ -301,7 +367,7 @@ def save_progress() -> None:
             f"Progress saved: {state['last_fighter_index']} fighters, "
             f"{state['successful_requests']}/{state['total_requests']} successful"
         )
-        request_stats["last_save_time"] = time.time()
+        request_stats["last_save_time"] = time.sleep(request_stats["last_save_time"])
     except Exception as e:
         logger.error(f"Failed to save progress: {str(e)}")
 
@@ -339,9 +405,38 @@ def ensure_tap_link_column() -> None:
     Verify Supabase schema includes tap_link column.
     """
     try:
-        logger.debug("Verifying tap_link column in schema")
+        supabase = get_supabase_client()
+        if not supabase:
+            raise Exception("Failed to initialize Supabase client")
+            
+        # Check if we can connect to the database
+        response = supabase.table('fighters').select('fighter_name').limit(1).execute()
+        if not response:
+            raise Exception("Could not verify database connection")
+            
+        # Check if the tap_link column exists
+        response = supabase.table('fighters').select('tap_link').limit(1).execute()
+        if not response:
+            logger.warning("tap_link column may not exist in the fighters table")
+            # You may want to add code here to create the column if it doesn't exist
+            
+        logger.info("Database connection and schema verified successfully")
     except Exception as e:
-        logger.error(f"Schema verification failed: {str(e)}")
+        logger.error(f"Database verification failed: {str(e)}")
+        raise
+
+def get_database_connection():
+    """
+    Get a database connection with error handling.
+    """
+    try:
+        supabase = get_supabase_client()
+        if not supabase:
+            raise Exception("Failed to initialize Supabase client")
+        return supabase
+    except Exception as e:
+        logger.error(f"Failed to get database connection: {str(e)}")
+        raise
 
 def remove_nicknames_and_extras(name: str) -> str:
     """
@@ -452,445 +547,567 @@ def create_direct_fighter_url(fighter_name: str) -> List[str]:
     
     return urls
 
-def search_tapology_for_fighter(fighter_name: str) -> Optional[str]:
+def get_fighter_details(url):
     """
-    Search and retrieve fighter's Tapology profile URL.
+    Fetch and parse fighter details from their profile page.
     """
-    search_url = tapology_search_url(fighter_name)
-    logger.debug(f"Searching for fighter: {fighter_name}")
+    if not url.startswith('http'):
+        url = f"https://www.tapology.com{url}"
     
-    response = get_with_retries(search_url)
-    
+    response = get_with_retries(url)
     if not response:
-        logger.debug(f"Search failed for {fighter_name}, trying direct URLs")
-        direct_urls = create_direct_fighter_url(fighter_name)
-        
-        for direct_url in direct_urls:
-            logger.debug(f"Trying URL: {direct_url}")
-            direct_response = get_with_retries(direct_url)
-            if direct_response and direct_response.status_code == 200:
-                soup = BeautifulSoup(direct_response.text, 'html.parser')
-                if soup.select_one('.fighterHeader') or soup.select_one('.fighterRecord'):
-                    logger.debug(f"Found profile: {direct_url}")
-                    return direct_url
-            time.sleep(random.uniform(1.0, 2.0))
-        
-        return None
+        return {}
         
     soup = BeautifulSoup(response.text, 'html.parser')
+    details = {}
     
-    search_results = soup.select('.searchResult a.name')
-    if search_results and len(search_results) > 0:
-        logger.debug(f"Found {len(search_results)} search results")
-        href = search_results[0].get('href')
-        if href:
-            if not href.startswith('http'):
-                href = f"https://www.tapology.com{href}"
-            logger.debug(f"Selected profile: {href}")
-            return href
+    # Get fighter name and nickname
+    name_elem = soup.select_one('span.name')
+    if name_elem:
+        details['full_name'] = name_elem.get_text(strip=True)
     
-    alt_results = soup.select('.searchResultsFighter a')
-    if alt_results and len(alt_results) > 0:
-        logger.debug(f"Found {len(alt_results)} alternative results")
-        for result in alt_results:
-            href = result.get('href')
-            if href and "/fightcenter/fighters/" in href:
-                if not href.startswith('http'):
-                    href = f"https://www.tapology.com{href}"
-                logger.debug(f"Selected alternative profile: {href}")
-                return href
+    # Get fighter image - try multiple selectors
+    image_found = False
     
-    direct_links = soup.select('a[href*="/fightcenter/fighters/"]')
-    if direct_links and len(direct_links) > 0:
-        logger.debug(f"Found {len(direct_links)} direct links")
-        for link in direct_links:
-            href = link.get('href')
-            link_text = link.get_text().lower().strip()
-            fighter_name_lower = fighter_name.lower().strip()
-            
-            if fighter_name_lower in link_text or any(part in link_text for part in fighter_name_lower.split()):
-                if not href.startswith('http'):
-                    href = f"https://www.tapology.com{href}"
-                logger.debug(f"Selected direct link: {href}")
-                return href
+    # Try the profile image selector
+    image_elem = soup.select_one('img.profile, img.profile_image')
+    if image_elem and image_elem.get('src'):
+        image_url = image_elem.get('src')
+        if 'tapology.com' in image_url:
+            details['image_url'] = image_url
+            image_found = True
     
-    all_links = soup.find_all('a')
-    logger.debug(f"Scanning {len(all_links)} links for matches")
-    for link in all_links:
-        href = link.get('href')
-        if href and "/fightcenter/fighters/" in href:
-            link_text = link.get_text().lower()
-            fighter_name_parts = fighter_name.lower().split()
-            
-            if any(part in link_text for part in fighter_name_parts):
-                if not href.startswith('http'):
-                    href = f"https://www.tapology.com{href}"
-                logger.debug(f"Found matching link: {href}")
-                return href
+    # If not found, try the letterbox image pattern
+    if not image_found:
+        # Try to construct the letterbox URL from the fighter's ID in the URL
+        fighter_id_match = re.search(r'/(\d+)/', url)
+        if fighter_id_match:
+            fighter_id = fighter_id_match.group(1)
+            # Try to get the fighter's name from URL or page
+            name_in_url = url.split('/')[-1].split('-')[0].lower()
+            if name_elem:
+                name_parts = name_elem.get_text(strip=True).split()
+                if name_parts:
+                    name_in_page = name_parts[0].lower()
+                    letterbox_url = f"https://images.tapology.com/letterbox_images/{fighter_id}/default/{name_in_page}.jpg"
+                    # Try to verify this URL exists
+                    test_response = get_with_retries(letterbox_url)
+                    if test_response and test_response.status_code == 200:
+                        details['image_url'] = letterbox_url
+                        image_found = True
     
-    direct_urls = create_direct_fighter_url(fighter_name)
+    # If still not found, try general image search in content
+    if not image_found:
+        for img in soup.select('img'):
+            src = img.get('src', '')
+            if 'tapology.com' in src and 'letterbox_images' in src:
+                details['image_url'] = src
+                break
     
-    for direct_url in direct_urls:
-        logger.debug(f"Trying final URL: {direct_url}")
-        direct_response = get_with_retries(direct_url)
-        if direct_response and direct_response.status_code == 200:
-            soup = BeautifulSoup(direct_response.text, 'html.parser')
-            if soup.select_one('.fighterHeader') or soup.select_one('.fighterRecord'):
-                logger.debug(f"Found valid profile: {direct_url}")
-                return direct_url
-        time.sleep(random.uniform(1.0, 2.0))
-    
-    logger.debug(f"No profile found for {fighter_name}")
-    return None
+    return details
 
-def is_valid_fighter_image(image_url: str) -> bool:
+def calculate_fighter_score(search_name, result_name, details):
     """
-    Validate fighter image URLs against quality criteria.
+    Calculate a score for how well a fighter matches the search criteria.
     """
-    if not image_url:
-        logger.debug("Empty image URL provided")
-        return False
+    base_score = 0
     
-    if 'images.tapology.com/letterbox_images/' in image_url:
-        logger.debug(f"Valid Tapology CDN image found: {image_url}")
-        return True
+    # Name matching score (0-100)
+    name_score = fuzz.ratio(search_name.lower(), result_name.lower())
+    base_score += name_score
+    
+    # Bonus for exact word matches
+    search_words = set(search_name.lower().split())
+    result_words = set(result_name.lower().split())
+    matching_words = search_words & result_words
+    base_score += len(matching_words) * 10
+    
+    # Simple UFC status check
+    if details and details.get('is_ufc'):
+        base_score += 20  # Reduced from 50 to make it less dominant
         
-    placeholder_patterns = [
-        'no-picture', 'no_picture', 'default_profile',
-        'blank-profile', 'no-avatar', 'noavatar',
-        'blank-user', 'blank_user'
+    return base_score
+
+def get_random_delay(base, variation=0.5):
+    """
+    Get a randomized delay to make requests look more human-like.
+    base: base delay in seconds
+    variation: percentage of variation (0.5 = ±50%)
+    """
+    min_delay = base * (1 - variation)
+    max_delay = base * (1 + variation)
+    return random.uniform(min_delay, max_delay)
+
+def search_fighter(name):
+    """
+    Search for a fighter by name and return the best match with full link.
+    """
+    try:
+        # Add random delay between searches (5-15 seconds base)
+        delay = get_random_delay(10, 0.5)
+        logger.info(f"Waiting {delay:.1f} seconds before searching...")
+        time.sleep(delay)
+        
+        # Format the search URL
+        search_url = f"https://www.tapology.com/search?term={quote_plus(name)}&search=fighters"
+        logger.info(f"Searching for {name} at: {search_url}")
+        
+        # Get the search page with retries - Add timeout here
+        response = requests.get(search_url, headers=HEADERS, timeout=30)  # Add 30 second timeout
+        response.raise_for_status()
+        
+        # Parse the HTML
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Check for rate limit indicators
+        if "too many requests" in soup.text.lower() or "rate limit" in soup.text.lower():
+            wait_time = get_random_delay(300)  # 5 minute base delay
+            logger.warning(f"Rate limit detected, waiting {wait_time:.1f} seconds...")
+            time.sleep(wait_time)
+            return None
+        
+        # Try different selectors for search results
+        selectors = [
+            'div.searchResult',
+            'a.searchResultsFighter',
+            'a[href*="fightcenter/fighters"]',
+            'div.fighter',
+            'tr.fighter',
+            'div.searchResults a',
+            'table.fighterTable tr'
+        ]
+        
+        results = []
+        seen_urls = set()  # Track seen URLs to avoid duplicates
+        
+        for selector in selectors:
+            elements = soup.select(selector)
+            logger.debug(f"Found {len(elements)} results with selector '{selector}'")
+            
+            for element in elements:
+                # Get the link and name
+                if element.name == 'a':
+                    link = element
+                else:
+                    link = element.select_one('a.name, a[href*="fightcenter/fighters"]') or element.select_one('a')
+                
+                if not link:
+                    continue
+                    
+                href = link.get('href', '')
+                if not href or 'fightcenter/fighters' not in href:
+                    continue
+                    
+                # Skip if we've seen this URL
+                full_url = f"https://www.tapology.com{href}" if not href.startswith('http') else href
+                if full_url in seen_urls:
+                    continue
+                seen_urls.add(full_url)
+                
+                # Get fighter details
+                result_name = link.get_text(strip=True)
+                record = None
+                weight_class = None
+                
+                # Try to find record and weight class
+                record_elem = element.select_one('.record, .fighterRecord')
+                if record_elem:
+                    record = record_elem.get_text(strip=True)
+                
+                weight_elem = element.select_one('.weight, .weightClass')
+                if weight_elem:
+                    weight_class = weight_elem.get_text(strip=True)
+                
+                # Calculate multiple similarity scores
+                name_similarity = calculate_name_similarity(name, result_name)
+                
+                # Boost score if record or weight class is found
+                score = name_similarity
+                if record:
+                    score += 0.1  # Small boost for having a record
+                if weight_class:
+                    score += 0.1  # Small boost for having weight class
+                
+                if score > 0.6:  # Lowered threshold but we'll sort by score
+                    results.append({
+                        'score': score,
+                        'name': result_name,
+                        'url': full_url,
+                        'record': record,
+                        'weight_class': weight_class
+                    })
+        
+        if results:
+            # Sort by score
+            results.sort(key=lambda x: x['score'], reverse=True)
+            best_match = results[0]
+            
+            # Log all potential matches for debugging
+            logger.info(f"Found {len(results)} potential matches for {name}:")
+            for i, result in enumerate(results[:3], 1):  # Show top 3
+                logger.info(f"{i}. {result['name']} (score: {result['score']:.2f})")
+                if result['record']:
+                    logger.info(f"   Record: {result['record']}")
+                if result['weight_class']:
+                    logger.info(f"   Weight: {result['weight_class']}")
+            
+            logger.info(f"Selected best match: {best_match['name']} (score: {best_match['score']:.2f})")
+            return best_match['url']
+        
+        logger.warning(f"No results found for {name}")
+        return None
+        
+    except requests.Timeout:
+        logger.error(f"Request timed out for {name}")
+        return None
+    except requests.RequestException as e:
+        logger.error(f"Request failed for {name}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Error searching for fighter {name}: {str(e)}")
+        time.sleep(get_random_delay(60))  # 1 minute base delay on error
+        return None
+
+def calculate_name_similarity(name1, name2):
+    """
+    Calculate similarity between two fighter names with improved matching.
+    """
+    def clean_name(name):
+        # Remove common nicknames and extra info
+        name = re.sub(r'"[^"]*"', '', name)  # Remove quoted nicknames
+        name = re.sub(r"'[^']*'", '', name)  # Remove single-quoted nicknames
+        name = re.sub(r'\([^)]*\)', '', name)  # Remove parentheses
+        name = re.sub(r'\s+', ' ', name)  # Normalize spaces
+        return name.lower().strip()
+    
+    # Clean both names
+    clean1 = clean_name(name1)
+    clean2 = clean_name(name2)
+    
+    # Calculate various similarity scores
+    scores = [
+        fuzz.ratio(clean1, clean2) / 100,  # Basic ratio
+        fuzz.partial_ratio(clean1, clean2) / 100,  # Partial match
+        fuzz.token_sort_ratio(clean1, clean2) / 100,  # Order-independent
+        fuzz.token_set_ratio(clean1, clean2) / 100,  # Set-based comparison
     ]
     
-    url_lower = image_url.lower()
+    # Calculate word-by-word match score
+    words1 = set(clean1.split())
+    words2 = set(clean2.split())
+    common_words = words1 & words2
+    word_match_score = len(common_words) / max(len(words1), len(words2))
+    scores.append(word_match_score)
     
-    if any(pattern in url_lower for pattern in placeholder_patterns):
-        logger.debug(f"Placeholder image detected: {image_url}")
-        return False
-        
-    valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
-    if not any(ext in url_lower for ext in valid_extensions):
-        logger.debug(f"Invalid image extension: {image_url}")
-        return False
-        
-    if 'tapology.com' in url_lower:
-        logger.debug(f"Valid Tapology domain image: {image_url}")
-        return True
+    # Return highest score
+    return max(scores)
+
+def test_fighter_search(fighter_name: str):
+    """
+    Test the fighter search function with detailed output.
+    """
+    print(f"\nTesting search for fighter: {fighter_name}")
+    print("=" * 50)
     
-    logger.debug(f"Image validation passed: {image_url}")
-    return True
-
-def scrape_tapology_fighter_page(url: str) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Extract fighter's image URL and profile URL from their Tapology page.
-    """
     try:
-        response = get_with_retries(url)
-        if not response:
-            return None, None
+        results = search_fighter(fighter_name)
+        
+        if not results:
+            print("No results found")
+            return
             
-        soup = BeautifulSoup(response.text, 'html.parser')
-        image_url = None
-        
-        all_images = soup.find_all('img')
-        for img in all_images:
-            src = img.get('src', '')
-            if 'images.tapology.com/letterbox_images/' in src:
-                image_url = src
-                logger.debug(f"Found CDN image: {image_url}")
-                break
-        
-        if not image_url:
-            for elem in soup.find_all(lambda tag: tag.has_attr('style')):
-                style = elem.get('style', '')
-                if 'background-image' in style and 'images.tapology.com/letterbox_images/' in style:
-                    match = re.search(r"url\(['\"]?(https?://images\.tapology\.com/letterbox_images/[^)'\"]*)['\"]\)?", style)
-                    if match:
-                        image_url = match.group(1)
-                        logger.debug(f"Found CDN background image: {image_url}")
-                        break
-        
-        if not image_url:
-            for img in all_images:
-                src = img.get('src', '')
-                if 'tapology.com' in src and ('images/' in src or 'letterbox' in src):
-                    image_url = src
-                    logger.debug(f"Found Tapology image: {image_url}")
-                    break
-        
-        if image_url and not image_url.startswith('http'):
-            if image_url.startswith('//'):
-                image_url = 'https:' + image_url
-            else:
-                image_url = f"https://www.tapology.com{image_url}"
-            
-        if not image_url:
-            logger.debug(f"No image found on page: {url}")
-                
-        if image_url and not image_url.startswith('https://images.tapology.com/'):
-            logger.debug(f"Non-CDN image found: {image_url}")
-        
-        return image_url, url
+        print("\nTop 5 Matches:")
+        for i, result in enumerate(results, 1):
+            print(f"\n{i}. {result}")
             
     except Exception as e:
-        logger.error(f"Failed to scrape page: {str(e)}")
-        return None, None
-
-def update_fighter_in_db(
-    db_name: str,
-    new_image_url: str,
-    tapology_url: str
-) -> bool:
-    """
-    Update fighter's image and Tapology URLs in database.
-    """
-    try:
-        with db_lock:
-            supabase = get_supabase_client()
-            
-            logger.debug(f"Updating fighter: {db_name}")
-            logger.debug(f"Image URL: {new_image_url}")
-            logger.debug(f"Tapology URL: {tapology_url}")
-            
-            update_data = {}
-            if new_image_url:
-                update_data['image_url'] = new_image_url
-            if tapology_url:
-                update_data['tap_link'] = tapology_url
-                
-            if not update_data:
-                logger.debug(f"No updates needed for {db_name}")
-                return False
-                
-            response = supabase.table('fighters') \
-                .update(update_data) \
-                .eq('fighter_name', db_name) \
-                .execute()
-            
-            if response.data and len(response.data) > 0:
-                updated_fields = []
-                if 'image_url' in update_data:
-                    updated_fields.append('image_url')
-                if 'tap_link' in update_data:
-                    updated_fields.append('tap_link')
-                
-                logger.debug(f"Updated {db_name}: {', '.join(updated_fields)}")
-                return True
-            else:
-                logger.debug(f"Update failed for {db_name}")
-                
-                check_response = supabase.table('fighters') \
-                    .select('fighter_name') \
-                    .eq('fighter_name', db_name) \
-                    .execute()
-                
-                if check_response.data and len(check_response.data) > 0:
-                    logger.debug(f"Fighter exists but update failed: {db_name}")
-                else:
-                    logger.debug(f"Fighter not found: {db_name}")
-                
-                return False
-                
-    except Exception as e:
-        logger.error(f"Database update failed: {str(e)}")
-        return False
-
-def process_fighter(
-    fighter_data: Tuple[str, Optional[str], Optional[str]]
-) -> bool:
-    """
-    Process fighter data and update their Tapology information.
-    Skips processing if fighter already has either a valid Tapology image or link.
-    """
-    try:
-        name, current_image, current_tap_link = fighter_data
-        
-        logger.debug(f"Processing fighter: {name}")
-        logger.debug(f"Current image: {current_image}")
-        logger.debug(f"Current link: {current_tap_link}")
-        
-        # Skip if fighter has a valid Tapology image
-        has_tapology_image = current_image and 'images.tapology.com/letterbox_images/' in current_image
-        if has_tapology_image:
-            logger.debug(f"Skipping {name}: already has valid Tapology image")
-            return True
-            
-        # Skip if fighter has a valid Tapology link
-        if current_tap_link:
-            logger.debug(f"Skipping {name}: already has Tapology link")
-            return True
-            
-        tap_url = search_tapology_for_fighter(name)
-        
-        if not tap_url:
-            logger.debug(f"Trying direct URLs for {name}")
-            direct_urls = create_direct_fighter_url(name)
-            
-            for url in direct_urls[:3]:
-                logger.debug(f"Checking URL: {url}")
-                response = get_with_retries(url)
-                if response and response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    if soup.select_one('.fighterHeader, .fighterRecord, .fighterBio'):
-                        tap_url = url
-                        logger.debug(f"Found valid URL: {tap_url}")
-                        break
-                time.sleep(random.uniform(1.0, 2.0))
-        
-        if not tap_url:
-            logger.debug(f"No Tapology page found for {name}")
-            return False
-            
-        logger.debug(f"Scraping page: {tap_url}")
-        image_url, profile_url = scrape_tapology_fighter_page(tap_url)
-        
-        logger.debug(f"Found image: {image_url}")
-        logger.debug(f"Found profile: {profile_url}")
-        
-        update_image = False
-        if image_url:
-            if not current_image:
-                update_image = True
-                logger.debug(f"Adding new image for {name}")
-            elif not has_tapology_image and 'images.tapology.com/letterbox_images/' in image_url:
-                update_image = True
-                logger.debug(f"Upgrading to CDN image for {name}")
-        
-        update_link = profile_url and not current_tap_link
-        
-        if update_image or update_link:
-            update_data = {}
-            if update_image:
-                update_data['image_url'] = image_url
-            if update_link:
-                update_data['tap_link'] = profile_url
-                
-            success = update_fighter_in_db(
-                name,
-                update_data.get('image_url', current_image),
-                update_data.get('tap_link', current_tap_link)
-            )
-            
-            if success:
-                updates = []
-                if update_image:
-                    updates.append("image_url")
-                if update_link:
-                    updates.append("tap_link")
-                    
-                logger.debug(f"Updated {name}: {', '.join(updates)}")
-                return True
-            else:
-                logger.debug(f"Update failed for {name}")
-                return False
-        else:
-            logger.debug(f"No updates needed for {name}")
-            return True
-            
-    except Exception as e:
-        logger.error(f"Failed to process {fighter_data[0]}: {str(e)}")
-        return False
+        print(f"Error during test: {str(e)}")
+        raise
 
 def should_continue_processing() -> bool:
     """
-    Check if scraping should continue based on performance metrics.
+    Check if scraping should continue based on failure rates and limits.
     """
-    if request_stats["total_requests"] > 20:
-        failure_rate = 1 - (request_stats["successful_requests"] / request_stats["total_requests"])
-        if failure_rate > CONFIG["max_failure_rate"]:
-            logger.error(
-                f"Stopping: failure rate {failure_rate:.2f} exceeds {CONFIG['max_failure_rate']:.2f}"
-            )
-            return False
-            
-    if request_stats["consecutive_failures"] > CONFIG["max_consecutive_failures"]:
-        logger.error(
-            f"Stopping: {request_stats['consecutive_failures']} consecutive failures"
-        )
+    if request_stats["consecutive_failures"] >= CONFIG["max_consecutive_failures"]:
+        logger.warning("Too many consecutive failures")
         return False
         
+    if request_stats["total_requests"] > 0:
+        failure_rate = 1 - (request_stats["successful_requests"] / request_stats["total_requests"])
+        if failure_rate > CONFIG["max_failure_rate"]:
+            logger.warning(f"Failure rate too high: {failure_rate:.2%}")
+            return False
+            
     return True
+
+def process_fighter(fighter: Tuple[str, Optional[str], Optional[str]]) -> bool:
+    """
+    Process a single fighter's data.
+    Returns True if processing was successful.
+    """
+    fighter_name, image_url, tap_link = fighter
+    
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            # Search for the fighter
+            results = search_fighter(fighter_name)
+            
+            if not results:
+                logger.warning(f"No results found for {fighter_name}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    logger.info(f"Retrying search for {fighter_name} (attempt {retry_count + 1}/{max_retries})")
+                    time.sleep(CONFIG["base_delay"] * (retry_count + 1))
+                    continue
+                return False
+                
+            # Get the best match
+            best_match = results
+            
+            # Only update if we have a reasonably good match
+            if best_match:
+                with db_lock:
+                    try:
+                        supabase = get_database_connection()
+                        response = supabase.table('fighters') \
+                            .update({"tap_link": best_match}) \
+                            .eq('fighter_name', fighter_name) \
+                            .execute()
+                            
+                        if not response.data:
+                            logger.error(f"Failed to update tap_link for {fighter_name}")
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                logger.info(f"Retrying database update for {fighter_name} (attempt {retry_count + 1}/{max_retries})")
+                                time.sleep(CONFIG["base_delay"] * (retry_count + 1))
+                                continue
+                            return False
+                            
+                        logger.info(f"Updated tap_link for {fighter_name}")
+                        return True
+                    except Exception as db_error:
+                        logger.error(f"Database error for {fighter_name}: {str(db_error)}")
+                        retry_count += 1
+                        if retry_count < max_retries:
+                            logger.info(f"Retrying database operation for {fighter_name} (attempt {retry_count + 1}/{max_retries})")
+                            time.sleep(CONFIG["base_delay"] * (retry_count + 1))
+                            continue
+                        return False
+            else:
+                logger.warning(f"No good match found for {fighter_name}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error processing fighter {fighter_name}: {str(e)}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.info(f"Retrying processing for {fighter_name} (attempt {retry_count + 1}/{max_retries})")
+                time.sleep(CONFIG["base_delay"] * (retry_count + 1))
+                continue
+            return False
+            
+    return False
 
 def main():
     """
-    Main scraping process for fighter data collection.
+    Main function to process all fighters in the database.
+    Always starts from the beginning and processes all fighters.
     """
     try:
-        ensure_tap_link_column()
+        logger.info("Starting fresh run - processing all fighters from the beginning")
         
-        start_index = 1
-        logger.info(f"Starting from index {start_index}")
-        request_stats["last_fighter_index"] = start_index
-        
+        # Initialize database connection
         supabase = get_supabase_client()
         
-        page_size = 1000
+        # First, get total count
+        count_response = supabase.table('fighters').select('count', count='exact').execute()
+        total_count = count_response.count
+        logger.info(f"Total fighters in database: {total_count}")
+        
+        # Fetch all fighters using proper pagination
+        page_size = 1000  # Maximum allowed by Supabase
         all_fighters = []
         page = 0
         
-        while True:
+        while len(all_fighters) < total_count:
+            # Fetch a page of fighters - we need name, current tap_link and image_url
             response = supabase.table('fighters') \
-                .select('fighter_name, image_url, tap_link') \
+                .select('fighter_name, tap_link, image_url') \
+                .order('fighter_name', desc=False) \
                 .range(page * page_size, (page + 1) * page_size - 1) \
                 .execute()
             
+            # Add fighters to our list
             fighters_page = response.data
-            if not fighters_page or len(fighters_page) == 0:
+            if not fighters_page:  # No more results
                 break
                 
             all_fighters.extend(fighters_page)
+            logger.info(f"Fetched page {page + 1}: {len(fighters_page)} fighters (Total: {len(all_fighters)}/{total_count})")
             
-            if len(fighters_page) < page_size:
-                break
-                
+            # Move to next page
             page += 1
+            time.sleep(get_random_delay(2))  # Random delay between pages
         
-        fighters = [(row['fighter_name'], row.get('image_url'), row.get('tap_link')) for row in all_fighters]
+        total_fighters = len(all_fighters)
+        logger.info(f"Successfully fetched all {total_fighters} fighters from the database.")
+        logger.info("Processing fighters in alphabetical order...")
         
-        if args.only_need_image:
-            fighters = [f for f in fighters if not f[1]]
-            
-        if args.only_need_tap:
-            fighters = [f for f in fighters if not f[2]]
-            
-        if not args.include_complete:
-            fighters = [f for f in fighters if not (f[1] and f[2])]
-            
-        logger.info(f"Found {len(fighters)} fighters to process")
-        logger.info(f"Starting from index {start_index}")
+        # Process in smaller batches to avoid rate limits
+        batch_size = 10  # Small batch size
+        success_count = 0
+        error_count = 0
+        consecutive_errors = 0
         
-        i = start_index
-        while i < len(fighters) and should_continue_processing():
-            fighter = fighters[i]
-            logger.info(f"Processing {i+1}/{len(fighters)}: {fighter[0]}")
+        for i in range(0, total_fighters, batch_size):
+            current_batch = i // batch_size + 1
+            total_batches = (total_fighters + batch_size - 1) // batch_size
+            logger.info(f"\nStarting batch {current_batch}/{total_batches}")
             
-            success = process_fighter(fighter)
-            i += 1
-            request_stats["last_fighter_index"] = i
+            batch = all_fighters[i:i+batch_size]
+            batch_success = 0
             
-            if time.time() - request_stats["last_save_time"] > CONFIG["save_interval"]:
-                save_progress()
+            for fighter in batch:
+                fighter_name = fighter['fighter_name']
+                current_link = fighter.get('tap_link')
+                current_image = fighter.get('image_url')
                 
-            if i % 10 == 0:
-                success_rate = request_stats['successful_requests'] / max(1, request_stats['total_requests']) * 100
-                logger.info(
-                    f"Progress: {i}/{len(fighters)} fighters, "
-                    f"{request_stats['successful_requests']}/{request_stats['total_requests']} "
-                    f"successful ({success_rate:.1f}%)"
-                )
+                # Determine if we need to search for missing data
+                needs_link = not current_link
+                # Consider default image or no image as needing image
+                needs_image = not current_image or current_image == DEFAULT_IMAGE_URL
                 
-        save_progress()
-        success_rate = request_stats['successful_requests'] / max(1, request_stats['total_requests']) * 100
-        logger.info(
-            f"Complete: {i}/{len(fighters)} fighters, "
-            f"{request_stats['successful_requests']}/{request_stats['total_requests']} "
-            f"successful ({success_rate:.1f}%)"
-        )
+                if not needs_link and not needs_image:
+                    logger.info(f"Skipping {fighter_name} - has both link and proper image")
+                    continue
+                
+                try:
+                    # If we have a link but no proper image, use the existing link
+                    if current_link and needs_image:
+                        result = current_link
+                        logger.info(f"Using existing link for {fighter_name} to find proper image")
+                    else:
+                        # Search for fighter if we need a link
+                        result = search_fighter(fighter_name)
+                    
+                    if result:
+                        # Get fighter details including image
+                        details = get_fighter_details(result)
+                        update_data = {}
+                        
+                        # Update link if needed
+                        if needs_link:
+                            update_data['tap_link'] = result
+                        
+                        # Update image if needed and found (and it's not the default image)
+                        if needs_image and details.get('image_url') and details['image_url'] != DEFAULT_IMAGE_URL:
+                            update_data['image_url'] = details['image_url']
+                            logger.info(f"Found image URL: {details['image_url']}")
+                        
+                        # Only update if we found something new to update
+                        if update_data:
+                            # Update fighter record
+                            response = supabase.table('fighters') \
+                                .update(update_data) \
+                                .eq('fighter_name', fighter_name) \
+                                .execute()
+                            
+                            if response.data:
+                                success_count += 1
+                                batch_success += 1
+                                consecutive_errors = 0
+                                logger.info(f"Updated {fighter_name}:")
+                                if 'tap_link' in update_data:
+                                    logger.info(f"  New link: {update_data['tap_link']}")
+                                    if current_link:
+                                        logger.info(f"  (Previous link: {current_link})")
+                                if 'image_url' in update_data:
+                                    logger.info(f"  New image: {update_data['image_url']}")
+                                    if current_image:
+                                        logger.info(f"  (Previous image: {current_image})")
+                        else:
+                            logger.info(f"No new data found for {fighter_name}")
+                    else:
+                        error_count += 1
+                        consecutive_errors += 1
+                        logger.warning(f"Could not find Tapology data for {fighter_name}")
+                except Exception as e:
+                    error_count += 1
+                    consecutive_errors += 1
+                    logger.error(f"Failed to process {fighter_name}: {str(e)}")
+                
+                # Add extra delay if we're getting too many errors
+                if consecutive_errors >= 2:  # Reduced threshold
+                    delay = min(60 * (consecutive_errors - 1), 900)  # Max 15 minute delay
+                    actual_delay = get_random_delay(delay)
+                    logger.warning(f"Too many consecutive errors ({consecutive_errors}). Waiting {actual_delay:.1f} seconds...")
+                    time.sleep(actual_delay)
+                
+                # Random delay between fighters (4-8 seconds)
+                time.sleep(get_random_delay(6, 0.3))
+            
+            progress = (i + len(batch)) / total_fighters * 100
+            logger.info(f"Progress: {progress:.1f}% ({min(i + batch_size, total_fighters)}/{total_fighters} fighters)")
+            logger.info(f"Batch {current_batch} success rate: {batch_success}/{len(batch)}")
+            
+            # Add longer random delay between batches (20-40 seconds)
+            batch_delay = get_random_delay(30, 0.3)
+            logger.info(f"Batch complete. Waiting {batch_delay:.1f} seconds before next batch...")
+            time.sleep(batch_delay)
         
+        logger.info("\n" + "="*50)
+        logger.info("Processing complete!")
+        logger.info(f"Total fighters processed: {total_fighters}")
+        logger.info(f"Successfully updated: {success_count}")
+        logger.info(f"Errors: {error_count}")
+        logger.info(f"Skipped (has both link and proper image): {total_fighters - success_count - error_count}")
+        logger.info("="*50)
     except Exception as e:
-        logger.error(f"Main process failed: {str(e)}")
-        save_progress()
-    finally:
-        save_progress()
+        logger.error(f"Failed to process fighters: {str(e)}")
+        raise
+
+def test_multiple_fighters():
+    """
+    Test the search function with multiple fighters.
+    """
+    test_fighters = [
+        "Jon Jones",
+        "Conor McGregor",
+        "Israel Adesanya",
+        "Amanda Nunes",
+        "Khabib Nurmagomedov"
+    ]
+    
+    print("\nTesting search with multiple fighters:")
+    print("=" * 50)
+    
+    for fighter in test_fighters:
+        print(f"\nSearching for: {fighter}")
+        result = search_fighter(fighter)
+        if result:
+            print(f"Found: {result}")
+        else:
+            print("No results found")
+        time.sleep(2)  # Be nice to the server
+        
+    print("\n" + "=" * 50)
 
 if __name__ == "__main__":
-    main()
+    # Set up logging
+    logger = setup_logging()
+    
+    try:
+        # Run the main process
+        main()
+    except KeyboardInterrupt:
+        logger.info("\nScript interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}")
+        sys.exit(1)
+
+    # Test the search function
+    test_multiple_fighters()
