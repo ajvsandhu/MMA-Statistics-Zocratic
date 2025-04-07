@@ -25,7 +25,7 @@ export default function AboutPage() {
     let scrollTimeout: NodeJS.Timeout
 
     const handleWheel = (e: WheelEvent) => {
-      if (isManualScroll) {
+      if (isManualScroll || isMobile) {
         e.preventDefault()
         return
       }
@@ -47,15 +47,17 @@ export default function AboutPage() {
           })
           setTimeout(() => setIsManualScroll(false), 1000)
         }
-      }, 50) // Debounce scroll events
+      }, 50)
     }
 
     const handleTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0].clientY
+      if (isMobile) {
+        touchStartY = e.touches[0].clientY
+      }
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (isManualScroll) {
+      if (!isMobile || isManualScroll) {
         e.preventDefault()
         return
       }
@@ -63,10 +65,10 @@ export default function AboutPage() {
     }
 
     const handleTouchEnd = () => {
-      if (isManualScroll) return
+      if (!isMobile || isManualScroll) return
       
       const delta = touchStartY - touchEndY
-      if (Math.abs(delta) < 50) return // Minimum swipe distance
+      if (Math.abs(delta) < 50) return // Increased threshold for more intentional swipes
 
       const newDirection = delta > 0 ? 1 : -1
       const nextSection = activeSection + newDirection
@@ -79,7 +81,7 @@ export default function AboutPage() {
           top: nextSection * window.innerHeight,
           behavior: 'smooth'
         })
-        setTimeout(() => setIsManualScroll(false), 1000)
+        setTimeout(() => setIsManualScroll(false), 800)
       }
     }
 
@@ -95,7 +97,7 @@ export default function AboutPage() {
       container.removeEventListener('touchmove', handleTouchMove)
       container.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [activeSection, sections.length, isManualScroll])
+  }, [activeSection, sections.length, isManualScroll, isMobile])
 
   const scrollToSection = (index: number) => {
     const container = containerRef.current?.querySelector('div')
@@ -107,10 +109,10 @@ export default function AboutPage() {
 
     container.scrollTo({
       top: index * window.innerHeight,
-      behavior: 'smooth'
+      behavior: isMobile ? 'auto' : 'smooth'
     })
 
-    setTimeout(() => setIsManualScroll(false), 1000)
+    setTimeout(() => setIsManualScroll(false), isMobile ? 500 : 1000)
   }
 
   return (
@@ -197,7 +199,7 @@ export default function AboutPage() {
         ref={containerRef}
         className="h-screen w-full overflow-hidden"
       >
-        <div className="h-full w-full overflow-y-auto overflow-x-hidden scrollbar-none snap-y snap-mandatory">
+        <div className="h-full w-full overflow-y-auto overflow-x-hidden scrollbar-none snap-y snap-mandatory scroll-smooth">
           <AnimatePresence initial={false} mode="wait">
             {sections.map((_, index) => (
               <motion.section 
@@ -206,21 +208,21 @@ export default function AboutPage() {
                 className="h-screen w-full flex items-center justify-center relative snap-start"
                 initial={{ 
                   opacity: 0,
-                  y: isMobile ? 0 : (direction > 0 ? 100 : -100)
+                  y: direction > 0 ? 100 : -100
                 }}
                 animate={{ 
                   opacity: 1,
                   y: 0,
                   transition: {
-                    duration: isMobile ? 0.2 : 0.6,
+                    duration: 0.8,
                     ease: [0.16, 1, 0.3, 1]
                   }
                 }}
                 exit={{ 
                   opacity: 0,
-                  y: isMobile ? 0 : (direction > 0 ? -100 : 100),
+                  y: direction > 0 ? -100 : 100,
                   transition: {
-                    duration: isMobile ? 0.15 : 0.6,
+                    duration: 0.6,
                     ease: [0.16, 1, 0.3, 1]
                   }
                 }}
@@ -233,32 +235,32 @@ export default function AboutPage() {
                 />
                 <motion.div
                   className="container max-w-5xl px-4"
-                  initial={{ opacity: 0, y: isMobile ? 0 : 40 }}
+                  initial={{ opacity: 0, y: 0 }}
                   animate={{ 
                     opacity: 1, 
                     y: 0,
                     transition: {
-                      duration: isMobile ? 0.2 : 0.8,
+                      duration: isMobile ? 0.3 : 0.8,
                       delay: isMobile ? 0.1 : 0.2,
-                      ease: [0.16, 1, 0.3, 1]
+                      ease: isMobile ? "easeOut" : [0.16, 1, 0.3, 1]
                     }
                   }}
                 >
                   {index === 0 && (
-                    <div className="max-w-3xl mx-auto text-center space-y-8">
+                    <div className="max-w-3xl mx-auto text-center space-y-4 sm:space-y-8 px-4">
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.6, delay: 0.3 }}
-                        className="inline-flex px-4 py-2 rounded-full bg-primary/10 backdrop-blur-sm"
+                        className="inline-flex px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-primary/10 backdrop-blur-sm"
                       >
-                        <span className="text-primary text-sm font-medium">UFC FIGHTER DATA API</span>
+                        <span className="text-primary text-xs sm:text-sm font-medium">UFC FIGHTER DATA API</span>
                       </motion.div>
                       <motion.h1
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.4 }}
-                        className="text-5xl sm:text-7xl font-bold text-foreground"
+                        className="text-3xl sm:text-5xl md:text-7xl font-bold text-foreground"
                       >
                         Next Generation Fight Analytics
                       </motion.h1>
@@ -266,7 +268,7 @@ export default function AboutPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.5 }}
-                        className="text-xl text-muted-foreground max-w-2xl mx-auto"
+                        className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto"
                       >
                         A comprehensive API and analytics platform for UFC fighter statistics, providing real-time access to
                         fighter data, match outcomes, and performance metrics.
@@ -275,13 +277,13 @@ export default function AboutPage() {
                   )}
 
                   {index === 1 && (
-                    <div className="space-y-16">
+                    <div className="space-y-8 sm:space-y-16 px-4">
                       <div className="max-w-2xl mx-auto text-center">
                         <motion.h2
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.6 }}
-                          className="text-4xl font-bold text-foreground mb-6"
+                          className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-6"
                         >
                           Key Features
                         </motion.h2>
@@ -289,13 +291,13 @@ export default function AboutPage() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.6, delay: 0.1 }}
-                          className="text-xl text-muted-foreground"
+                          className="text-base sm:text-lg md:text-xl text-muted-foreground"
                         >
                           Discover the powerful features that make our UFC Fighter Data API the ultimate tool for fight analysis.
                         </motion.p>
                       </div>
 
-                      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                      <div className="grid md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 max-w-4xl mx-auto">
                         {[
                           {
                             title: "Real-time Data",
@@ -324,10 +326,10 @@ export default function AboutPage() {
                             }}
                             className="group relative"
                           >
-                            <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                            <div className="relative space-y-4 p-4">
-                              <h3 className="text-2xl font-semibold text-foreground">{feature.title}</h3>
-                              <p className="text-muted-foreground text-lg">{feature.description}</p>
+                            <div className="absolute -inset-2 sm:-inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                            <div className="relative space-y-2 sm:space-y-4 p-2 sm:p-4">
+                              <h3 className="text-xl sm:text-2xl font-semibold text-foreground">{feature.title}</h3>
+                              <p className="text-sm sm:text-base md:text-lg text-muted-foreground">{feature.description}</p>
                             </div>
                           </motion.div>
                         ))}
@@ -336,13 +338,13 @@ export default function AboutPage() {
                   )}
 
                   {index === 2 && (
-                    <div className="space-y-16">
+                    <div className="space-y-6 sm:space-y-12 px-4 max-h-[85vh] overflow-y-auto scrollbar-none">
                       <div className="max-w-2xl mx-auto text-center">
                         <motion.h2
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.6 }}
-                          className="text-4xl font-bold text-foreground mb-6"
+                          className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4"
                         >
                           Stay Tuned
                         </motion.h2>
@@ -350,13 +352,13 @@ export default function AboutPage() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.6, delay: 0.1 }}
-                          className="text-xl text-muted-foreground"
+                          className="text-sm sm:text-base text-muted-foreground"
                         >
                           We're actively developing new features and improvements to enhance your fight analysis experience.
                         </motion.p>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 max-w-4xl mx-auto">
                         {[
                           {
                             title: "Event Analysis",
@@ -385,10 +387,10 @@ export default function AboutPage() {
                             }}
                             className="group relative"
                           >
-                            <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                            <div className="relative space-y-4 p-4">
-                              <h3 className="text-2xl font-semibold text-foreground">{feature.title}</h3>
-                              <p className="text-muted-foreground text-lg">{feature.description}</p>
+                            <div className="absolute -inset-1.5 sm:-inset-2 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                            <div className="relative space-y-1.5 sm:space-y-2 p-2 sm:p-3">
+                              <h3 className="text-lg sm:text-xl font-semibold text-foreground">{feature.title}</h3>
+                              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
                             </div>
                           </motion.div>
                         ))}
@@ -400,7 +402,7 @@ export default function AboutPage() {
                         transition={{ duration: 0.6, delay: 0.5 }}
                         className="text-center max-w-2xl mx-auto"
                       >
-                        <p className="text-muted-foreground text-lg">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           Follow our updates as we continue to improve and expand the platform with new features and insights.
                         </p>
                       </motion.div>
