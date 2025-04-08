@@ -1,3 +1,3 @@
 """
-UFC Fighter Data API routes and database modules.
+Zocratic MMA Statistics API routes and database modules.
 """

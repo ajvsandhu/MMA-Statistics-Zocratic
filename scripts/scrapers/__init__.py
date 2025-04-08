@@ -1,3 +1,3 @@
 """
-UFC Fighter Data API - Scrapers Package
+Zocratic MMA Statistics - Scrapers Package
 """ 

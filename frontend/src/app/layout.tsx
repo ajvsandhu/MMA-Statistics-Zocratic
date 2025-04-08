@@ -18,8 +18,36 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "UFC Fighter Data API",
-  description: "Comprehensive UFC fighter statistics and analytics platform.",
+  metadataBase: new URL('https://www.zocraticmma.com'),
+  title: "Zocratic MMA",
+  description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
+  openGraph: {
+    title: "Zocratic MMA",
+    description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
+    type: "website",
+    url: 'https://www.zocraticmma.com',
+    siteName: "Zocratic MMA",
+    locale: "en_US",
+    images: [{
+      url: "https://www.zocraticmma.com/og-image.jpg",
+      width: 1200,
+      height: 630,
+      alt: "Zocratic MMA - Fight Analysis Platform"
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Zocratic MMA",
+    description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
+    images: ["https://www.zocraticmma.com/og-image.jpg"],
+  },
+  other: {
+    'msapplication-TileColor': '#000000',
+    'theme-color': '#000000',
+    'apple-mobile-web-app-capable': 'yes',
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black',
+  }
 };
 
 function SiteHeader() {
