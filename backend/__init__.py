@@ -1,3 +1,3 @@
 """
-UFC Fighter Data API backend package.
+Zocratic MMA Statistics backend package.
 """

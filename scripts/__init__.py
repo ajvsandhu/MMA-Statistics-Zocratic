@@ -1,3 +1,3 @@
 """
-UFC Fighter Data API - Scripts Package
+Zocratic MMA Statistics - Scripts Package
 """ 

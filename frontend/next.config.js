@@ -27,6 +27,22 @@ const nextConfig = {
       '@tailwindcss/oxide': false
     }
     return config
+  },
+  env: {
+    NEXT_PUBLIC_SITE_URL: 'https://www.zocraticmma.com'
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate'
+          }
+        ]
+      }
+    ]
   }
 };
 
