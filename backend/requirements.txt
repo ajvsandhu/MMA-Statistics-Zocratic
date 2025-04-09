@@ -287,5 +287,4 @@ wsproto==1.2.0
 yarl==1.19.0
     # via aiohttp
 secure==0.3.0
-python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
