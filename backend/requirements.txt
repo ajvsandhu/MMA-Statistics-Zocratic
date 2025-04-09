@@ -4,9 +4,9 @@
 #
 #    pip-compile --output-file=requirements_temp.txt requirements.txt
 #
-aiohappyeyeballs==2.4.4
+aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.10.11
+aiohttp==3.11.16
     # via
     #   -r requirements.txt
     #   realtime
