@@ -10,8 +10,8 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
@@ -22,8 +22,8 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 217.2 91.2% 59.8%;
-    --radius: 0.75rem;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
 
     --nav-text: 240 10% 3.9%;
     --nav-text-hover: 224 100% 68%;
@@ -33,28 +33,43 @@
     --scrollbar-bg: transparent;
     --scrollbar-thumb: rgba(0, 0, 0, 0.2);
     --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+
+    --primary-rgb: 79, 70, 229;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+
+    /* Scrollbar colors */
+    --scrollbar-track: 240 10% 3.9%;
+    --scrollbar-thumb: 240 3.7% 15.9%;
+
+    /* Enhanced gradient system */
+    --gradient-start: 240 10% 3.9%;
+    --gradient-end: 240 10% 3.9%;
+    --gradient-opacity: 0.5;
+
+    /* Ambient light effect */
+    --ambient-light: 240 10% 3.9%;
+    --ambient-light-opacity: 0.1;
 
     --nav-text: 210 20% 98%;
     --nav-text-hover: 210 20% 98%;
@@ -64,6 +79,372 @@
     --scrollbar-bg: transparent;
     --scrollbar-thumb: rgba(255, 255, 255, 0.2);
     --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+
+    --primary-rgb: 79, 70, 229;
+  }
+  
+  /* Huemint Teal Theme - Based on 0d0d11-00e5e9-00aebb-007488 */
+  .theme-teal {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 183 100% 45%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 183 57% 37%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 183 100% 45%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 183 100% 45%;
+
+    /* Scrollbar colors */
+    --scrollbar-track: 240 10% 3.9%;
+    --scrollbar-thumb: 183 57% 37%;
+
+    /* Enhanced gradient system */
+    --gradient-start: 183 100% 45%;
+    --gradient-end: 183 57% 37%;
+    --gradient-opacity: 0.25;
+
+    /* Ambient light effect */
+    --ambient-light: 183 100% 45%;
+    --ambient-light-opacity: 0.1;
+
+    --nav-text: 180 100% 95%;
+    --nav-text-hover: 180 100% 85%;
+    --nav-bg-active: 240 10% 10%;
+
+    /* Scrollbar Colors */
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(0, 229, 233, 0.2);
+    --scrollbar-thumb-hover: rgba(0, 229, 233, 0.4);
+
+    --primary-rgb: 0, 229, 233;
+    
+    /* Enhanced gradient system */
+    --gradient-start: rgba(0, 229, 233, 0.15);
+    --gradient-mid: rgba(0, 174, 187, 0.08);
+    --gradient-end: rgba(0, 116, 136, 0.03);
+    --gradient-shine: rgba(0, 229, 233, 0.05);
+    
+    /* Enhanced ambient light effect */
+    --ambient-light: radial-gradient(
+      circle at 50% -20%,
+      rgba(0, 229, 233, 0.2),
+      rgba(0, 174, 187, 0.1) 20%,
+      transparent 50%
+    );
+    
+    --app-bg: #0d0d11;
+    --app-gradient: radial-gradient(
+      circle at top center,
+      rgba(0, 229, 233, 0.12) 0%,
+      rgba(0, 174, 187, 0.06) 25%,
+      rgba(0, 116, 136, 0.4) 50%,
+      transparent 100%
+    );
+    --nav-bg: rgba(13, 13, 17, 0.8);
+    --nav-border: rgba(0, 229, 233, 0.08);
+    --nav-shadow: none;
+  }
+  
+  /* Purple Theme */
+  .theme-purple {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 267 100% 75%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 267 50% 42%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 267 100% 75%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 267 100% 75%;
+
+    /* Scrollbar colors */
+    --scrollbar-track: 240 10% 3.9%;
+    --scrollbar-thumb: 267 50% 42%;
+
+    /* Enhanced gradient system */
+    --gradient-start: 267 100% 75%;
+    --gradient-end: 267 50% 42%;
+    --gradient-opacity: 0.25;
+
+    /* Ambient light effect */
+    --ambient-light: 267 100% 75%;
+    --ambient-light-opacity: 0.1;
+
+    --nav-text: 270 100% 95%;
+    --nav-text-hover: 270 100% 85%;
+    --nav-bg-active: 270 15% 10%;
+    
+    /* Scrollbar Colors */
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(147, 51, 234, 0.2);
+    --scrollbar-thumb-hover: rgba(147, 51, 234, 0.4);
+
+    --primary-rgb: 147, 51, 234;
+    
+    /* Enhanced gradient system */
+    --gradient-start: rgba(147, 51, 234, 0.15);
+    --gradient-mid: rgba(126, 34, 206, 0.08);
+    --gradient-end: rgba(107, 33, 168, 0.03);
+    --gradient-shine: rgba(147, 51, 234, 0.05);
+    
+    /* Enhanced ambient light effect */
+    --ambient-light: radial-gradient(
+      circle at 50% -20%,
+      rgba(147, 51, 234, 0.2),
+      rgba(126, 34, 206, 0.1) 20%,
+      transparent 50%
+    );
+    
+    --app-bg: #10071a;
+    --app-gradient: radial-gradient(
+      circle at top center,
+      rgba(147, 51, 234, 0.12) 0%,
+      rgba(126, 34, 206, 0.06) 25%,
+      rgba(107, 33, 168, 0.4) 50%,
+      transparent 100%
+    );
+    --nav-bg: rgba(16, 7, 26, 0.8);
+    --nav-border: rgba(147, 51, 234, 0.08);
+    --nav-shadow: none;
+  }
+  
+  /* Fire Theme */
+  .theme-fire {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 25 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 15 80% 42%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 25 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 25 100% 50%;
+
+    /* Scrollbar colors */
+    --scrollbar-track: 240 10% 3.9%;
+    --scrollbar-thumb: 15 80% 42%;
+
+    /* Enhanced gradient system */
+    --gradient-start: 25 100% 50%;
+    --gradient-end: 15 80% 42%;
+    --gradient-opacity: 0.25;
+
+    /* Ambient light effect */
+    --ambient-light: 25 100% 50%;
+    --ambient-light-opacity: 0.1;
+
+    --nav-text: 20 100% 95%;
+    --nav-text-hover: 20 100% 85%;
+    --nav-bg-active: 220 15% 10%;
+    
+    /* Scrollbar Colors */
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(249, 115, 22, 0.2);
+    --scrollbar-thumb-hover: rgba(249, 115, 22, 0.4);
+
+    --primary-rgb: 249, 115, 22;
+    
+    /* Enhanced gradient system */
+    --gradient-start: rgba(249, 115, 22, 0.15);
+    --gradient-mid: rgba(234, 88, 12, 0.08);
+    --gradient-end: rgba(194, 65, 12, 0.03);
+    --gradient-shine: rgba(249, 115, 22, 0.05);
+    
+    /* Enhanced ambient light effect */
+    --ambient-light: radial-gradient(
+      circle at 50% -20%,
+      rgba(249, 115, 22, 0.2),
+      rgba(234, 88, 12, 0.1) 20%,
+      transparent 50%
+    );
+    
+    --app-bg: #0a0c14;
+    --app-gradient: radial-gradient(
+      circle at top center,
+      rgba(249, 115, 22, 0.12) 0%,
+      rgba(234, 88, 12, 0.06) 25%,
+      rgba(194, 65, 12, 0.4) 50%,
+      transparent 100%
+    );
+    --nav-bg: rgba(10, 12, 20, 0.8);
+    --nav-border: rgba(249, 115, 22, 0.08);
+    --nav-shadow: none;
+  }
+
+  .theme-huemint {
+    --background: 0 3% 10%; /* #191a19 - Very dark gray/black */
+    --foreground: 180 6% 81%; /* #cdd0d0 - Light gray */
+    --card: 0 3% 10%;
+    --card-foreground: 180 6% 81%;
+    --popover: 0 3% 10%;
+    --popover-foreground: 180 6% 81%;
+    --primary: 359 52% 52%; /* #ca3f40 - Red/crimson */
+    --primary-foreground: 180 6% 81%;
+    --secondary: 17 5% 27%; /* #4b4643 - Dark brown/gray */
+    --secondary-foreground: 180 6% 81%;
+    --muted: 17 5% 27%;
+    --muted-foreground: 180 6% 65%;
+    --accent: 359 52% 52%;
+    --accent-foreground: 180 6% 81%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 180 6% 81%;
+    --border: 17 5% 20%;
+    --input: 17 5% 20%;
+    --ring: 359 52% 52%;
+
+    /* Scrollbar colors */
+    --scrollbar-track: 0 3% 10%;
+    --scrollbar-thumb: 17 5% 27%;
+
+    /* Enhanced gradient system */
+    --gradient-start: 359 52% 52%;
+    --gradient-end: 17 5% 27%;
+    --gradient-opacity: 0.25;
+
+    /* Ambient light effect */
+    --ambient-light: 359 52% 52%;
+    --ambient-light-opacity: 0.1;
+
+    --nav-text: 180 6% 95%;
+    --nav-text-hover: 180 6% 85%;
+    --nav-bg-active: 0 3% 15%;
+    
+    /* Scrollbar Colors */
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(202, 63, 64, 0.2);
+    --scrollbar-thumb-hover: rgba(202, 63, 64, 0.4);
+
+    --primary-rgb: 202, 63, 64;
+    
+    /* Enhanced gradient system */
+    --gradient-start: rgba(202, 63, 64, 0.15);
+    --gradient-mid: rgba(180, 55, 56, 0.08);
+    --gradient-end: rgba(75, 70, 67, 0.03);
+    --gradient-shine: rgba(205, 208, 208, 0.05);
+    
+    /* Enhanced ambient light effect */
+    --ambient-light: radial-gradient(
+      circle at 50% -20%,
+      rgba(202, 63, 64, 0.2),
+      rgba(180, 55, 56, 0.1) 20%,
+      transparent 50%
+    );
+    
+    --app-bg: #191a19;
+    --app-gradient: radial-gradient(
+      circle at top center,
+      rgba(202, 63, 64, 0.12) 0%,
+      rgba(180, 55, 56, 0.06) 25%,
+      rgba(75, 70, 67, 0.4) 50%,
+      transparent 100%
+    );
+    --nav-bg: rgba(25, 26, 25, 0.8);
+    --nav-border: rgba(202, 63, 64, 0.08);
+    --nav-shadow: none;
+  }
+
+  /* Steel Crimson Theme - identical to theme-huemint but with different class name */
+  .theme-crimson {
+    --background: 0 3% 10%; /* #191a19 - Very dark gray/black */
+    --foreground: 180 6% 81%; /* #cdd0d0 - Light gray */
+    --card: 0 3% 10%;
+    --card-foreground: 180 6% 81%;
+    --popover: 0 3% 10%;
+    --popover-foreground: 180 6% 81%;
+    --primary: 359 52% 52%; /* #ca3f40 - Red/crimson */
+    --primary-foreground: 180 6% 81%;
+    --secondary: 17 5% 27%; /* #4b4643 - Dark brown/gray */
+    --secondary-foreground: 180 6% 81%;
+    --muted: 17 5% 27%;
+    --muted-foreground: 180 6% 65%;
+    --accent: 359 52% 52%;
+    --accent-foreground: 180 6% 81%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 180 6% 81%;
+    --border: 17 5% 20%;
+    --input: 17 5% 20%;
+    --ring: 359 52% 52%;
+
+    /* Scrollbar colors */
+    --scrollbar-track: 0 3% 10%;
+    --scrollbar-thumb: 17 5% 27%;
+
+    /* Enhanced gradient system */
+    --gradient-start: 359 52% 52%;
+    --gradient-end: 17 5% 27%;
+    --gradient-opacity: 0.25;
+
+    /* Ambient light effect */
+    --ambient-light: 359 52% 52%;
+    --ambient-light-opacity: 0.1;
+
+    --nav-text: 180 6% 95%;
+    --nav-text-hover: 180 6% 85%;
+    --nav-bg-active: 0 3% 15%;
+    
+    /* Scrollbar Colors */
+    --scrollbar-bg: transparent;
+    --scrollbar-thumb: rgba(202, 63, 64, 0.2);
+    --scrollbar-thumb-hover: rgba(202, 63, 64, 0.4);
+
+    --primary-rgb: 202, 63, 64;
+    
+    /* Enhanced gradient system */
+    --gradient-start: rgba(202, 63, 64, 0.15);
+    --gradient-mid: rgba(180, 55, 56, 0.08);
+    --gradient-end: rgba(75, 70, 67, 0.03);
+    --gradient-shine: rgba(205, 208, 208, 0.05);
+    
+    /* Enhanced ambient light effect */
+    --ambient-light: radial-gradient(
+      circle at 50% -20%,
+      rgba(202, 63, 64, 0.2),
+      rgba(180, 55, 56, 0.1) 20%,
+      transparent 50%
+    );
+    
+    --app-bg: #191a19;
+    --app-gradient: radial-gradient(
+      circle at top center,
+      rgba(202, 63, 64, 0.12) 0%,
+      rgba(180, 55, 56, 0.06) 25%,
+      rgba(75, 70, 67, 0.4) 50%,
+      transparent 100%
+    );
+    --nav-bg: rgba(25, 26, 25, 0.8);
+    --nav-border: rgba(202, 63, 64, 0.08);
+    --nav-shadow: none;
   }
 
   * {
@@ -111,6 +492,62 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
+  }
+
+  /* Fix for fighter card still appearing purple in black theme */
+  .dark .fighter-card {
+    background-color: hsl(var(--background)) !important;
+    border-color: hsla(var(--primary), 0.1) !important;
+  }
+
+  .dark .fighter-card .fighter-image-container::before {
+    background: conic-gradient(
+      from 0deg at 50% 50%,
+      hsl(var(--primary)) 0deg,
+      transparent 60deg,
+      transparent 300deg,
+      hsl(var(--primary)) 360deg
+    ) !important;
+  }
+
+  .dark .fighter-card .fighter-image-container::after {
+    background: radial-gradient(
+      circle at center,
+      transparent 30%,
+      rgba(var(--primary-rgb), 0.2) 100%
+    ) !important;
+  }
+
+  /* Fix for dropdown and popover backgrounds in dark mode */
+  .dark .bg-background\/60 {
+    background-color: hsl(var(--background) / 0.95) !important;
+  }
+
+  .dark .bg-background\/95 {
+    background-color: hsl(var(--background) / 0.98) !important;
+  }
+
+  /* Fix for text contrast in dark mode */
+  .dark .text-muted-foreground {
+    color: hsl(var(--muted-foreground) / 0.8) !important;
+  }
+
+  .dark .text-foreground {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Fix for button and interactive elements in dark mode */
+  .dark .hover\:bg-accent\/50:hover {
+    background-color: hsl(var(--accent) / 0.5) !important;
+  }
+
+  .dark .hover\:text-foreground:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Fix for borders in dark mode */
+  .dark .border-white\/20 {
+    border-color: hsl(var(--border) / 0.2) !important;
   }
 }
 
@@ -243,6 +680,164 @@
       hsl(var(--primary)/0.8)
     );
   }
+
+  /* Shake animation for input validation feedback */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  
+  .shake-animation {
+    animation: shake 0.3s ease-in-out;
+  }
+
+  /* Fighter Card Hover Effects */
+  .fighter-card {
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden;
+  }
+  
+  .fighter-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2), 0 0 15px rgba(var(--primary-rgb), 0.3);
+  }
+  
+  .fighter-image-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  .fighter-image-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at center,
+      transparent 30%,
+      rgba(var(--primary-rgb), 0.2) 100%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 5;
+  }
+  
+  .fighter-card:hover .fighter-image-container::after {
+    opacity: 1;
+  }
+  
+  /* Fighter Picture Frame Glow */
+  .fighter-image-container::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    background: conic-gradient(
+      from 0deg at 50% 50%,
+      hsl(var(--primary)) 0deg,
+      transparent 60deg,
+      transparent 300deg,
+      hsl(var(--primary)) 360deg
+    );
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0.7;
+    animation: rotateGlow 4s linear infinite;
+  }
+  
+  @keyframes rotateGlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  /* Save CPU by pausing animations when not visible */
+  @media (prefers-reduced-motion) {
+    .fighter-image-container::before {
+      animation: none;
+    }
+  }
+  
+  /* Background Atmosphere Effects */
+  .fight-card-background {
+    position: relative;
+    overflow: hidden;
+    z-index: 0;
+  }
+  
+  .fight-card-background::before {
+    content: '';
+    position: absolute;
+    width: 300%;
+    height: 300%;
+    top: -100%;
+    left: -100%;
+    background: radial-gradient(
+      circle at center,
+      rgba(var(--primary-rgb), 0.15) 0%,
+      transparent 40%
+    );
+    opacity: 0.8;
+    animation: ambient-glow 15s ease infinite alternate;
+    z-index: -1;
+  }
+  
+  @keyframes ambient-glow {
+    0% { transform: translate(-5%, -5%); }
+    100% { transform: translate(5%, 5%); }
+  }
+  
+  /* Performance optimizations */
+  @media (prefers-reduced-motion) {
+    .fight-card-background::before {
+      animation: none;
+    }
+  }
+}
+
+/* Theme-specific card background adjustments */
+.theme-crimson .fight-card-background,
+.theme-huemint .fight-card-background {
+  background-color: hsl(var(--background)) !important;
+  border-color: hsla(var(--primary), 0.1) !important;
+}
+
+.theme-crimson .fight-card-background::before,
+.theme-huemint .fight-card-background::before {
+  background: radial-gradient(
+    circle at center,
+    rgba(var(--primary-rgb), 0.15) 0%,
+    transparent 40%
+  ) !important;
+  opacity: 0.8;
+}
+
+/* Fix for fighter card still appearing purple in black theme */
+.theme-crimson .fighter-card,
+.theme-huemint .fighter-card {
+  background-color: hsl(var(--background)) !important;
+  border-color: hsla(var(--primary), 0.1) !important;
+}
+
+.theme-crimson .fighter-card .fighter-image-container::before,
+.theme-huemint .fighter-card .fighter-image-container::before {
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    hsl(var(--primary)) 0deg,
+    transparent 60deg,
+    transparent 300deg,
+    hsl(var(--primary)) 360deg
+  ) !important;
+}
+
+.theme-crimson .fighter-card .fighter-image-container::after,
+.theme-huemint .fighter-card .fighter-image-container::after {
+  background: radial-gradient(
+    circle at center,
+    transparent 30%,
+    rgba(var(--primary-rgb), 0.2) 100%
+  ) !important;
 }
 
 /* Base styles */
@@ -253,4 +848,75 @@ html {
 
 body {
   min-height: 100vh;
+}
+
+[data-theme="theme-fire"] {
+  --background: 0 0% 9.8%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 5.9%;  
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 5.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 86% 48.6%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 10 25% 25%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 10 25% 25%; 
+  --muted-foreground: 0 0% 63.9%;
+  --accent: 10 25% 25%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 0 86% 48.6%;
+  --nav-border: 0 86% 48.6%;
+}
+
+[data-theme="theme-huemint"] {
+  --background: 0 3% 10%;
+  --foreground: 180 6% 81%;
+  --card: 0 3% 10%;  
+  --card-foreground: 180 6% 81%;
+  --popover: 0 3% 10%;
+  --popover-foreground: 180 6% 81%;
+  --primary: 359 52% 52%;
+  --primary-foreground: 180 6% 81%;
+  --secondary: 17 5% 27%;
+  --secondary-foreground: 180 6% 81%;
+  --muted: 17 5% 27%; 
+  --muted-foreground: 180 6% 65%;
+  --accent: 359 52% 52%;
+  --accent-foreground: 180 6% 81%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 180 6% 81%;
+  --border: 17 5% 20%;
+  --input: 17 5% 20%;
+  --ring: 359 52% 52%;
+  --nav-border: 359 52% 52%;
+  --primary-rgb: 202, 63, 64;
+}
+
+[data-theme="theme-crimson"] {
+  --background: 0 3% 10%;
+  --foreground: 180 6% 81%;
+  --card: 0 3% 10%;  
+  --card-foreground: 180 6% 81%;
+  --popover: 0 3% 10%;
+  --popover-foreground: 180 6% 81%;
+  --primary: 359 52% 52%;
+  --primary-foreground: 180 6% 81%;
+  --secondary: 17 5% 27%;
+  --secondary-foreground: 180 6% 81%;
+  --muted: 17 5% 27%; 
+  --muted-foreground: 180 6% 65%;
+  --accent: 359 52% 52%;
+  --accent-foreground: 180 6% 81%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 180 6% 81%;
+  --border: 17 5% 20%;
+  --input: 17 5% 20%;
+  --ring: 359 52% 52%;
+  --nav-border: 359 52% 52%;
+  --primary-rgb: 202, 63, 64;
 }

@@ -12,6 +12,12 @@ from fastapi.exceptions import RequestValidationError
 from starlette.responses import RedirectResponse
 from typing import Callable, Any, Dict, Union
 from mangum import Mangum
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
 
 from backend.constants import (
     APP_TITLE, 
@@ -43,6 +49,9 @@ logger = logging.getLogger(__name__)
 # Global predictor instance
 predictor = None
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
@@ -57,6 +66,10 @@ async def lifespan(app: FastAPI):
     
     # Log startup complete
     logger.info("Application startup complete")
+    
+    # Add rate limiter to the application
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     
     yield
     
@@ -123,6 +136,8 @@ app.add_middleware(
     allow_credentials=CORS_CREDENTIALS,
     allow_methods=CORS_METHODS,
     allow_headers=CORS_HEADERS,
+    expose_headers=["X-Process-Time", "X-Request-ID"],
+    max_age=3600,  # 1 hour for browsers to cache CORS response
 )
 
 # Log CORS configuration
@@ -241,9 +256,9 @@ async def general_exception_handler(request: Request, exc: Exception):
         content=sanitized_data
     )
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handler for HTTP exceptions to ensure consistent logging."""
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handler for Starlette HTTP exceptions."""
     logger.warning(f"HTTP exception: {exc.status_code} - {exc.detail}")
     
     # Add request path to help with debugging
@@ -271,6 +286,37 @@ async def validation_exception_handler(request, exc):
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=sanitize_json({"detail": str(exc)}),
     )
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+        return response
+
+# Add custom middleware to handle database connection errors
+class ConnectionErrorMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as e:
+            # Check for database connection errors
+            error_message = str(e).lower()
+            if "connection" in error_message or "timeout" in error_message or "database" in error_message:
+                logger.error(f"Database connection error: {str(e)}")
+                return JSONResponse(
+                    status_code=HTTP_503_SERVICE_UNAVAILABLE,
+                    content={"detail": "Database connection error, please try again later"}
+                )
+            # Let other exceptions be handled by FastAPI
+            raise
+
+# Add security headers middleware and connection error middleware after they're defined
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(ConnectionErrorMiddleware)
 
 # Run the API with uvicorn when script is executed directly
 if __name__ == "__main__":

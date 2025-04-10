@@ -75,6 +75,9 @@ module.exports = {
         "accordion-up": "accordion-up 0.2s ease-out",
         "marquee": 'marquee var(--marquee-duration, 45s) linear infinite',
       },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+      },
     },
   },
   plugins: [
