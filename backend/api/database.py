@@ -6,6 +6,8 @@ from functools import lru_cache
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import time
+import traceback
 
 # Load environment variables
 load_dotenv()
@@ -18,8 +20,15 @@ logger = logging.getLogger(__name__)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+# Connection settings
+CONNECTION_TIMEOUT = int(os.getenv("CONNECTION_TIMEOUT", "15"))  # 15-second timeout by default
+MAX_RETRIES = int(os.getenv("CONNECTION_RETRIES", "3"))  # 3 retries by default
+RETRY_BACKOFF = 2  # Exponential backoff multiplier
+
 # Global connection instance
 _supabase_client: Optional[Client] = None
+_last_connection_attempt = 0
+_connection_expiry = 3600  # 1 hour expiry for connection
 
 class SimpleSupabaseClient:
     """A simplified client for Supabase that uses direct HTTP requests instead of SDK."""
@@ -174,50 +183,84 @@ class QueryBuilder:
 
 def get_db_connection() -> Optional[Client]:
     """
-    Get a connection to the Supabase database.
+    Get a connection to the Supabase database with retry logic.
     
     Returns:
         Optional[Client]: A Supabase client instance or None if connection fails
     """
-    global _supabase_client
+    global _supabase_client, _last_connection_attempt
     
     try:
-        # Return existing connection if available
-        if _supabase_client is not None:
+        # Return existing connection if available and not expired
+        current_time = time.time()
+        if _supabase_client is not None and (current_time - _last_connection_attempt) < _connection_expiry:
             return _supabase_client
             
         # Check if credentials are available
         if not SUPABASE_URL or not SUPABASE_KEY:
             logger.error("Missing Supabase credentials. Please check environment variables.")
             return None
-            
-        # Create new connection
-        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info("Successfully connected to Supabase")
-        return _supabase_client
+        
+        # Create new connection with retries
+        for attempt in range(MAX_RETRIES):
+            try:
+                logger.info(f"Connecting to Supabase (attempt {attempt+1}/{MAX_RETRIES})...")
+                _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+                
+                # Test connection
+                test_response = _supabase_client.table('fighters').select('id').limit(1).execute()
+                if test_response is not None and hasattr(test_response, 'data'):
+                    logger.info("Successfully connected to Supabase")
+                    _last_connection_attempt = current_time
+                    return _supabase_client
+                else:
+                    logger.warning(f"Connection test failed on attempt {attempt+1}")
+            except Exception as e:
+                retry_wait = RETRY_BACKOFF ** attempt
+                logger.warning(f"Connection attempt {attempt+1} failed: {str(e)}")
+                logger.info(f"Retrying in {retry_wait} seconds...")
+                time.sleep(retry_wait)
+        
+        logger.error(f"Failed to connect to Supabase after {MAX_RETRIES} attempts")
+        return None
         
     except Exception as e:
         logger.error(f"Failed to connect to Supabase: {str(e)}")
+        logger.error(traceback.format_exc())
         return None
 
 def test_connection() -> bool:
-    """
-    Test the database connection.
-    
-    Returns:
-        bool: True if connection is successful, False otherwise
-    """
+    """Test the database connection."""
     try:
+        start_time = time.time()
+        logger.info("Testing database connection...")
         client = get_db_connection()
         if client is None:
+            logger.error("Database client is None")
             return False
-            
-        # Try a simple query to verify connection
-        response = client.table('fighters').select('id').limit(1).execute()
-        return response is not None and hasattr(response, 'data')
         
+        if isinstance(client, SimpleSupabaseClient):
+            is_connected = client.test_connection()
+        else:
+            # For the official Supabase client
+            try:
+                # Execute a simple query to check the connection
+                client.table('fighters').select('*').limit(1).execute()
+                is_connected = True
+            except Exception as e:
+                logger.error(f"Error testing database connection: {str(e)}")
+                is_connected = False
+        
+        elapsed = time.time() - start_time
+        if is_connected:
+            logger.info(f"Database connection successful (took {elapsed:.2f}s)")
+        else:
+            logger.error(f"Database connection test failed (took {elapsed:.2f}s)")
+        
+        return is_connected
     except Exception as e:
-        logger.error(f"Connection test failed: {str(e)}")
+        logger.error(f"Error testing database connection: {str(e)}")
+        logger.error(traceback.format_exc())
         return False
 
 # Alias for get_db_connection to maintain compatibility

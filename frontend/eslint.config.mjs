@@ -26,5 +26,12 @@ export default [
       "@typescript-eslint/no-unused-vars": "warn",
       "@typescript-eslint/no-explicit-any": "warn"
     }
+  },
+  {
+    settings: {
+      next: {
+        rootDir: "."
+      }
+    }
   }
 ];

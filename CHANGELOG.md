@@ -24,3 +24,15 @@
 - Enhanced scrollbar management across different pages
 - Optimized component imports and dependencies
 - Streamlined fighter data handling and validation 
+
+## Version 1.03 - Search and Compare Page Improvements
+- Fixed fighter search suggestions to properly show 5 recent searches
+- Implemented independent search histories for fighter comparison page
+- Optimized search bar functionality and history management
+- Fixed animation issues in fighter comparison page
+- Improved fighter card rendering and state management
+- Enhanced search history persistence across page navigation
+- Fixed ranking and stats display animations
+- Optimized component re-rendering for better performance
+- Added proper error handling for search history
+- Improved search history synchronization between components

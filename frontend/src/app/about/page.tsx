@@ -1,421 +1,381 @@
 "use client"
 
-import { motion, AnimatePresence } from "framer-motion"
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
-import { getAnimationVariants } from '@/lib/animations'
 import { useIsMobile } from "@/lib/utils"
+import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
+
+const TRANSITION_DURATION_MS = 700;
+const OPACITY_DURATION_MS = 500;
 
 export default function AboutPage() {
   const [activeSection, setActiveSection] = useState(0)
+  const [previousSection, setPreviousSection] = useState(-1) // Initialize to -1 to handle initial load
   const sections = ["Overview", "Features", "Stay Tuned"]
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [isManualScroll, setIsManualScroll] = useState(false)
-  const [direction, setDirection] = useState(0)
+  const isTransitioning = useRef(false)
+  const [hasScrolled, setHasScrolled] = useState(false)
   const isMobile = useIsMobile()
-  const animationVariants = getAnimationVariants(isMobile)
+  const touchStartY = useRef(0)
+
+  const changeSection = (newSection: number) => {
+    if (
+      isTransitioning.current ||
+      newSection < 0 ||
+      newSection >= sections.length ||
+      newSection === activeSection
+    ) {
+      return
+    }
+
+    if (!hasScrolled) {
+      setHasScrolled(true)
+    }
+
+    isTransitioning.current = true
+    setPreviousSection(activeSection)
+    setActiveSection(newSection)
+
+    setTimeout(() => {
+      isTransitioning.current = false
+      setPreviousSection(-1) // Reset previous section after transition
+    }, TRANSITION_DURATION_MS)
+  }
 
   useEffect(() => {
-    const container = containerRef.current?.querySelector('div')
-    if (!container) return
+    const container = document.documentElement // Listen on the whole page
 
-    let lastScrollTop = 0
-    let touchStartY = 0
-    let touchEndY = 0
-    let scrollTimeout: NodeJS.Timeout
-
+    let wheelTimeoutId: NodeJS.Timeout
     const handleWheel = (e: WheelEvent) => {
-      if (isManualScroll || isMobile) {
-        e.preventDefault()
+      // Allow default scroll if modifier key is pressed (for accessibility/debugging)
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+          return;
+      }
+      
+      // Prevent default page scroll controlled by this component
+      e.preventDefault();
+      
+      if (isTransitioning.current) {
         return
       }
       
-      clearTimeout(scrollTimeout)
-      scrollTimeout = setTimeout(() => {
-        const delta = e.deltaY
-        const newDirection = delta > 0 ? 1 : -1
-        
-        setDirection(newDirection)
-        const nextSection = activeSection + newDirection
-        
-        if (nextSection >= 0 && nextSection < sections.length) {
-          setIsManualScroll(true)
-          setActiveSection(nextSection)
-          container.scrollTo({
-            top: nextSection * window.innerHeight,
-            behavior: 'smooth'
-          })
-          setTimeout(() => setIsManualScroll(false), 1000)
-        }
-      }, 50)
+      clearTimeout(wheelTimeoutId)
+      wheelTimeoutId = setTimeout(() => {
+        const direction = e.deltaY > 0 ? 1 : -1
+        changeSection(activeSection + direction)
+      }, 50) // Increased debounce slightly
     }
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (isMobile) {
-        touchStartY = e.touches[0].clientY
-      }
+      if (isTransitioning.current) return
+      touchStartY.current = e.touches[0].clientY
     }
 
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isMobile || isManualScroll) {
-        e.preventDefault()
-        return
-      }
-      touchEndY = e.touches[0].clientY
-    }
-
-    const handleTouchEnd = () => {
-      if (!isMobile || isManualScroll) return
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (isTransitioning.current) return
       
-      const delta = touchStartY - touchEndY
-      if (Math.abs(delta) < 50) return // Increased threshold for more intentional swipes
-
-      const newDirection = delta > 0 ? 1 : -1
-      const nextSection = activeSection + newDirection
+      const touchEndY = e.changedTouches[0].clientY
+      const deltaY = touchStartY.current - touchEndY
       
-      if (nextSection >= 0 && nextSection < sections.length) {
-        setIsManualScroll(true)
-        setDirection(newDirection)
-        setActiveSection(nextSection)
-        container.scrollTo({
-          top: nextSection * window.innerHeight,
-          behavior: 'smooth'
-        })
-        setTimeout(() => setIsManualScroll(false), 800)
+      // Reset touch start to prevent accidental multi-swipes if needed
+      // touchStartY.current = 0;
+
+      if (Math.abs(deltaY) > 40) { // Slightly reduced threshold
+        const direction = deltaY > 0 ? 1 : -1
+        changeSection(activeSection + direction)
       }
     }
 
+    // Use passive: false for wheel to allow preventDefault
     container.addEventListener('wheel', handleWheel, { passive: false })
-    container.addEventListener('touchstart', handleTouchStart, { passive: true })
-    container.addEventListener('touchmove', handleTouchMove, { passive: false })
-    container.addEventListener('touchend', handleTouchEnd, { passive: true })
+    if (isMobile) {
+      container.addEventListener('touchstart', handleTouchStart, { passive: true })
+      container.addEventListener('touchend', handleTouchEnd, { passive: true })
+    }
 
     return () => {
-      clearTimeout(scrollTimeout)
+      clearTimeout(wheelTimeoutId)
       container.removeEventListener('wheel', handleWheel)
-      container.removeEventListener('touchstart', handleTouchStart)
-      container.removeEventListener('touchmove', handleTouchMove)
-      container.removeEventListener('touchend', handleTouchEnd)
+      if (isMobile) {
+        container.removeEventListener('touchstart', handleTouchStart)
+        container.removeEventListener('touchend', handleTouchEnd)
+      }
     }
-  }, [activeSection, sections.length, isManualScroll, isMobile])
+  }, [activeSection, hasScrolled, isMobile]) // previousSection is not needed here
 
   const scrollToSection = (index: number) => {
-    const container = containerRef.current?.querySelector('div')
-    if (!container || isManualScroll) return
-
-    setDirection(index > activeSection ? 1 : -1)
-    setIsManualScroll(true)
-    setActiveSection(index)
-
-    container.scrollTo({
-      top: index * window.innerHeight,
-      behavior: isMobile ? 'auto' : 'smooth'
-    })
-
-    setTimeout(() => setIsManualScroll(false), isMobile ? 500 : 1000)
+    if (isTransitioning.current) return
+    changeSection(index)
   }
 
+  const getSectionStyles = (index: number): React.CSSProperties => {
+    const isActive = activeSection === index
+    const isPrev = previousSection === index
+    
+    // Determine direction of movement for transform calculation
+    let moveDirection = 0; 
+    if (previousSection !== -1) { // Check if it's not the initial load
+        moveDirection = activeSection > previousSection ? 1 : -1;
+    }
+
+    let transform = 'translateY(0)';
+    let opacity = 0;
+    let zIndex = 0;
+    let visibility: 'visible' | 'hidden' = 'hidden'; // Default to hidden
+
+    if (isActive) {
+      transform = 'translateY(0)';
+      opacity = 1;
+      zIndex = 1; // Active is on top
+      visibility = 'visible';
+    } else if (isPrev) {
+      // Previous section slides out based on the direction it was pushed
+      transform = `translateY(${-moveDirection * 25}vh)`; // Slide out 25% of viewport height
+      opacity = 0;
+      zIndex = 0; // Keep behind active
+      visibility = 'visible'; // Keep visible during its own transition
+    } else {
+      // Sections far away - determine initial position based on relation to *active*
+      const initialDirection = index > activeSection ? 1 : -1;
+      transform = `translateY(${initialDirection * 100}vh)`; // Position fully off-screen
+      opacity = 0;
+      zIndex = 0;
+      visibility = 'hidden'; // Stays hidden
+    }
+
+    // Apply transition styles
+    const isVisible = isActive || isPrev;
+    const visibilityDelay = isVisible ? '0ms' : `${TRANSITION_DURATION_MS}ms`;
+
+    return {
+      transform,
+      opacity,
+      zIndex,
+      visibility,
+      transition: 
+        `transform ${TRANSITION_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1), ` +
+        `opacity ${OPACITY_DURATION_MS}ms ease-out, ` +
+        `visibility 0ms linear ${visibilityDelay}`,
+      pointerEvents: isActive ? 'auto' : 'none',
+    };
+  };
+
+
   return (
-    <div className="fixed inset-0 bg-background">
-      {/* Navigation Legend - Updated positioning and styling */}
-      <div className={cn(
-        "fixed z-50 transition-all duration-300",
-        isMobile 
-          ? "bottom-6 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border/50 shadow-lg" 
-          : "right-8 top-1/2 -translate-y-1/2"
-      )}>
-        <div className={cn(
-          "flex items-center relative",
-          isMobile ? "flex-row gap-3" : "flex-col gap-6"
-        )}>
-          {isMobile ? (
-            <div 
-              className="absolute inset-y-[15px] left-0 right-0 h-[2px] bg-muted-foreground/10"
-              style={{
-                transform: `scaleX(${(sections.length - 1) * 100}%)`
-              }}
-            />
-          ) : (
-            <div 
-              className="absolute right-[19px] top-0 bottom-0 w-[2px] bg-muted-foreground/20"
-              style={{
-                transform: `scaleY(${(sections.length - 1) * 100}%)`
-              }}
-            />
-          )}
-          {sections.map((section, index) => (
-            <div key={index} className="relative">
-              {!isMobile && (
-                <motion.div
-                  className="absolute right-full mr-6 top-1/2 -translate-y-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-md border border-border/50"
-                  initial={false}
-                  animate={{
-                    opacity: activeSection === index ? 1 : 0,
-                    x: activeSection === index ? 0 : 20,
-                    scale: activeSection === index ? 1 : 0.95
-                  }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <span className="text-sm font-medium whitespace-nowrap text-foreground">
-                    {section}
-                  </span>
-                </motion.div>
+    <PageTransition variant="fade">
+       {/* Scroll Indicator - Changed from fadeDown to fadeIn to prevent vertical movement */}
+       <AnimatedItem variant="fadeIn" className="bottom-fixed">
+         <div className={cn(
+           "fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500",
+           "pointer-events-none select-none",
+           isMobile ? "bottom-28" : "bottom-8",
+           hasScrolled ? "opacity-0 translate-y-4" : "opacity-100"
+         )}>
+           <div className="flex flex-col items-center gap-2">
+             <div className="text-sm text-muted-foreground/80 font-medium">
+               Scroll to explore
+             </div>
+             <div className="relative w-6 h-10 rounded-full border-2 border-muted-foreground/20 p-1">
+               <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-scroll-bounce" />
+             </div>
+           </div>
+         </div>
+       </AnimatedItem>
+
+       {/* Navigation */}
+       <AnimatedItem variant="fadeIn" delay={0.1}>
+         <div className={cn(
+           "fixed z-40 transition-all duration-500",
+           isMobile 
+             ? "bottom-8 left-1/2 -translate-x-1/2" 
+             : "right-8 top-1/2 -translate-y-1/2",
+           !hasScrolled && "opacity-0 translate-y-4"
+         )}>
+           <div className={cn(
+             "relative flex items-center backdrop-blur-md bg-background/60 border border-border/50 shadow-lg",
+             isMobile 
+               ? "flex-row gap-4 px-6 py-3 rounded-full" 
+               : "flex-col gap-6 p-4 rounded-2xl"
+           )}>
+             {/* Progress Line */}
+              <div className={cn(
+                "absolute bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20 before:absolute before:content-[''] before:inset-0",
+                isMobile 
+                  ? "h-[2px] left-6 right-6 top-[50%] -translate-y-1/2" 
+                  : "w-[2px] top-4 bottom-4 left-0 right-0 mx-auto",
+                "transition-transform duration-500 ease-out"
+              )} style={{
+                transform: isMobile 
+                  ? `scaleX(${activeSection / (sections.length - 1)})` 
+                  : `scaleY(${activeSection / (sections.length - 1)})`,
+                transformOrigin: isMobile ? 'left' : 'top' // Ensure scaling starts from the beginning
+              }} />
+
+             {sections.map((section, index) => (
+               <div key={index} className="relative group z-10"> {/* Ensure dots are above progress line */}
+                 {/* Section Label */}
+                 <div className={cn(
+                   "absolute transition-all duration-300 px-3 py-1.5 rounded-md",
+                   "bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg",
+                   "opacity-0 scale-95 pointer-events-none", // Add pointer-events-none
+                   isMobile 
+                     ? "-top-12 left-1/2 -translate-x-1/2" 
+                     : "right-full mr-4 top-1/2 -translate-y-1/2",
+                   "group-hover:opacity-100 group-hover:scale-100", // Show on hover
+                   // Keep active label potentially visible slightly longer if needed, or remove if hover is enough
+                   // activeSection === index && "opacity-100 scale-100" 
+                 )}>
+                   <span className="text-sm font-medium whitespace-nowrap text-foreground">
+                     {section}
+                   </span>
+                 </div>
+
+                 {/* Navigation Dot */}
+                 <button
+                   onClick={() => scrollToSection(index)}
+                   className={cn(
+                     "relative flex items-center justify-center transition-transform duration-200",
+                     "hover:scale-110",
+                     isMobile ? "w-8 h-8" : "w-10 h-10"
+                   )}
+                 >
+                   <div className={cn(
+                     "absolute inset-0 rounded-full bg-gradient-to-r from-primary/40 to-primary/60",
+                     "transition-all duration-300 ease-out",
+                     activeSection === index ? "scale-100 opacity-100" : "scale-0 opacity-0"
+                   )} />
+                   <div className={cn(
+                     "rounded-full transition-all duration-300",
+                     isMobile ? "w-2.5 h-2.5" : "w-3 h-3",
+                     activeSection === index 
+                       ? "bg-primary scale-100" 
+                       : "bg-muted-foreground/60 scale-75 group-hover:scale-90 group-hover:bg-primary/80"
+                   )} />
+                 </button>
+               </div>
+             ))}
+           </div>
+         </div>
+       </AnimatedItem>
+
+      {/* Content Sections Container */}
+      <div className="fixed inset-0 h-full w-full overflow-hidden">
+        {sections.map((_, index) => (
+          <section 
+            key={index}
+            className="absolute inset-0 h-full w-full flex items-center justify-center overflow-hidden p-4"
+            style={getSectionStyles(index)}
+          >
+            {/* Section Inner Content Container */}
+            <div className={cn(
+              "container max-w-5xl px-4 relative",
+            )}>
+              {index === 0 && (
+                <AnimatedContainer delay={0.1} className="max-w-3xl mx-auto text-center space-y-4 sm:space-y-6 md:space-y-8">
+                  <AnimatedItem variant="fadeDown">
+                    <div className={cn("inline-flex px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-primary/10 backdrop-blur-sm")}>
+                      <span className="text-primary text-xs sm:text-sm font-medium">UFC FIGHTER DATA API</span>
+                    </div>
+                  </AnimatedItem>
+                  <AnimatedItem variant="fadeUp" delay={0.1}>
+                    <h1 className={cn(
+                      "font-bold text-foreground",
+                      "text-4xl sm:text-5xl md:text-7xl"
+                    )}>
+                      Next Generation Fight Analytics
+                    </h1>
+                  </AnimatedItem>
+                  <AnimatedItem variant="fadeUp" delay={0.15}>
+                    <p className={cn(
+                      "text-muted-foreground max-w-2xl mx-auto",
+                      "text-base sm:text-lg md:text-xl"
+                    )}>
+                      A comprehensive API and analytics platform for UFC fighter statistics, providing real-time access to fighter data, match outcomes, and performance metrics.
+                    </p>
+                  </AnimatedItem>
+                </AnimatedContainer>
               )}
-              <button
-                onClick={() => scrollToSection(index)}
-                className={cn(
-                  "relative flex items-center justify-center group",
-                  isMobile ? "w-8 h-8" : "w-10 h-10"
-                )}
-              >
-                <motion.div
-                  className="absolute inset-0 rounded-full bg-primary/20"
-                  initial={false}
-                  animate={{
-                    scale: activeSection === index ? 1 : 0,
-                    opacity: activeSection === index ? 1 : 0
-                  }}
-                  transition={{ duration: 0.3 }}
-                />
-                <motion.div
-                  className={cn(
-                    "rounded-full",
-                    isMobile ? "w-2 h-2" : "w-2.5 h-2.5"
-                  )}
-                  initial={false}
-                  animate={{
-                    scale: activeSection === index ? 1 : 0.8,
-                    backgroundColor: activeSection === index ? 'var(--primary)' : 'var(--muted-foreground)'
-                  }}
-                  transition={{ duration: 0.3 }}
-                />
-              </button>
+               {index === 1 && (
+                <AnimatedContainer delay={0.1} className="space-y-8 sm:space-y-12 md:space-y-16">
+                  <AnimatedItem variant="fadeDown">
+                    <h2 className={cn(
+                      "font-bold text-foreground mb-3 sm:mb-4 md:mb-6",
+                      "text-3xl sm:text-4xl"
+                    )}>Key Features</h2>
+                    <p className={cn(
+                      "text-muted-foreground",
+                      "text-base sm:text-lg md:text-xl"
+                    )}>
+                      Discover the powerful features that make our UFC Fighter Data API the ultimate tool for fight analysis.
+                    </p>
+                  </AnimatedItem>
+                  
+                  <AnimatedContainer delay={0.2} className="grid md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 max-w-4xl mx-auto">
+                    {[
+                      { title: "Real-time Data", description: "Up-to-date fighter statistics and match outcomes, processed and available instantly" },
+                      { title: "Comprehensive Stats", description: "Detailed metrics covering every aspect of fighter performance and history" },
+                      { title: "RESTful API", description: "Well-documented endpoints for seamless integration with any application" },
+                      { title: "Advanced Analytics", description: "Sophisticated analysis tools for deep insights into fighter performance" }
+                    ].map((feature, idx) => (
+                      <AnimatedItem key={idx} variant="fadeUp" delay={0.05 * idx} className={cn("group relative")}>
+                        <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                        <div className="relative space-y-2 sm:space-y-3 md:space-y-4 p-3 sm:p-4">
+                          <h3 className="font-semibold text-foreground text-xl sm:text-2xl">{feature.title}</h3>
+                          <p className="text-muted-foreground text-sm sm:text-base md:text-lg">{feature.description}</p>
+                        </div>
+                      </AnimatedItem>
+                    ))}
+                  </AnimatedContainer>
+                </AnimatedContainer>
+               )}
+               {index === 2 && (
+                <AnimatedContainer delay={0.1} className="space-y-6 sm:space-y-8 md:space-y-12">
+                  <AnimatedItem variant="fadeDown">
+                    <h2 className={cn(
+                      "font-bold text-foreground mb-3 sm:mb-4",
+                      "text-3xl sm:text-4xl"
+                    )}>Stay Tuned</h2>
+                    <p className={cn(
+                      "text-muted-foreground",
+                      "text-sm sm:text-base"
+                    )}>We're actively developing new features and improvements to enhance your fight analysis experience.</p>
+                  </AnimatedItem>
+                  
+                  <AnimatedContainer delay={0.2} className="grid md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 max-w-4xl mx-auto">
+                    {[
+                      { title: "Event Analysis", description: "Coming soon: Comprehensive analysis of upcoming UFC events with detailed breakdowns and predictions for every fight on the card." },
+                      { title: "Fighter Career Insights", description: "Deep dive into fighter careers with trend analysis, style matchups, and performance evolution over time." },
+                      { title: "Advanced Statistics", description: "New metrics and visualizations to better understand fighter performance, including dynamic striking maps and grappling position analysis." },
+                      { title: "Community Features", description: "Share your predictions, discuss matchups, and compete with other fight analysts in our upcoming community section." }
+                    ].map((feature, idx) => (
+                      <AnimatedItem key={idx} variant="fadeUp" delay={0.05 * idx} className={cn("group relative")}>
+                        <div className="absolute -inset-2 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                        <div className="relative space-y-1.5 sm:space-y-2 p-2 sm:p-3">
+                          <h3 className="font-semibold text-foreground text-lg sm:text-xl">{feature.title}</h3>
+                          <p className="text-muted-foreground leading-relaxed text-xs sm:text-sm">{feature.description}</p>
+                        </div>
+                      </AnimatedItem>
+                    ))}
+                  </AnimatedContainer>
+                  
+                  <AnimatedItem variant="fadeUp" delay={0.3} className={cn("text-center max-w-2xl mx-auto")}>
+                    <p className="text-muted-foreground text-xs sm:text-sm">Follow our updates as we continue to improve and expand the platform with new features and insights.</p>
+                  </AnimatedItem>
+                </AnimatedContainer>
+               )}
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div 
-        ref={containerRef}
-        className="h-screen w-full overflow-hidden"
-      >
-        <div className="h-full w-full overflow-y-auto overflow-x-hidden scrollbar-none snap-y snap-mandatory scroll-smooth">
-          <AnimatePresence initial={false} mode="wait">
-            {sections.map((_, index) => (
-              <motion.section 
-                key={index}
-                id={`section-${index}`}
-                className="h-screen w-full flex items-center justify-center relative snap-start"
-                initial={{ 
-                  opacity: 0,
-                  y: direction > 0 ? 100 : -100
-                }}
-                animate={{ 
-                  opacity: 1,
-                  y: 0,
-                  transition: {
-                    duration: 0.8,
-                    ease: [0.16, 1, 0.3, 1]
-                  }
-                }}
-                exit={{ 
-                  opacity: 0,
-                  y: direction > 0 ? -100 : 100,
-                  transition: {
-                    duration: 0.6,
-                    ease: [0.16, 1, 0.3, 1]
-                  }
-                }}
-              >
-                <motion.div 
-                  className="absolute inset-0 bg-gradient-to-b from-primary/5 via-primary/10 to-transparent"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 1 }}
-                />
-                <motion.div
-                  className="container max-w-5xl px-4"
-                  initial={{ opacity: 0, y: 0 }}
-                  animate={{ 
-                    opacity: 1, 
-                    y: 0,
-                    transition: {
-                      duration: isMobile ? 0.3 : 0.8,
-                      delay: isMobile ? 0.1 : 0.2,
-                      ease: isMobile ? "easeOut" : [0.16, 1, 0.3, 1]
-                    }
-                  }}
-                >
-                  {index === 0 && (
-                    <div className="max-w-3xl mx-auto text-center space-y-4 sm:space-y-8 px-4">
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.6, delay: 0.3 }}
-                        className="inline-flex px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-primary/10 backdrop-blur-sm"
-                      >
-                        <span className="text-primary text-xs sm:text-sm font-medium">UFC FIGHTER DATA API</span>
-                      </motion.div>
-                      <motion.h1
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.4 }}
-                        className="text-3xl sm:text-5xl md:text-7xl font-bold text-foreground"
-                      >
-                        Next Generation Fight Analytics
-                      </motion.h1>
-                      <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.5 }}
-                        className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto"
-                      >
-                        A comprehensive API and analytics platform for UFC fighter statistics, providing real-time access to
-                        fighter data, match outcomes, and performance metrics.
-                      </motion.p>
-                    </div>
-                  )}
-
-                  {index === 1 && (
-                    <div className="space-y-8 sm:space-y-16 px-4">
-                      <div className="max-w-2xl mx-auto text-center">
-                        <motion.h2
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.6 }}
-                          className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-6"
-                        >
-                          Key Features
-                        </motion.h2>
-                        <motion.p
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.6, delay: 0.1 }}
-                          className="text-base sm:text-lg md:text-xl text-muted-foreground"
-                        >
-                          Discover the powerful features that make our UFC Fighter Data API the ultimate tool for fight analysis.
-                        </motion.p>
-                      </div>
-
-                      <div className="grid md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 max-w-4xl mx-auto">
-                        {[
-                          {
-                            title: "Real-time Data",
-                            description: "Up-to-date fighter statistics and match outcomes, processed and available instantly"
-                          },
-                          {
-                            title: "Comprehensive Stats",
-                            description: "Detailed metrics covering every aspect of fighter performance and history"
-                          },
-                          {
-                            title: "RESTful API",
-                            description: "Well-documented endpoints for seamless integration with any application"
-                          },
-                          {
-                            title: "Advanced Analytics",
-                            description: "Sophisticated analysis tools for deep insights into fighter performance"
-                          }
-                        ].map((feature, idx) => (
-                          <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ 
-                              duration: 0.6,
-                              delay: idx * 0.1
-                            }}
-                            className="group relative"
-                          >
-                            <div className="absolute -inset-2 sm:-inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                            <div className="relative space-y-2 sm:space-y-4 p-2 sm:p-4">
-                              <h3 className="text-xl sm:text-2xl font-semibold text-foreground">{feature.title}</h3>
-                              <p className="text-sm sm:text-base md:text-lg text-muted-foreground">{feature.description}</p>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {index === 2 && (
-                    <div className="space-y-6 sm:space-y-12 px-4 max-h-[85vh] overflow-y-auto scrollbar-none">
-                      <div className="max-w-2xl mx-auto text-center">
-                        <motion.h2
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.6 }}
-                          className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4"
-                        >
-                          Stay Tuned
-                        </motion.h2>
-                        <motion.p
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.6, delay: 0.1 }}
-                          className="text-sm sm:text-base text-muted-foreground"
-                        >
-                          We're actively developing new features and improvements to enhance your fight analysis experience.
-                        </motion.p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 max-w-4xl mx-auto">
-                        {[
-                          {
-                            title: "Event Analysis",
-                            description: "Coming soon: Comprehensive analysis of upcoming UFC events with detailed breakdowns and predictions for every fight on the card."
-                          },
-                          {
-                            title: "Fighter Career Insights",
-                            description: "Deep dive into fighter careers with trend analysis, style matchups, and performance evolution over time."
-                          },
-                          {
-                            title: "Advanced Statistics",
-                            description: "New metrics and visualizations to better understand fighter performance, including dynamic striking maps and grappling position analysis."
-                          },
-                          {
-                            title: "Community Features",
-                            description: "Share your predictions, discuss matchups, and compete with other fight analysts in our upcoming community section."
-                          }
-                        ].map((feature, idx) => (
-                          <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ 
-                              duration: 0.6,
-                              delay: idx * 0.1
-                            }}
-                            className="group relative"
-                          >
-                            <div className="absolute -inset-1.5 sm:-inset-2 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                            <div className="relative space-y-1.5 sm:space-y-2 p-2 sm:p-3">
-                              <h3 className="text-lg sm:text-xl font-semibold text-foreground">{feature.title}</h3>
-                              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6, delay: 0.5 }}
-                        className="text-center max-w-2xl mx-auto"
-                      >
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          Follow our updates as we continue to improve and expand the platform with new features and insights.
-                        </p>
-                      </motion.div>
-                    </div>
-                  )}
-                </motion.div>
-              </motion.section>
-            ))}
-          </AnimatePresence>
-        </div>
+          </section>
+        ))}
       </div>
 
       <style jsx global>{`
+        /* Ensure html/body have overflow hidden and height 100vh */
+        html, body {
+          overflow: hidden !important; /* Force override */
+          height: 100vh;
+          margin: 0;
+          padding: 0;
+        }
+        
         .scrollbar-none {
           scrollbar-width: none;
           -ms-overflow-style: none;
@@ -423,14 +383,25 @@ export default function AboutPage() {
         .scrollbar-none::-webkit-scrollbar {
           display: none;
         }
-        
-        html, body {
-          overflow: hidden;
-          height: 100vh;
-          margin: 0;
-          padding: 0;
+
+        @keyframes scroll-bounce {
+          0%, 100% {
+            transform: translateY(0) translateX(-50%);
+          }
+          50% {
+            transform: translateY(16px) translateX(-50%);
+          }
+        }
+
+        .animate-scroll-bounce {
+          animation: scroll-bounce 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+        }
+
+        /* Prevent any transforms on the scroll indicator */
+        .bottom-fixed {
+          transform: none !important;
         }
       `}</style>
-    </div>
+    </PageTransition>
   )
 } 

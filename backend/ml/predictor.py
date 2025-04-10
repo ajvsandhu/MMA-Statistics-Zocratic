@@ -8,7 +8,7 @@ Uses fighter stats and recent performance to make predictions.
 import os
 import logging
 import numpy as np
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, List
 import joblib
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
@@ -25,6 +25,7 @@ class FighterPredictor:
         """Initialize the fight predictor."""
         self.model = None
         self.scaler = None
+        self.feature_names: List[str] = []
         self._load_model()
     
     def _load_model(self) -> bool:
@@ -41,6 +42,8 @@ class FighterPredictor:
                     if isinstance(model_data, dict):
                         self.model = model_data.get('model')
                         self.scaler = model_data.get('scaler')
+                        self.feature_names = model_data.get('feature_names', [])
+                        logger.info(f"Model loaded successfully with {len(self.feature_names)} features")
                         return True
             
             # If no model found, create a new one
@@ -51,6 +54,8 @@ class FighterPredictor:
                 random_state=42
             )
             self.scaler = StandardScaler()
+            self.feature_names = []
+            logger.warning("No model found, initialized a new model")
             return False
             
         except Exception as e:

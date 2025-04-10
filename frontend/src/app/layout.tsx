@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeProvider } from "@/lib/theme-provider";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { MainNav } from "@/components/main-nav";
 import { Toaster } from "@/components/ui/toaster";
 import { PageBackground } from "@/components/page-background";
 import { ScrollbarManager } from "@/components/scrollbar-manager";
+import { PageTransitionsProvider } from "@/components/page-transitions-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,6 +22,15 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.zocraticmma.com'),
   title: "Zocratic MMA",
   description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/icon.png', sizes: '192x192' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180' },
+    ],
+  },
   openGraph: {
     title: "Zocratic MMA",
     description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
@@ -59,7 +69,7 @@ function SiteHeader() {
             <MainNav />
             <div className="flex flex-1 items-center justify-end">
               <div className="relative">
-                <ThemeToggle />
+                <ThemeSwitcher />
               </div>
             </div>
           </div>
@@ -78,6 +88,18 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                const theme = localStorage.getItem('zocratic-ui-theme') || 'dark';
+                document.documentElement.classList.remove('light', 'dark', 'theme-teal', 'theme-purple', 'theme-fire', 'theme-huemint', 'theme-crimson');
+                document.documentElement.classList.add(theme);
+                document.documentElement.style.colorScheme = theme === 'dark' || theme.startsWith('theme-') ? 'dark' : 'light';
+              } catch (e) {}
+            })();
+          `
+        }} />
         <style>{`
           html, body {
             height: 100%;
@@ -97,16 +119,16 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} scrollbar-hidden`}>
         <ThemeProvider
-          attribute="class"
           defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
+          storageKey="zocratic-ui-theme"
         >
           <PageBackground />
           <SiteHeader />
           <main className="relative min-h-screen pt-24 pb-8">
             <div className="mx-auto max-w-[90rem] px-4">
-              {children}
+              <PageTransitionsProvider>
+                {children}
+              </PageTransitionsProvider>
             </div>
           </main>
           <Toaster />
