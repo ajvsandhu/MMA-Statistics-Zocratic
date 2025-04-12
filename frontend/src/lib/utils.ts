@@ -97,39 +97,6 @@ export const cleanFighterName = (name: string): string => {
 };
 
 /**
- * Formats a fighter's URL-friendly name
- * @param name - The fighter's name
- * @param record - Optional fighter record
- * @returns URL-friendly string
- */
-export const formatFighterUrl = (name: string, record?: string): string => {
-  // Clean the name but preserve original casing
-  const cleanName = name
-    .trim()                // Remove leading/trailing spaces
-    .replace(/\s+/g, ' '); // Normalize spaces
-  
-  // URL encode the name
-  const encodedName = encodeURIComponent(cleanName);
-  
-  if (record) {
-    // Clean the record and ensure it has the full format (W-L-D)
-    const cleanRecord = record
-      .replace(/[()]/g, '')  // Remove parentheses
-      .trim();               // Remove leading/trailing spaces
-    
-    // Split the record into wins, losses, draws
-    const [wins = '0', losses = '0', draws = '0'] = cleanRecord.split('-');
-    
-    // Combine with all three numbers
-    const fullRecord = `${wins}-${losses}-${draws}`;
-    
-    return `${encodedName}-${fullRecord}`;
-  }
-  
-  return encodedName;
-};
-
-/**
  * Validates fighter data
  * @param fighter - The fighter object to validate
  * @returns Boolean indicating if the fighter data is valid
@@ -195,3 +162,75 @@ export function useIsMobile() {
   
   return isMobile
 }
+
+/**
+ * Creates a clean URL slug for a fighter
+ * @param name - The fighter's full name with record
+ * @returns A clean URL-friendly slug
+ */
+export const createFighterSlug = (name: string): string => {
+  // Remove any " - N/A" or weight class information after the record
+  const cleanedName = name.replace(/ - .*$/, '');
+  
+  // Extract name and record parts
+  const nameParts = cleanedName.match(/^(.*?)\s*\(([^)]*)\)/);
+  
+  if (!nameParts) {
+    // If no record found, just slugify the name
+    return name.toLowerCase()
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-')     // Replace spaces with hyphens
+      .replace(/-+/g, '-')      // Replace multiple hyphens with single ones
+      .trim();
+  }
+  
+  const fighterName = nameParts[1].trim();
+  const record = nameParts[2].trim();
+  
+  // Create slug from name
+  const nameSlug = fighterName.toLowerCase()
+    .replace(/[^\w\s-]/g, '')  // Remove special characters
+    .replace(/\s+/g, '-')      // Replace spaces with hyphens
+    .replace(/-+/g, '-')       // Replace multiple hyphens with single ones
+    .trim();
+  
+  // Clean up record for URL
+  const recordSlug = record
+    .replace(/\s+/g, '')       // Remove spaces
+    .replace(/\(|\)/g, '')     // Remove parentheses
+    .toLowerCase();
+  
+  // Combine name and record for the final slug
+  return `${nameSlug}-${recordSlug}`;
+};
+
+/**
+ * Parses a fighter slug back into components
+ * @param slug - The URL slug to parse
+ * @returns An object with name and record
+ */
+export const parseFighterSlug = (slug: string): { name: string, record: string } => {
+  // Find where the record starts (pattern looking for numbers-numbers-numbers at the end)
+  const recordMatch = slug.match(/(.*)-(\d+-\d+-\d+(?:\d+nc)?)$/);
+  
+  if (!recordMatch) {
+    // If no record pattern found, just convert hyphens back to spaces
+    return {
+      name: slug.replace(/-/g, ' '),
+      record: ''
+    };
+  }
+  
+  const nameSlug = recordMatch[1];
+  const recordSlug = recordMatch[2];
+  
+  // Convert name slug back to readable format
+  const name = nameSlug
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
+  
+  // Format record with parentheses
+  const record = `(${recordSlug.replace(/(\d+)nc/, '$1 NC')})`;
+  
+  return { name, record };
+};

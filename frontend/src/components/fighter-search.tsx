@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Check, Search, History, X, Filter } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, useIsMobile, createFighterSlug } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { ENDPOINTS } from "@/lib/api-config"
 import { motion, AnimatePresence } from "framer-motion"
@@ -22,11 +22,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { SimpleSelect } from "@/components/ui/simple-select"
-import { formatFighterUrl } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from 'react'
 import { getAnimationVariants, fadeAnimation } from '@/lib/animations'
-import { useIsMobile } from "@/lib/utils"
 
 interface Fighter {
   name: string;
@@ -237,11 +235,6 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   // Use callback for event handlers
   const handleFighterSelect = React.useCallback((fighterName: string) => {
     try {
-      // Extract the record from the fighter name string
-      const recordMatch = fighterName.match(/\(([^)]+)\)/);
-      const record = recordMatch ? recordMatch[1] : '';
-      const cleanName = fighterName.split('(')[0].trim();
-      
       // Update the UI state
       setShowSuggestions(false);
       setSearchTerm("");
@@ -257,8 +250,9 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         return;
       }
       
-      // Otherwise create the URL-friendly version and navigate
-      const url = `/fighters/${formatFighterUrl(cleanName, record)}`;
+      // Create a clean URL slug for the fighter
+      const slug = createFighterSlug(fighterName);
+      const url = `/fighters/${slug}`;
       
       // Use Next.js router for client-side navigation (no page reload)
       router.push(url);
@@ -268,7 +262,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
     } catch (err) {
       console.error('Error processing fighter selection:', err);
     }
-  }, [onSelectFighter, router, pathname]);
+  }, [onSelectFighter, router, pathname, saveToHistory]);
 
   const handleInputChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;

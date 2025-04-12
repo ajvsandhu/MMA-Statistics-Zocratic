@@ -20,7 +20,7 @@ import {
   Cell,
 } from "recharts"
 import { ErrorBoundary } from "react-error-boundary"
-import { ChevronDown, ChevronUp, X } from "lucide-react"
+import { ChevronDown, ChevronUp, X, AlertCircle, RefreshCw } from "lucide-react"
 import { FighterStats, FightHistory } from "@/types/fighter"
 import { formatDate } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -948,8 +948,11 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
       setError('');
 
       try {
+        // Clean the fighter name to remove any trailing "- N/A" which causes API issues
+        const cleanedFighterName = fighterName.replace(/ - N\/A$/, '');
+        
         // Use fetchWithRetries for robust API calls
-        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(fighterName));
+        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(cleanedFighterName));
         
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'Fighter not found' : `Server error: ${response.status}`);
@@ -1049,7 +1052,10 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
     // We need to create a new function here because fetchFighterData is scoped to the useEffect
     const refetch = async () => {
       try {
-        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(fighterName));
+        // Clean the fighter name to remove any trailing "- N/A" which causes API issues
+        const cleanedFighterName = fighterName.replace(/ - N\/A$/, '');
+        
+        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(cleanedFighterName));
         
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'Fighter not found' : `Server error: ${response.status}`);
@@ -1057,13 +1063,79 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
 
         const data = await response.json();
         
-        // ... rest of the data processing code from fetchFighterData ...
-        // Handle the response the same way as in the original function
-        // ... 
+        // Check if there was an error from the API
+        if (data.status === 'error') {
+          throw new Error(data.detail || 'Error fetching fighter data');
+        }
+        
+        // Check for fight history data
+        if (!data.last_5_fights) {
+          // Try looking for fights under other keys
+          const possibleKeys = ['last_5_fights', 'fights', 'fight_history', 'fightHistory'];
+          for (const key of possibleKeys) {
+            if (data[key] && Array.isArray(data[key]) && data[key].length > 0) {
+              data.last_5_fights = data[key];
+              break;
+            }
+          }
+        }
+        
+        // Map and sanitize fight history data if available
+        const processedFightHistory = Array.isArray(data.last_5_fights) 
+          ? data.last_5_fights.map((fight: Fight) => ({
+              id: fight.id,
+              fighter_name: String(fight.fighter_name || ''),
+              fight_url: String(fight.fight_url || ''),
+              opponent: String(fight.opponent || ''),
+              date: String(fight.date || fight.fight_date || 'Unknown Date'),
+              fight_date: String(fight.fight_date || fight.date || 'Unknown Date'),
+              opponent_name: String(fight.opponent_name || fight.opponent || 'Unknown Opponent'),
+              opponent_display_name: String(fight.opponent_display_name || fight.opponent || 'Unknown Opponent'),
+              result: String(fight.result || 'NC'),
+              method: String(fight.method || 'N/A'),
+              round: Number(fight.round || 0),
+              time: String(fight.time || '0:00'),
+              event: String(fight.event || 'Unknown Event'),
+              kd: String(fight.kd || '0'),
+              sig_str: String(fight.sig_str || '0/0'),
+              sig_str_pct: String(fight.sig_str_pct || '0%'),
+              total_str: String(fight.total_str || '0/0'),
+              head_str: String(fight.head_str || '0/0'),
+              body_str: String(fight.body_str || '0/0'),
+              leg_str: String(fight.leg_str || '0/0'),
+              takedowns: String(fight.takedowns || '0/0'),
+              td_pct: String(fight.td_pct || '0%'),
+              ctrl: String(fight.ctrl || '0:00'),
+            }))
+          : [];
 
-        // Complete the implementation as needed - for now just clear the error
-        setIsLoading(false);
-        window.location.reload(); // Simple solution - just reload the page
+        // Properly map API fields to our expected structure
+        const sanitizedData: Record<string, any> = {
+          name: data?.fighter_name || data?.name || fighterName || '',
+          image_url: data?.image_url || DEFAULT_PLACEHOLDER_IMAGE,
+          record: data?.Record || data?.record || DEFAULT_VALUE,
+          height: data?.Height || data?.height || DEFAULT_VALUE,
+          weight: data?.Weight || data?.weight || DEFAULT_VALUE,
+          reach: data?.Reach || data?.reach || DEFAULT_VALUE,
+          stance: data?.STANCE || data?.stance || DEFAULT_VALUE,
+          dob: data?.DOB || data?.dob || '',
+          slpm: data?.SLpM || data?.SLPM || data?.slpm || DEFAULT_VALUE,
+          str_acc: data?.['Str. Acc.'] || data?.str_acc || DEFAULT_PERCENTAGE,
+          sapm: data?.SApM || data?.SAPM || data?.sapm || DEFAULT_VALUE,
+          str_def: data?.['Str. Def'] || data?.str_def || DEFAULT_PERCENTAGE,
+          td_avg: data?.['TD Avg.'] || data?.td_avg || DEFAULT_VALUE,
+          td_acc: data?.['TD Acc.'] || data?.td_acc || DEFAULT_PERCENTAGE,
+          td_def: data?.['TD Def.'] || data?.td_def || DEFAULT_PERCENTAGE,
+          sub_avg: data?.['Sub. Avg.'] || data?.sub_avg || DEFAULT_VALUE,
+          weight_class: data?.weight_class || '',
+          nickname: data?.nickname || '',
+          last_5_fights: processedFightHistory, // Use the processed fight history
+          ranking: data?.ranking || UNRANKED_VALUE,
+          tap_link: data?.tap_link || '',
+        };
+        
+        setStats(sanitizedData as FighterStats);
+        setFightHistory(processedFightHistory);
       } catch (err) {
         console.error('Error refetching fighter:', err);
         setError('Failed to load fighter data. Please try again later.');
@@ -1108,30 +1180,32 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
     return value || fallback;
   };
 
-  // Display error state
+  // Render component based on loading and error states
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="w-12 h-12 mb-4 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        <p className="text-muted-foreground">Loading fighter data...</p>
+      </div>
+    )
+  }
+
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 bg-muted/20 rounded-lg">
-        <h3 className="text-xl font-semibold text-red-500 mb-2">Error Loading Fighter Data</h3>
-        <p className="text-center mb-4">{error}</p>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <AlertCircle className="w-12 h-12 mb-4 text-destructive" />
+        <h3 className="text-xl font-bold mb-2">Error Loading Fighter Data</h3>
+        <p className="text-muted-foreground mb-6">{error}</p>
         <Button 
-          onClick={() => {
-            setIsLoading(true);
-            setError(null);
-            // Use the refetchFighterData function
-            refetchFighterData();
-          }}
-          variant="outline"
+          variant="outline" 
+          onClick={refetchFighterData}
+          className="flex items-center gap-2"
         >
+          <RefreshCw className="w-4 h-4" />
           Retry
         </Button>
       </div>
-    );
-  }
-
-  // Display loading state
-  if (isLoading) {
-    return <div className="p-8 text-center animate-pulse">Loading fighter data...</div>
+    )
   }
 
   if (!stats) {

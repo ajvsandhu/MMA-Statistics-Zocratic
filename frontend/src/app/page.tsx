@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react"
 import { useState, useEffect } from "react"
 import { API_URL, API_VERSION, ENDPOINTS } from "@/lib/api-config"
 import { Badge } from "@/components/ui/badge"
-import { useIsMobile, formatFighterUrl } from "@/lib/utils"
+import { useIsMobile, createFighterSlug } from "@/lib/utils"
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
 
 const FEATURED_FIGHTERS = [
@@ -120,7 +120,7 @@ export default function HomePage() {
               {[...featuredFighters, ...featuredFighters, ...featuredFighters].map((fighter, index) => (
                 <Link 
                   key={index} 
-                  href={`/fighters/${formatFighterUrl(fighter.name, fighter.stat)}`}
+                  href={`/fighters/${createFighterSlug(`${fighter.name} (${fighter.stat})`)}`}
                   className="inline-flex items-center gap-2 mx-4 sm:mx-8 text-foreground/50 hover:text-foreground/90 transition-colors"
                 >
                   <span className="text-sm font-medium">{fighter.name}</span>

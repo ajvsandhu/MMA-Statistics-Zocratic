@@ -4,44 +4,46 @@ import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { FighterSearch } from "@/components/fighter-search"
 import { FighterDetails } from "@/components/fighter-details"
-import { formatFighterUrl } from "@/lib/utils"
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, createFighterSlug } from "@/lib/utils"
 
 function FightersContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [selectedFighter, setSelectedFighter] = useState<string | null>(null)
+  const [isRedirecting, setIsRedirecting] = useState<boolean>(false)
 
-  // Handle initial load and URL changes
+  // Handle initial load and URL changes - maintain backward compatibility with query params
   useEffect(() => {
     const name = searchParams.get('name') || searchParams.get('fighter')
     if (name) {
-      setSelectedFighter(decodeURIComponent(name))
+      // If query parameters are used, redirect to the new slug-based URL
+      const slug = createFighterSlug(name)
+      setIsRedirecting(true)
+      router.replace(`/fighters/${slug}`)
     }
-  }, [searchParams])
+  }, [searchParams, router])
 
   const handleFighterSelect = (name: string) => {
-    // Extract the record from the fighter name string
-    const recordMatch = name.match(/\(([^)]+)\)/);
-    const record = recordMatch ? recordMatch[1] : '';
-    const cleanName = name.split('(')[0].trim();
+    // Create a slug for clean URLs
+    const slug = createFighterSlug(name)
     
-    // Format the URL
-    const url = `/fighters/${formatFighterUrl(cleanName, record)}`;
+    // Navigate to the fighter details page using the slug-based URL
+    router.push(`/fighters/${slug}`)
     
-    // Update the URL without changing the page
-    window.history.pushState({}, '', url);
-    
-    // Update the selected fighter
-    setSelectedFighter(name);
+    // Also update the selected fighter
+    setSelectedFighter(name)
   }
 
-  const handleBack = () => {
-    setSelectedFighter(null)
-    window.history.pushState({}, '', '/fighters')
+  // Show loading state during redirect
+  if (isRedirecting) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    )
   }
 
   return (
