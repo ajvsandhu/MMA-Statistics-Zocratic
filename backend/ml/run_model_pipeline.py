@@ -1,10 +1,13 @@
 """
 MMA Fight Prediction Model Pipeline
 
-This script runs the complete modeling pipeline:
+This script runs the complete modeling pipeline for development and testing:
 1. Training the model with naturally calibrated predictions
 2. Testing the model across different fighter matchup types
 3. Generating a final report on model performance
+
+This is a development utility and not used by the frontend or API.
+It helps with model training, testing, and evaluation during development.
 
 Usage: python -m backend.ml.run_model_pipeline --train --test --plot
 """

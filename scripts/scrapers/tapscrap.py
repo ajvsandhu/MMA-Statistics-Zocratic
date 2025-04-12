@@ -138,23 +138,11 @@ def get_human_headers():
     
     return headers
 
-def human_delay(min_seconds=45, max_seconds=90):
-    """Add a random delay to simulate human behavior."""
-    delay = random.uniform(min_seconds, max_seconds)
-    
-    # Create human-like pauses by splitting the delay into smaller chunks
-    chunks = random.randint(1, 3)
-    for i in range(chunks):
-        chunk_delay = delay / chunks
-        
-        # Display countdown for longer waits
-        if chunk_delay > 10:
-            logger.info(f"Waiting for {chunk_delay:.1f} seconds to avoid rate limiting...")
-            time.sleep(chunk_delay)
-        else:
-            time.sleep(chunk_delay)
-    
-    return delay
+def human_delay(seconds=30):
+    """Add a consistent delay before web requests to avoid rate limiting."""
+    logger.info(f"Waiting {seconds} seconds before next web request...")
+    time.sleep(seconds)
+    return seconds
 
 def reset_progress(force=False):
     """Reset the scraping progress."""
@@ -197,8 +185,7 @@ def safe_request(url, timeout=30, max_retries=3, cooldown_time=180):
             # Get fresh headers for each request
             headers = get_human_headers()
             
-            # Small pre-request delay like a human would have
-            time.sleep(random.uniform(1, 3))
+            # Remove the small pre-request delay since we're using a flat delay before calling this function
             
             logger.info(f"Requesting {url}")
             response = requests.get(url, headers=headers, timeout=actual_timeout)
@@ -293,8 +280,7 @@ def search_fighter(name):
         search_url = f"https://www.tapology.com/search?term={quote_plus(name)}&search=fighters"
         logger.info(f"Searching for {name} at: {search_url}")
         
-        # Wait like a human would before searching
-        human_delay(45, 90)
+        # Web request - delay already added before this function call
         
         # Make the request
         response = safe_request(search_url)
@@ -417,8 +403,7 @@ def get_fighter_details(url):
     if not url.startswith('http'):
         url = f"https://www.tapology.com{url}"
     
-    # Human-like delay before visiting profile
-    human_delay(45, 75)
+    # Web request - delay already added before this function call
     
     # Request the fighter's profile page
     response = safe_request(url)
@@ -520,26 +505,27 @@ def process_fighter(fighter_data):
         logger.info(f"Skipping {fighter_name} - has both link and proper image")
         return True
 
-    # Search for fighter
+    # Search for fighter - add delay before web request
+    human_delay()
     tap_link = search_fighter(fighter_name)
     
     if not tap_link:
         logger.warning(f"Could not find Tapology link for {fighter_name}")
-        # Take an extra long break after a failure
-        human_delay(60, 120)
         return False
     
     # Only get details if we need an image or found a new link
     fighter_details = {}
     if needs_image or (needs_link and tap_link != current_link):
+        # Remove delay after best match selection
         fighter_details = get_fighter_details(tap_link)
     
-    # Update database
+    # Update database - no delay needed for database operations
     image_url = fighter_details.get('image_url')
     result = update_fighter_in_database(fighter_name, tap_link, image_url)
     
-    # Take a longer break after database update
-    human_delay(60, 90)
+    # Add a short delay after database update - vital for completion
+    logger.info(f"Database updated, allowing time for operation to complete...")
+    time.sleep(5)
     
     return result
 
@@ -612,7 +598,7 @@ def main():
         logger.info(f"Fetched {len(all_fighters)} fighters")
         
         # Process in small batches
-        batch_size = min(args.batch_size, 5)  # Cap at 5 for safety
+        batch_size = min(args.batch_size, 10)  # Increased batch size
         success_count = 0
         error_count = 0
         
@@ -624,15 +610,13 @@ def main():
             logger.info(f"\n--- Processing fighter {i+1}/{len(all_fighters)}: {fighter_name} ---")
             
             try:
-                # Check if fighter already has complete data
+                # Check if fighter already has complete data - no delay needed for db check
                 has_complete_data = (fighter.get('tap_link') and 
                                    fighter.get('image_url') and 
                                    fighter.get('image_url') != DEFAULT_IMAGE_URL)
                 
                 if has_complete_data:
                     logger.info(f"Skipping {fighter_name} - already has complete data")
-                    # Use a very short delay for fighters that already have complete data
-                    time.sleep(2)
                     success_count += 1
                 else:
                     # Process fighter that needs data
@@ -641,20 +625,18 @@ def main():
                     else:
                         error_count += 1
                 
-                # Save progress periodically
+                # Save progress periodically - no delay needed
                 if (i + 1) % 5 == 0:
                     save_progress(i, i + 1, success_count, error_count)
                 
-                # Take a longer break after every few fighters to avoid patterns
+                # Take a break after every few fighters to avoid patterns, but only if we made web requests
                 if (i + 1) % batch_size == 0 and not has_complete_data:
                     logger.info(f"Completed batch of {batch_size} fighters. Taking a longer break...")
-                    human_delay(180, 300)  # 3-5 minute break between batches
+                    time.sleep(60)  # 1 minute break between batches
             except Exception as e:
                 logger.error(f"Error processing fighter {fighter_name}: {str(e)}")
                 error_count += 1
-            # Take a long break after an error
-            human_delay(120, 180)
-            continue
+                continue
         
         # Progress update
         progress = (i + 1) / len(all_fighters) * 100

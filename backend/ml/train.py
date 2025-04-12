@@ -6,23 +6,23 @@ and comprehensive evaluation focused on natural probability calibration.
 
 import os
 import logging
+from datetime import datetime
+from typing import Tuple, List, Dict, Any, Optional
+
 import numpy as np
 import pandas as pd
-from typing import Tuple, List, Dict, Any, Optional
 import joblib
-from datetime import datetime
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.calibration import CalibratedClassifierCV
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 from sklearn.metrics import (
     classification_report, brier_score_loss, 
     accuracy_score, roc_auc_score, precision_recall_curve,
     auc as auc_score, confusion_matrix, log_loss
 )
-from sklearn.pipeline import Pipeline
-import matplotlib.pyplot as plt
-from sklearn.calibration import calibration_curve
 
 from backend.api.database import get_db_connection
 from backend.ml.feature_engineering import (
@@ -323,38 +323,20 @@ def main():
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
         
-        # Train models
-        logger.info("Training models with cross-validation")
+        # Train Gradient Boosting model
+        logger.info("Training Gradient Boosting model with cross-validation")
         
-        # Test different models to find the best one
-        models = [
-            ('Gradient Boosting', GradientBoostingClassifier(random_state=42)),
-            ('Random Forest', RandomForestClassifier(random_state=42)),
-        ]
+        # Create the Gradient Boosting model
+        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        model = GradientBoostingClassifier(random_state=42)
         
-        best_model = None
-        best_score = -1
-        best_model_name = None
-        metrics = {}
+        # Evaluate with cross-validation
+        scores = cross_val_score(model, X_train_scaled, y_train, cv=cv, scoring='roc_auc')
+        logger.info(f"Gradient Boosting cross-validation AUC: {scores.mean():.4f} (±{scores.std():.4f})")
         
-        for name, model in models:
-            # Train with cross-validation
-            cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-            scores = cross_val_score(model, X_train_scaled, y_train, cv=cv, scoring='roc_auc')
-            
-            logger.info(f"{name} cross-validation AUC: {scores.mean():.4f} (±{scores.std():.4f})")
-            
-            if scores.mean() > best_score:
-                best_score = scores.mean()
-                best_model_name = name
-        
-        # Train the best model
-        logger.info(f"Training {best_model_name} as the final model")
-        
-        if best_model_name == 'Gradient Boosting':
-            model = GradientBoostingClassifier(n_estimators=100, max_depth=3, random_state=42)
-        else:
-            model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
+        # Train the final model with optimized parameters
+        logger.info("Training final Gradient Boosting model")
+        model = GradientBoostingClassifier(n_estimators=100, max_depth=3, random_state=42)
         
         # Train with the full training set
         model.fit(X_train_scaled, y_train)

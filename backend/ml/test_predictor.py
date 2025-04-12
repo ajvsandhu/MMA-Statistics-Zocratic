@@ -9,15 +9,15 @@ Tests the calibration and quality of predictions across different fighter matchu
 Also validates that predictions are naturally calibrated without extreme values.
 """
 
-import logging
-import argparse
-import numpy as np
-import pandas as pd
-from typing import Dict, List, Tuple, Any, Optional
-import matplotlib.pyplot as plt
-from collections import defaultdict
 import os
 import random
+import logging
+import argparse
+from collections import defaultdict
+from typing import Dict, List, Tuple, Any, Optional
+
+import numpy as np
+import matplotlib.pyplot as plt
 import joblib
 
 from backend.ml.predictor import FighterPredictor
@@ -672,9 +672,6 @@ def test_matchups(model, scaler, feature_names):
         logger.info(f"\nMatchup {idx+1}: {description}")
         logger.info(f"  - Fighter 1 win probability: {fighter1_prob:.2f}")
         logger.info(f"  - Fighter 2 win probability: {fighter2_prob:.2f}")
-        
-        # Removed any assertions about what probabilities "should" be
-        # Let the model make its own predictions based on the data
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Test the MMA Fight Predictor")

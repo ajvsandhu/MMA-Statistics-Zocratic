@@ -16,8 +16,7 @@ from backend.constants import (
     CONFIG_PATH,
     LOG_LEVEL,
     LOG_FORMAT,
-    LOG_DATE_FORMAT,
-    APP_VERSION
+    LOG_DATE_FORMAT
 )
 
 # Configuration Constants
@@ -106,6 +105,7 @@ def update_config(new_config):
             _current_config[section] = values
     
     logger.info("Configuration updated")
+    _save_config()  # Save changes to file
     return get_config()
 
 def reset_config():
@@ -113,6 +113,7 @@ def reset_config():
     global _current_config
     _current_config = deepcopy(DEFAULT_CONFIG)
     logger.info("Configuration reset to defaults")
+    _save_config()  # Save changes to file
     return get_config()
 
 def _save_config() -> None:
@@ -121,6 +122,8 @@ def _save_config() -> None:
     
     This function saves the current configuration to the configured file path,
     creating the necessary directories if they don't exist.
+    
+    Note: This is called internally by update_config and reset_config.
     """
     global _current_config
     

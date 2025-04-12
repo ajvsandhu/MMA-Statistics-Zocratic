@@ -1,12 +1,14 @@
 """
 Enhanced Feature Engineering for MMA Fight Prediction.
 Handles data cleaning, feature extraction, and normalization.
-Adds support for active vs. retired fighter distinction.
+Adds support for active vs. retired fighter distinction and gender-based
+physical differences for realistic matchup predictions.
 """
 
 import re
 import datetime
 from typing import Dict, Any, List, Optional, Tuple
+
 import numpy as np
 from dateutil.parser import parse
 
@@ -309,7 +311,7 @@ def calculate_grappling_stats(recent_fights: List[Dict[str, Any]]) -> Dict[str, 
 
 def is_female_fighter(fighter_data: Dict[str, Any]) -> bool:
     """
-    Determine if a fighter is female based on weight class and other indicators.
+    Determine if a fighter is female based on multiple indicators.
     
     Parameters:
         fighter_data: Dictionary containing fighter attributes
@@ -324,23 +326,44 @@ def is_female_fighter(fighter_data: Dict[str, Any]) -> bool:
         "strawweight", "atomweight"
     ]
     
-    # Common female UFC fighters to use as reference
+    # Known female UFC fighters to use as reference
     known_female_fighters = [
         "amanda nunes", "valentina shevchenko", "ronda rousey", "joanna jedrzejczyk",
         "rose namajunas", "holly holm", "cris cyborg", "weili zhang", "jessica andrade",
         "carla esparza", "miesha tate", "paige vanzant", "julianna pena", "alexa grasso"
     ]
     
-    # Check fighter name
+    # Female-specific terms
+    female_terms = ["she", "her", "woman", "female", "queen", "lioness", "princess"]
+    
+    # Female name patterns
+    female_name_patterns = ["a$", "ie$", "na$", "ey$", "yn$", "sa$"]
+    
+    # Get fighter details
     fighter_name = fighter_data.get('fighter_name', '').lower()
+    nickname = fighter_data.get('Nickname', '').lower() 
+    bio = fighter_data.get('bio', '').lower()
+    weight = fighter_data.get('Weight', '').lower()
+    
+    # Check fighter name
     if any(name in fighter_name for name in known_female_fighters):
         return True
     
     # Check weight class
-    weight = fighter_data.get('Weight', '').lower()
     for weight_class in womens_weight_classes:
         if weight_class in weight:
             return True
+    
+    # Check nickname and bio for gender-specific terms
+    if nickname and any(term in nickname for term in female_terms):
+        return True
+    
+    if bio and any(term in bio for term in female_terms):
+        return True
+    
+    # Check name patterns common in female names
+    if any(re.search(pattern, fighter_name) for pattern in female_name_patterns):
+        return True
     
     # Check weight thresholds (UFC women typically fight at 115, 125, 135, 145)
     try:
@@ -349,6 +372,21 @@ def is_female_fighter(fighter_data: Dict[str, Any]) -> bool:
             return True
     except:
         pass
+    
+    # Height check - average female MMA fighter is under 5'7"
+    height = fighter_data.get('Height', '')
+    height_inches = extract_height_in_inches(height)
+    if height_inches > 0 and height_inches < 67:  # Under 5'7"
+        # Combined with low weight, this is a strong indicator
+        if 'weight_value' in locals() and weight_value > 0 and weight_value < 135:
+            return True
+    
+    # Check record for fights against known female fighters
+    recent_fights = fighter_data.get('recent_fights', [])
+    for fight in recent_fights:
+        opponent = fight.get('opponent', '').lower()
+        if any(name in opponent for name in known_female_fighters):
+            return True
     
     return False
 
@@ -501,47 +539,100 @@ def create_fight_vector(fighter1_features: Dict[str, float],
     # Get all feature names
     feature_names = sorted(set(fighter1_features.keys()).union(set(fighter2_features.keys())))
     
-    # Create the feature vector
+    # Initialize vectors and names
     feature_vector = []
     output_feature_names = []
     
-    # Add gender context features - let the model learn physical differences
+    # Add gender-related features
+    gender_features, gender_names = _create_gender_features(fighter1_features, fighter2_features)
+    feature_vector.extend(gender_features)
+    output_feature_names.extend(gender_names)
+    
+    # Add direct comparison features
+    direct_features, direct_names = _create_direct_comparison_features(
+        fighter1_features, fighter2_features, feature_names, 
+        gender_matchup=gender_features[2]  # Pass the gender_matchup value
+    )
+    feature_vector.extend(direct_features)
+    output_feature_names.extend(direct_names)
+    
+    return np.array(feature_vector), output_feature_names
+
+def _create_gender_features(fighter1_features: Dict[str, float], 
+                          fighter2_features: Dict[str, float]) -> Tuple[List[float], List[str]]:
+    """
+    Create gender-related features for matchup prediction.
+    
+    Parameters:
+        fighter1_features: Dictionary of fighter 1 attributes
+        fighter2_features: Dictionary of fighter 2 attributes
+        
+    Returns:
+        Tuple containing:
+            - List[float]: Gender feature values
+            - List[str]: Names of the gender features
+    """
+    features = []
+    names = []
+    
     # Gender flags
     fighter1_female = fighter1_features.get('is_female', 0.0)
     fighter2_female = fighter2_features.get('is_female', 0.0)
     
     # Add gender features
-    feature_vector.append(fighter1_female)
-    output_feature_names.append('f1_is_female')
+    features.append(fighter1_female)
+    names.append('f1_is_female')
     
-    feature_vector.append(fighter2_female)
-    output_feature_names.append('f2_is_female')
+    features.append(fighter2_female)
+    names.append('f2_is_female')
     
     # Add gender matchup context (0=M vs M, 1=M vs F or F vs M, 2=F vs F)
     gender_matchup = 0
     if fighter1_female == 1.0 and fighter2_female == 1.0:
         gender_matchup = 2  # Female vs Female
     elif fighter1_female == 1.0 or fighter2_female == 1.0:
-        gender_matchup = 1  # Mixed gender (only for training purposes, shouldn't happen in real fights)
+        gender_matchup = 1  # Mixed gender (only for training purposes)
     
-    feature_vector.append(float(gender_matchup))
-    output_feature_names.append('gender_matchup_type')
+    features.append(float(gender_matchup))
+    names.append('gender_matchup_type')
     
     # Add gender advantage feature - males have physical advantage over females
     gender_advantage = 0.0
     
     # If fighter1 is male and fighter2 is female, fighter1 has advantage
     if fighter1_female == 0.0 and fighter2_female == 1.0:
-        gender_advantage = 0.9  # Male has strong advantage over female
+        gender_advantage = 0.9  # Male has advantage over female
     
     # If fighter1 is female and fighter2 is male, fighter2 has advantage
     elif fighter1_female == 1.0 and fighter2_female == 0.0:
         gender_advantage = -0.9  # Female has disadvantage against male
     
-    feature_vector.append(gender_advantage)
-    output_feature_names.append('gender_advantage')
+    features.append(gender_advantage)
+    names.append('gender_advantage')
     
-    # Add all direct features
+    return features, names
+
+def _create_direct_comparison_features(fighter1_features: Dict[str, float],
+                                    fighter2_features: Dict[str, float],
+                                    feature_names: List[str],
+                                    gender_matchup: float) -> Tuple[List[float], List[str]]:
+    """
+    Create direct comparison features between fighters.
+    
+    Parameters:
+        fighter1_features: Dictionary of fighter 1 attributes
+        fighter2_features: Dictionary of fighter 2 attributes
+        feature_names: List of all feature names to process
+        gender_matchup: The gender matchup value (0=M vs M, 1=M vs F or F vs M, 2=F vs F)
+        
+    Returns:
+        Tuple containing:
+            - List[float]: Comparison feature values
+            - List[str]: Names of the comparison features
+    """
+    features = []
+    names = []
+    
     for name in feature_names:
         # Skip gender indicator as we've already processed it
         if name == 'is_female':
@@ -553,30 +644,29 @@ def create_fight_vector(fighter1_features: Dict[str, float],
         # Adjust physical stats based on gender matchups
         if name in ['striking_power', 'striking_differential', 'td_avg', 'sub_avg'] and gender_matchup == 1:
             # For mixed gender fights, adjust strength-related stats
-            if fighter1_female == 1.0:  # Fighter 1 is female
+            if fighter1_features.get('is_female', 0.0) == 1.0:  # Fighter 1 is female
                 f1_value = f1_value * 0.7  # Reduce female power stats
-            elif fighter2_female == 1.0:  # Fighter 2 is female
+            elif fighter2_features.get('is_female', 0.0) == 1.0:  # Fighter 2 is female
                 f2_value = f2_value * 0.7  # Reduce female power stats
         
         # Add individual fighter features
-        feature_vector.append(f1_value)
-        output_feature_names.append(f'f1_{name}')
+        features.append(f1_value)
+        names.append(f'f1_{name}')
         
-        feature_vector.append(f2_value)
-        output_feature_names.append(f'f2_{name}')
+        features.append(f2_value)
+        names.append(f'f2_{name}')
         
         # Add difference features
         diff = f1_value - f2_value
-        feature_vector.append(diff)
-        output_feature_names.append(f'diff_{name}')
+        features.append(diff)
+        names.append(f'diff_{name}')
         
         # Add relative difference for non-zero values
         if abs(f1_value) > 0 and abs(f2_value) > 0:
             rel_diff = diff / max(abs(f1_value), abs(f2_value))
-            feature_vector.append(rel_diff)
-            output_feature_names.append(f'rel_diff_{name}')
         else:
-            feature_vector.append(0.0)
-            output_feature_names.append(f'rel_diff_{name}')
+            rel_diff = 0.0
+        features.append(rel_diff)
+        names.append(f'rel_diff_{name}')
     
-    return np.array(feature_vector), output_feature_names 
+    return features, names 
