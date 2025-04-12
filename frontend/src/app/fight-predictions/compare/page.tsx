@@ -391,14 +391,19 @@ export default function ComparePage() {
           )}>
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${width1}%` }}
+              animate={{ width: width1 > 0 ? `calc(${width1}% - 2px)` : '0%' }}
               transition={{ duration: 0.5, ease: "easeOut" }}
               className={cn(
-                "absolute top-0 left-0 h-full rounded-l-md opacity-10",
+                "absolute top-0 h-full opacity-10",
                 color1.includes("green") ? "bg-green-500" : 
                 color1.includes("red") ? "bg-red-500" : 
                 "bg-yellow-500"
               )}
+              style={{ 
+                left: width1 > 0 ? '2px' : '0',
+                width: width1 > 0 ? `calc(${width1}% - 2px)` : '0%',
+                borderRadius: width1 > 0 ? '4px' : '0'
+              }}
             />
             <div className="relative flex items-center justify-center">
               <motion.div 
@@ -437,14 +442,19 @@ export default function ComparePage() {
           )}>
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${width2}%` }}
+              animate={{ width: width2 > 0 ? `calc(${width2}% - 2px)` : '0%' }}
               transition={{ duration: 0.5, ease: "easeOut" }}
               className={cn(
-                "absolute top-0 right-0 h-full rounded-r-md opacity-10",
+                "absolute top-0 h-full opacity-10",
                 color2.includes("green") ? "bg-green-500" : 
                 color2.includes("red") ? "bg-red-500" : 
                 "bg-yellow-500"
               )}
+              style={{ 
+                right: width2 > 0 ? '2px' : '0',
+                width: width2 > 0 ? `calc(${width2}% - 2px)` : '0%',
+                borderRadius: width2 > 0 ? '4px' : '0'
+              }}
             />
             <div className="relative flex items-center justify-center">
               <motion.div 
