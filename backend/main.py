@@ -19,6 +19,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
 
+# Added imports for new ML components and utilities
+import pandas as pd
+import numpy as np
+from datetime import datetime, timezone
+from backend.ml_new.utils.data_loader import DataLoader
+from backend.ml_new.models.trainer import UFCTrainer
+from backend.ml_new.utils.advanced_features import FighterProfiler, MatchupAnalyzer
+from backend.ml_new.config.settings import DATA_DIR
+
 from backend.constants import (
     APP_TITLE, 
     APP_DESCRIPTION, 
@@ -32,7 +41,6 @@ from backend.constants import (
 )
 from backend.utils import sanitize_json
 from backend.api.database import get_db_connection, test_connection
-from backend.ml.predictor import FighterPredictor
 from backend.api.routes import fighters, predictions
 
 # Configure logging
@@ -46,8 +54,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Global predictor instance
-predictor = None
+# Removed old global predictor instance
+# predictor = None
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -56,16 +64,15 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
     # Log startup
-    logger.info("Starting UFC Fighter Prediction API")
-    
-    # Create FastAPI app
+    logger.info("--- Starting UFC Fighter Prediction API ---")
     logger.info(f"Initializing {APP_TITLE} v{APP_VERSION}")
     
-    # Setup model and database
-    await setup_dependencies()
+    # Setup ML components and database connection
+    logger.info("Setting up dependencies (DB Connection & ML Components)...")
+    await setup_dependencies(app) # Pass app to store state
     
     # Log startup complete
-    logger.info("Application startup complete")
+    logger.info("--- Application startup complete ---")
     
     # Add rate limiter to the application
     app.state.limiter = limiter
@@ -74,33 +81,72 @@ async def lifespan(app: FastAPI):
     yield
     
     # Cleanup on shutdown
-    logger.info("Application shutting down...")
+    logger.info("--- Application shutting down... ---")
 
-async def setup_dependencies():
-    """Setup required dependencies like model and database"""
-    global predictor
-    # Load model with multiple attempts
-    model_loaded = False
-    try:
-        for attempt in range(3):  # Try up to 3 times
-            logger.info(f"Loading model attempt {attempt+1}/3...")
-            predictor = FighterPredictor()
-            if predictor.model is not None:
-                logger.info("Model loaded successfully!")
-                model_loaded = True
-                break
-            else:
-                logger.warning("Model loading failed. Retrying...")
-        
-        if not model_loaded:
-            logger.error("All model loading attempts failed.")
-    except Exception as e:
-        logger.error(f"Unexpected error loading model on startup: {str(e)}")
-        logger.error(traceback.format_exc())
-    
-    # Test database connection
+async def setup_dependencies(app: FastAPI):
+    """Load ML components and test DB connection, store in app.state."""
+    # Initialize state variables
+    app.state.data_loader = None
+    app.state.profiler = None
+    app.state.analyzer = None
+    app.state.trainer = None
+    ml_components_loaded = False
     db_connected = False
+
     try:
+        logger.info("--- Loading ML Components --- ")
+        # 1. Load DataLoader
+        logger.info("Loading DataLoader...")
+        app.state.data_loader = DataLoader()
+        logger.info("DataLoader loaded.")
+
+        # 2. Load Data using DataLoader
+        logger.info("Loading fighters and fights data...")
+        fighters_df = app.state.data_loader.load_fighters()
+        fights_df = app.state.data_loader.load_fights()
+        logger.info(f"Loaded {len(fighters_df)} fighters and {len(fights_df)} fights.")
+        
+        # Preprocess fights_df date column (important for profiler/analyzer)
+        logger.info("Preprocessing fight dates...")
+        fights_df['fight_date'] = pd.to_datetime(fights_df['fight_date'], errors='coerce')
+        if fights_df['fight_date'].dt.tz is None:
+            fights_df['fight_date'] = fights_df['fight_date'].dt.tz_localize(timezone.utc)
+        else:
+            fights_df['fight_date'] = fights_df['fight_date'].dt.tz_convert(timezone.utc)
+        fights_df.dropna(subset=['fight_date'], inplace=True) # Drop rows missing critical date info
+        logger.info("Fight dates preprocessed.")
+
+        # 3. Load Profiler & Analyzer
+        logger.info("Initializing FighterProfiler...")
+        app.state.profiler = FighterProfiler(fighters_df, fights_df)
+        logger.info("FighterProfiler initialized.")
+        logger.info("Initializing MatchupAnalyzer...")
+        app.state.analyzer = MatchupAnalyzer(app.state.profiler, fights_df)
+        logger.info("MatchupAnalyzer initialized.")
+
+        # 4. Load Model Trainer
+        logger.info("Initializing UFCTrainer...")
+        app.state.trainer = UFCTrainer()
+        model_path = os.path.join(DATA_DIR, 'advanced_leakproof_model.pkl')
+        logger.info(f"Loading model from {model_path}...")
+        app.state.trainer.load_model(model_path)
+        logger.info("UFCTrainer initialized and model loaded.")
+        if app.state.trainer.features is None:
+            logger.warning("Loaded model does not contain feature names.")
+        else:
+            logger.info(f"Model expects {len(app.state.trainer.features)} features.")
+            
+        ml_components_loaded = True
+        logger.info("--- ML Components Loaded Successfully ---")
+
+    except Exception as e:
+        logger.error(f"!!! Error loading ML components: {str(e)} !!!", exc_info=True)
+        # Allow app to start, but predictions will fail
+        ml_components_loaded = False 
+
+    # Test database connection
+    try:
+        logger.info("--- Checking Database Connection --- ")
         for attempt in range(3):  # Try up to 3 times
             logger.info(f"Checking database connection attempt {attempt+1}/3...")
             if test_connection():
@@ -112,14 +158,13 @@ async def setup_dependencies():
                 time.sleep(2)  # Wait a bit before retrying
         
         if not db_connected:
-            logger.error("All database connection attempts failed.")
+            logger.error("!!! All database connection attempts failed. !!!")
     except Exception as e:
-        logger.error(f"Error checking database connection: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(f"!!! Error checking database connection: {str(e)} !!!", exc_info=True)
+        db_connected = False
     
     # Log dependency status
-    logger.info(f"Dependencies initialized - Model loaded: {model_loaded}, Database connected: {db_connected}")
-    return model_loaded, db_connected
+    logger.info(f"--- Dependency Status: ML Loaded = {ml_components_loaded}, DB Connected = {db_connected} ---")
 
 # Create FastAPI app
 app = FastAPI(
@@ -217,18 +262,32 @@ def read_root():
         return {"status": "error", "message": str(e)}
 
 @app.get("/health")
-def health_check():
+def health_check(request: Request): # Pass request to access app.state
     """Health check endpoint - returns status of model and database"""
-    # Do basic checks
-    model = predictor.model is not None
+    # Check ML components loaded via app.state
+    model_loaded = (request.app.state.trainer is not None and 
+                    request.app.state.trainer.model is not None)
+    analyzer_loaded = request.app.state.analyzer is not None
+    profiler_loaded = request.app.state.profiler is not None
+    data_loader_loaded = request.app.state.data_loader is not None
+    all_ml_loaded = model_loaded and analyzer_loaded and profiler_loaded and data_loader_loaded
+    
+    # Check DB
     db_connected = test_connection()
     
     response_data = {
-        "status": "healthy" if model and db_connected else "degraded",
-        "model_loaded": bool(model),
+        "status": "healthy" if all_ml_loaded and db_connected else "degraded",
+        "ml_components_loaded": {
+            "model": model_loaded,
+            "analyzer": analyzer_loaded,
+            "profiler": profiler_loaded,
+            "data_loader": data_loader_loaded
+        },
         "database_connected": db_connected
     }
-    return sanitize_json(response_data)
+    # Use the existing sanitize_json if needed, or return directly
+    # return sanitize_json(response_data) 
+    return response_data # Direct return is fine for this structure
 
 # Add exception handlers for better error responses
 @app.exception_handler(Exception)

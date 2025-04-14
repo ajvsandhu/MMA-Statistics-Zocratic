@@ -195,39 +195,45 @@ export default function ComparePage() {
         return;
       }
 
-      const fighter1Prob = Number(data.fighter1?.probability || 0);
-      const fighter2Prob = Number(data.fighter2?.probability || 0);
-      
-      const totalProb = fighter1Prob + fighter2Prob;
-      const normalizedFighter1Prob = totalProb > 0 ? Math.round((fighter1Prob / totalProb) * 100) : 50;
-      const normalizedFighter2Prob = totalProb > 0 ? Math.round((fighter2Prob / totalProb) * 100) : 50;
+      // Access data directly from the new API response structure
+      const winnerName: string = data.predicted_winner;
+      const confidencePercent: number = data.confidence_percent;
+      const f1ProbPercent: number = data.fighter1_win_probability_percent;
+      const f2ProbPercent: number = data.fighter2_win_probability_percent;
 
+      // Determine loser based on winner (assuming fighter names are consistent)
+      const loserName = winnerName === cleanFighter1 ? cleanFighter2 : cleanFighter1;
+      const loserProbPercent = winnerName === cleanFighter1 ? f2ProbPercent : f1ProbPercent;
+
+      // Construct the prediction state object, mapping new keys to the structure the UI likely expects
+      // Ensure the Prediction type definition matches this structure
       const validatedPrediction: Prediction = {
-        winner: data.winner?.name || data.winner,
-        loser: data.loser?.name || data.loser,
-        winner_probability: Math.max(normalizedFighter1Prob, normalizedFighter2Prob),
-        loser_probability: Math.min(normalizedFighter1Prob, normalizedFighter2Prob),
-        prediction_confidence: data.prediction_confidence || Math.max(normalizedFighter1Prob, normalizedFighter2Prob),
-        model_version: data.model_version || '1.0',
-        head_to_head: {
-          fighter1_wins: data.head_to_head?.fighter1_wins || 0,
-          fighter2_wins: data.head_to_head?.fighter2_wins || 0,
-          last_winner: data.head_to_head?.last_winner || '',
-          last_method: data.head_to_head?.last_method || ''
+        winner: winnerName, // UI likely expects 'winner'
+        loser: loserName, // Keep structure if UI uses it
+        winner_probability: confidencePercent, // Map confidence to winner_probability for potential UI use
+        loser_probability: loserProbPercent, // Keep structure
+        prediction_confidence: confidencePercent, // Explicit confidence field
+        model_version: '2.0', // Update version display if needed
+        // Head-to-head might not be returned by the new API, provide defaults or remove if unused
+        head_to_head: { 
+          fighter1_wins: 0,
+          fighter2_wins: 0,
+          last_winner: '',
+          last_method: ''
         },
-        fighter1: {
-          name: data.fighter1?.name || cleanFighter1,
-          record: data.fighter1?.record || '',
-          image_url: data.fighter1?.image_url || '',
-          probability: normalizedFighter1Prob,
-          win_probability: `${normalizedFighter1Prob}%`
+        fighter1: { // UI needs these for bars/text
+          name: cleanFighter1,
+          record: '', // Data not returned by new predict endpoint
+          image_url: '', // Data not returned by new predict endpoint
+          probability: f1ProbPercent, // UI likely expects 'probability' for the bar/text
+          win_probability: `${f1ProbPercent}%` // Keep if UI uses this string format
         },
-        fighter2: {
-          name: data.fighter2?.name || cleanFighter2,
-          record: data.fighter2?.record || '',
-          image_url: data.fighter2?.image_url || '',
-          probability: normalizedFighter2Prob,
-          win_probability: `${normalizedFighter2Prob}%`
+        fighter2: { // UI needs these for bars/text
+          name: cleanFighter2,
+          record: '', // Data not returned by new predict endpoint
+          image_url: '', // Data not returned by new predict endpoint
+          probability: f2ProbPercent, // UI likely expects 'probability' for the bar/text
+          win_probability: `${f2ProbPercent}%` // Keep if UI uses this string format
         }
       };
 
@@ -1147,7 +1153,7 @@ export default function ComparePage() {
                       </h4>
                       <div className="flex justify-center items-center gap-2">
                         <span className="text-lg md:text-xl font-semibold">
-                          Confidence: {prediction.prediction_confidence}%
+                          Confidence: {prediction.prediction_confidence.toFixed(2)}%
                         </span>
                       </div>
                     </div>
@@ -1157,7 +1163,7 @@ export default function ComparePage() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>{prediction.fighter1.name}</span>
-                          <span>{prediction.fighter1.win_probability}</span>
+                          <span>{prediction.fighter1.probability.toFixed(2)}%</span>
                         </div>
                         <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <motion.div
@@ -1172,7 +1178,7 @@ export default function ComparePage() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>{prediction.fighter2.name}</span>
-                          <span>{prediction.fighter2.win_probability}</span>
+                          <span>{prediction.fighter2.probability.toFixed(2)}%</span>
                         </div>
                         <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <motion.div

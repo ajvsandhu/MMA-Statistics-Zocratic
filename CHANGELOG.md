@@ -36,3 +36,14 @@
 - Optimized component re-rendering for better performance
 - Added proper error handling for search history
 - Improved search history synchronization between components
+
+## Version 1.04 - Advanced ML Pipeline Implementation
+- Replaced the existing machine learning pipeline (`ml`) with a new, advanced system (`ml_new`).
+- Implemented sophisticated feature engineering (`advanced_features.py`):
+  - Time-weighted fight recency and fighter inactivity penalties.
+  - Comprehensive `FighterProfiler` generating detailed historical performance profiles.
+  - `MatchupAnalyzer` creating comparative features based on striking, grappling, physicals, experience, competition quality, H2H, and common opponents.
+- Enhanced data loading (`DataLoader`) to fetch directly from Supabase, removing potential CSV dependencies.
+- Updated training (`train.py`) and prediction logic (`predict.py`, API endpoint) to utilize the new pipeline, improving prediction accuracy and reliability.
+- Refactored application (`main.py`) to integrate the new ML components during startup.
+- Removed legacy `ml` module dependencies from the core application.

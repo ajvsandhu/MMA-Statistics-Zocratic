@@ -3,26 +3,25 @@ from fastapi.responses import Response, JSONResponse
 import logging
 import traceback
 import json
-from ...ml.predictor import FighterPredictor
-from ...ml.feature_engineering import extract_all_features
+import pandas as pd
+import numpy as np
+from datetime import datetime, timezone
 from ..database import get_db_connection
 from ...constants import (
     LOG_LEVEL,
     LOG_FORMAT,
     LOG_DATE_FORMAT,
-    MODEL_PATH,
-    API_V1_STR,
-    MAX_FIGHTS_DISPLAY
+    API_V1_STR
 )
 from typing import Dict, List, Optional, Any
 import re
 from urllib.parse import unquote
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from ...utils import sanitize_json, set_parent_key
 
 # Set up logging
 logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format=LOG_FORMAT,
     datefmt=LOG_DATE_FORMAT
 )
@@ -30,42 +29,50 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=f"{API_V1_STR}/prediction", tags=["Predictions"])
 
-# Create predictor instance and ensure model is loaded
-predictor = FighterPredictor()
-if not predictor.model:
-    logger.warning("Model not loaded, attempting to load...")
-    try:
-        predictor._load_model()
-    except Exception as e:
-        logger.error(f"Failed to load model: {str(e)}")
-        logger.warning("Application will continue running without prediction capabilities")
-
 class FighterInput(BaseModel):
     fighter1_name: str
     fighter2_name: str
 
-class FighterMatchup(BaseModel):
-    fighter1: str
-    fighter2: str
+class PredictionResponse(BaseModel):
+    fighter1_name: str
+    fighter2_name: str
+    predicted_winner: str
+    confidence_percent: float
+    fighter1_win_probability_percent: float
+    fighter2_win_probability_percent: float
+    status: str = "success"
+    probability_adjusted_for_weight: Optional[bool] = Field(None, description="Indicates if probability was adjusted due to large weight difference (>20 lbs)")
 
-class ModelInfoResponse(BaseModel):
-    model_loaded: bool
-    model_type: Optional[str] = None
-    feature_count: Optional[int] = None
-    important_features: Optional[List[str]] = None
-
-@router.post("/predict")
-async def predict_fight(fight_data: FighterInput):
+@router.post("/predict", response_model=PredictionResponse)
+async def predict_fight(request: Request, fight_data: FighterInput):
     """
-    Predict the winner of a fight between two fighters.
+    Predict the winner of a fight between two fighters using the advanced ML model,
+    ensuring consistency regardless of input order.
     """
     try:
-        logger.info(f"Received prediction request for {fight_data.fighter1_name} vs {fight_data.fighter2_name}")
+        original_fighter1_name = fight_data.fighter1_name
+        original_fighter2_name = fight_data.fighter2_name
+        logger.info(f"Received prediction request for {original_fighter1_name} vs {original_fighter2_name}")
         
-        # Validate fighter names
-        if not fight_data.fighter1_name or not fight_data.fighter2_name:
+        # --- Get Pre-loaded ML Components --- 
+        analyzer = getattr(request.app.state, 'analyzer', None)
+        trainer = getattr(request.app.state, 'trainer', None)
+
+        if not analyzer or not trainer or not trainer.model:
+            logger.error("ML components (analyzer/trainer/model) not loaded properly.")
             raise HTTPException(
-                status_code=400,
+                status_code=503,
+                detail={
+                    "error": "Service Unavailable",
+                    "message": "Prediction service components are not ready.",
+                    "status": "ml_components_unavailable"
+                }
+            )
+
+        # --- Input Validation --- 
+        if not original_fighter1_name or not original_fighter2_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "error": "Invalid input",
                     "message": "Both fighter names are required",
@@ -73,159 +80,128 @@ async def predict_fight(fight_data: FighterInput):
                 }
             )
         
-        # Check if model is loaded
-        if not predictor.model:
-            return {
-                "error": "Model not loaded",
-                "message": "The prediction model is not available",
-                "status": "model_not_loaded"
-            }
+        # --- Canonical Ordering --- 
+        # Sort names alphabetically to ensure consistent feature generation order
+        ordered_names = sorted([original_fighter1_name, original_fighter2_name])
+        canonical_f1_name = ordered_names[0]
+        canonical_f2_name = ordered_names[1]
+        # Track if the original order was swapped relative to canonical order
+        order_swapped = original_fighter1_name != canonical_f1_name
+        logger.info(f"Using canonical order for prediction: {canonical_f1_name} vs {canonical_f2_name}. Original order swapped: {order_swapped}")
+        # --- End Canonical Ordering --- 
         
-        # Get database connection
-        db = get_db_connection()
-        if not db:
+        context_date = pd.Timestamp.now(tz=timezone.utc)
+
+        # --- Feature Generation (using canonical names) --- 
+        logger.info(f"Generating features for {canonical_f1_name} vs {canonical_f2_name}...")
+        features_dict = analyzer.get_prediction_features(canonical_f1_name, canonical_f2_name, context_date)
+        
+        if not features_dict:
+            logger.error(f"Could not generate features. Check if fighters '{original_fighter1_name}' and '{original_fighter2_name}' exist in the loaded data.")
             raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": "Database error",
-                    "message": "Could not connect to database",
-                    "status": "database_error"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={ 
+                    "error": "Feature Generation Failed", 
+                    "message": f"Could not generate features. One or both fighters ('{original_fighter1_name}', '{original_fighter2_name}') might not be found in the dataset used by the model.", 
+                    "status": "feature_generation_error"
                 }
             )
-        
-        # Get fighter data
-        fighter1_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter1_name).execute()
-        fighter2_data = db.table("fighters").select("*").ilike("fighter_name", fight_data.fighter2_name).execute()
-        
-        if not fighter1_data.data:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": "Fighter not found",
-                    "message": f"Could not find fighter: {fight_data.fighter1_name}",
-                    "status": "fighter_not_found"
-                }
-            )
-        
-        if not fighter2_data.data:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "error": "Fighter not found",
-                    "message": f"Could not find fighter: {fight_data.fighter2_name}",
-                    "status": "fighter_not_found"
-                }
-            )
-        
-        # Get recent fights for both fighters
-        fighter1_fights = db.table("fighter_last_5_fights").select("*")\
-            .eq("fighter_name", fighter1_data.data[0]['fighter_name'])\
-            .order('fight_date', desc=True)\
-            .limit(5)\
-            .execute()
             
-        fighter2_fights = db.table("fighter_last_5_fights").select("*")\
-            .eq("fighter_name", fighter2_data.data[0]['fighter_name'])\
-            .order('fight_date', desc=True)\
-            .limit(5)\
-            .execute()
+        # Get Weights (still based on canonical feature dict)
+        f1_weight = features_dict.get('f1_weight', 0.0) # Corresponds to canonical_f1
+        f2_weight = features_dict.get('f2_weight', 0.0) # Corresponds to canonical_f2
             
-        # Add recent fights to fighter data
-        fighter1_data.data[0]['recent_fights'] = fighter1_fights.data if fighter1_fights.data else []
-        fighter2_data.data[0]['recent_fights'] = fighter2_fights.data if fighter2_fights.data else []
+        # --- Prepare DataFrame for Model --- 
+        prediction_df = pd.DataFrame([features_dict])
         
-        # Make prediction
-        prediction = predictor.predict_winner(fighter1_data.data[0]['fighter_name'], fighter2_data.data[0]['fighter_name'])
-        
-        if not prediction or "error" in prediction:
+        model_features = trainer.features
+        if model_features is None:
+            logger.error("Model feature names are missing from the loaded trainer object.")
             raise HTTPException(
                 status_code=500,
                 detail={
-                    "error": "Prediction failed",
-                    "message": prediction.get("error", "Unknown prediction error"),
-                    "status": "prediction_error"
+                    "error": "Internal Server Error",
+                    "message": "Model configuration error: Feature names not found.",
+                    "status": "model_config_error"
                 }
             )
+            
+        for col in model_features:
+            if col not in prediction_df.columns:
+                prediction_df[col] = 0.0
+        prediction_df = prediction_df[model_features]
         
-        # Format response
-        response = {
-            "fighter1": {
-                "name": fighter1_data.data[0]['fighter_name'],
-                "record": fighter1_data.data[0].get("Record", "0-0-0"),
-                "image_url": fighter1_data.data[0].get("image_url"),
-                "probability": prediction["fighter1_probability"]
-            },
-            "fighter2": {
-                "name": fighter2_data.data[0]['fighter_name'],
-                "record": fighter2_data.data[0].get("Record", "0-0-0"),
-                "image_url": fighter2_data.data[0].get("image_url"),
-                "probability": prediction["fighter2_probability"]
-            },
-            "winner": {
-                "name": prediction["winner"],
-                "probability": prediction["winner_probability"]
-            },
-            "status": "success"
-        }
+        if prediction_df.isna().any().any():
+            logger.warning("NaN values found in features before prediction. Filling with 0.")
+            prediction_df = prediction_df.fillna(0.0)
+        if np.isinf(prediction_df).any().any():
+             logger.warning("Infinite values found in features before prediction. Replacing with 0.")
+             prediction_df.replace([np.inf, -np.inf], 0.0, inplace=True)
+
+        # --- Initial Model Prediction (based on canonical order) --- 
+        logger.info("Making initial prediction (canonical order)...")
+        probability_canonical_f1_model = trainer.predict_proba(prediction_df)[0][1] # Prob of canonical F1 winning
         
-        logger.info(f"Prediction successful: {response}")
-        return response
+        # --- Apply Weight Adjustment (based on canonical weights) --- 
+        weight_diff = abs(f1_weight - f2_weight)
+        weight_threshold = 20.0 
+        probability_adjusted = False
+        probability_canonical_f1_adjusted = probability_canonical_f1_model # Start with model prediction
+        
+        if weight_diff > weight_threshold:
+            probability_adjusted = True
+            excess_weight = weight_diff - weight_threshold
+            k = 0.15 
+            weight_impact = 1 / (1 + np.exp(-k * excess_weight)) 
+            
+            if f1_weight > f2_weight: # Canonical F1 is heavier
+                probability_canonical_f1_adjusted = probability_canonical_f1_model + (1 - probability_canonical_f1_model) * (2 * weight_impact - 1) if weight_impact > 0.5 else probability_canonical_f1_model
+                logger.warning(f"Adjusting probability for F1 (Heavier): Diff={weight_diff:.1f} lbs. Initial P={probability_canonical_f1_model:.3f}, Adjusted P={probability_canonical_f1_adjusted:.3f}")
+            else: # Canonical F2 is heavier
+                probability_canonical_f1_adjusted = probability_canonical_f1_model * (1 - (2 * weight_impact - 1)) if weight_impact > 0.5 else probability_canonical_f1_model
+                logger.warning(f"Adjusting probability for F2 (Heavier): Diff={weight_diff:.1f} lbs. Initial P={probability_canonical_f1_model:.3f}, Adjusted P={probability_canonical_f1_adjusted:.3f}")
+
+            probability_canonical_f1_adjusted = max(0.0, min(1.0, probability_canonical_f1_adjusted))
+
+        # --- Re-orient Probability for Original Input Order --- 
+        if order_swapped:
+            # If original F1 was canonical F2, the probability we want is 1 - P(canonical F1)
+            final_probability_for_original_f1 = 1.0 - probability_canonical_f1_adjusted
+            logger.info(f"Original order was swapped. Adjusted probability for {original_fighter1_name}: {final_probability_for_original_f1:.3f}")
+        else:
+            # Original F1 was canonical F1, use the probability directly
+            final_probability_for_original_f1 = probability_canonical_f1_adjusted
+            logger.info(f"Original order matched canonical. Adjusted probability for {original_fighter1_name}: {final_probability_for_original_f1:.3f}")
+        # --- End Re-orientation --- 
+        
+        # --- Determine Winner and Confidence (based on original F1's final probability) --- 
+        predicted_winner = original_fighter1_name if final_probability_for_original_f1 >= 0.5 else original_fighter2_name
+        confidence = final_probability_for_original_f1 if predicted_winner == original_fighter1_name else 1.0 - final_probability_for_original_f1
+        
+        # --- Format Response (using original names and re-oriented probabilities) --- 
+        response_data = PredictionResponse(
+            fighter1_name=original_fighter1_name,
+            fighter2_name=original_fighter2_name,
+            predicted_winner=predicted_winner,
+            confidence_percent=round(confidence * 100, 2),
+            fighter1_win_probability_percent=round(final_probability_for_original_f1 * 100, 2),
+            fighter2_win_probability_percent=round((1.0 - final_probability_for_original_f1) * 100, 2),
+            probability_adjusted_for_weight=probability_adjusted 
+        )
+        
+        logger.info(f"Prediction successful for {original_fighter1_name} vs {original_fighter2_name}: Winner {predicted_winner}")
+        return response_data
         
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"Error in prediction endpoint: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(f"Error in prediction endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
-                "error": "Internal server error",
-                "message": f"An unexpected error occurred: {str(e)}",
+                "error": "Internal Server Error",
+                "message": f"An unexpected error occurred during prediction.",
+                "details": str(e),
                 "status": "internal_error"
             }
-        )
-
-@router.get("/model-info")
-async def get_model_info():
-    """Get information about the loaded model."""
-    try:
-        if not predictor.model:
-            return sanitize_json(ModelInfoResponse(model_loaded=False).dict())
-        
-        # Get model type
-        model_type = type(predictor.model).__name__
-        
-        # Get feature count
-        feature_count = len(predictor.feature_names) if predictor.feature_names else 0
-        
-        # Get important features (if available)
-        important_features = None
-        if hasattr(predictor.model, "feature_importances_") and predictor.feature_names:
-            # Create a list of (feature_name, importance) tuples
-            feature_importances = [(predictor.feature_names[i], predictor.model.feature_importances_[i]) 
-                                  for i in range(len(predictor.feature_names))]
-            
-            # Sort by importance in descending order and take top 10
-            feature_importances.sort(key=lambda x: x[1], reverse=True)
-            important_features = [f[0] for f in feature_importances[:10]]
-        
-        return sanitize_json(
-            ModelInfoResponse(
-                model_loaded=True,
-                model_type=model_type,
-                feature_count=feature_count,
-                important_features=important_features
-            ).dict()
-        )
-    
-    except Exception as e:
-        logger.error(f"Error getting model info: {str(e)}")
-        return sanitize_json(ModelInfoResponse(model_loaded=False).dict())
-
-@router.get("/status")
-async def model_status():
-    """Get the status of the prediction model"""
-    return sanitize_json({
-        "model_loaded": predictor.model is not None,
-        "model_path": MODEL_PATH if predictor.model else None
-    }) 
+        ) 
