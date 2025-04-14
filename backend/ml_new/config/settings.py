@@ -19,9 +19,13 @@ RANDOM_STATE = 42
 TEST_SIZE = 0.2
 VAL_SIZE = 0.2
 
-# Supabase configuration
-SUPABASE_URL = "https://jjfaidtdhuxmekdznwor.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqZmFpZHRkaHV4bWVrZHpud29yIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Mjg3ODQxNCwiZXhwIjoyMDU4NDU0NDE0fQ._hEy5tjczZoiuR15S0eElSayPvSPUFkI0-IruKA-buA"
+# Supabase configuration - Load from environment variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# Add checks to ensure variables are loaded
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("Supabase URL or Key not found in environment variables. Please check your .env file.")
 
 # Feature configuration
 NUMERICAL_FEATURES = [
