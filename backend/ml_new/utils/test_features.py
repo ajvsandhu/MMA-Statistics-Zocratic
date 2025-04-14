@@ -45,8 +45,8 @@ def fetch_all_data(supabase, table_name: str) -> pd.DataFrame:
 def main():
     """Main function to test the FighterProfiler and MatchupAnalyzer"""
     # Supabase connection
-    url = "https://jjfaidtdhuxmekdznwor.supabase.co"
-    key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpqZmFpZHRkaHV4bWVrZHpud29yIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Mjg3ODQxNCwiZXhwIjoyMDU4NDU0NDE0fQ._hEy5tjczZoiuR15S0eElSayPvSPUFkI0-IruKA-buA"
+    url = 
+    key = 
     
     try:
         # Connect to Supabase
