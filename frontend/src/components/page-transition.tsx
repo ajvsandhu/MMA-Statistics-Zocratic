@@ -32,16 +32,16 @@ export function PageTransition({
   const getVariant = () => {
     switch (variant) {
       case "fade":
-        return getResponsiveVariants(fadeInVariants, isMobile)
+        return getResponsiveVariants(fadeInVariants, { isMobile })
       case "slide-up":
-        return getResponsiveVariants(fadeUpVariants, isMobile)
+        return getResponsiveVariants(fadeUpVariants, { isMobile })
       case "slide-down":
-        return getResponsiveVariants(fadeDownVariants, isMobile)
+        return getResponsiveVariants(fadeDownVariants, { isMobile })
       case "scale":
-        return getResponsiveVariants(scaleUpVariants, isMobile)
+        return getResponsiveVariants(scaleUpVariants, { isMobile })
       case "default":
       default:
-        return getResponsiveVariants(pageVariants, isMobile)
+        return getResponsiveVariants(pageVariants, { isMobile })
     }
   }
 
@@ -69,7 +69,7 @@ export function AnimatedContainer({
   delay?: number
 }) {
   const isMobile = useIsMobile()
-  const variants = getResponsiveVariants(containerVariants, isMobile)
+  const variants = getResponsiveVariants(containerVariants, { isMobile })
   
   // Apply custom delay if provided
   if (delay > 0 && variants.visible) {
@@ -111,19 +111,19 @@ export function AnimatedItem({
   const getVariant = () => {
     switch (variant) {
       case "fadeUp":
-        return getResponsiveVariants(fadeUpVariants, isMobile)
+        return getResponsiveVariants(fadeUpVariants, { isMobile })
       case "fadeDown":
-        return getResponsiveVariants(fadeDownVariants, isMobile)
+        return getResponsiveVariants(fadeDownVariants, { isMobile })
       case "fadeIn":
-        return getResponsiveVariants(fadeInVariants, isMobile)
+        return getResponsiveVariants(fadeInVariants, { isMobile })
       case "slideLeft":
-        return getResponsiveVariants(slideInLeftVariants, isMobile)
+        return getResponsiveVariants(slideInLeftVariants, { isMobile })
       case "slideRight":
-        return getResponsiveVariants(slideInRightVariants, isMobile)
+        return getResponsiveVariants(slideInRightVariants, { isMobile })
       case "scale":
-        return getResponsiveVariants(scaleUpVariants, isMobile)
+        return getResponsiveVariants(scaleUpVariants, { isMobile })
       default:
-        return getResponsiveVariants(fadeUpVariants, isMobile)
+        return getResponsiveVariants(fadeUpVariants, { isMobile })
     }
   }
 
