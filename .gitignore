@@ -87,7 +87,7 @@ ENV/
 *.swo
 
 # Model files and data
-*.pkl
+
 *.h5
 !backend/ml/models/*.joblib
 !backend/ml/models/model_info.joblib
