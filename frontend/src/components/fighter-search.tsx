@@ -235,30 +235,23 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   // Use callback for event handlers
   const handleFighterSelect = React.useCallback((fighterName: string) => {
     try {
-      // Update the UI state
       setShowSuggestions(false);
       setSearchTerm("");
       setSelectedIndex(-1);
       saveToHistory(fighterName);
       
-      // Check the current path to determine if we should navigate to fighter details
       const isComparisonPage = pathname?.includes('/fight-predictions/compare');
       
-      // If we're on the comparison page, just call the callback without navigation
       if (isComparisonPage) {
         onSelectFighter(fighterName);
-        return;
+        return; // Stop here for compare page
       }
       
-      // Create a clean URL slug for the fighter
       const slug = createFighterSlug(fighterName);
       const url = `/fighters/${slug}`;
-      
-      // Use Next.js router for client-side navigation (no page reload)
       router.push(url);
-      
-      // Also call the callback for components that need it
-      onSelectFighter(fighterName);
+      onSelectFighter(fighterName); // Call callback after potential navigation
+
     } catch (err) {
       console.error('Error processing fighter selection:', err);
     }
@@ -507,7 +500,11 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         "cursor-pointer md:transition-colors"
       )}
       onMouseEnter={() => setSelectedIndex(index)}
-      onSelect={() => handleFighterSelect(item)}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        handleFighterSelect(item);
+      }}
+      onSelect={() => handleFighterSelect(item)} 
     >
       {getFighterDisplayElement(item, isHistory)}
     </CommandItem>
@@ -621,7 +618,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         {showSuggestions && (searchTerm || searchHistory.length > 0) && (
           <motion.div
             className={cn(
-              "absolute top-full left-0 right-0 mt-2 z-50",
+              "absolute top-full left-0 right-0 mt-2 z-[60]",
               "bg-background/95 backdrop-blur-xl",
               "border border-white/20 rounded-lg shadow-xl",
               "overflow-hidden"

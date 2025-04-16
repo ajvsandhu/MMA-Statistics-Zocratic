@@ -65,6 +65,26 @@ def get_session():
         thread_local.session.headers.update(REQUEST_HEADERS)
     return thread_local.session
 
+# Helper function for robust date parsing
+def parse_fight_date_robust(date_str: str) -> datetime:
+    """Parse fight date string with multiple formats."""
+    if not date_str or not isinstance(date_str, str):
+        logger.warning("Invalid date string provided for parsing.")
+        return datetime(1900, 1, 1) # Return a very old date
+
+    formats_to_try = [
+        "%b. %d, %Y",  # e.g., "Oct. 26, 2024"
+        "%b %d, %Y",   # e.g., "Oct 26, 2024"
+        "%B %d, %Y",   # e.g., "October 26, 2024"
+    ]
+    for fmt in formats_to_try:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    logger.warning(f"Could not parse date string '{date_str}' with known formats.")
+    return datetime(1900, 1, 1) # Fallback date
+
 # Helper functions to maintain compatibility with old code
 def get_fighters():
     """Get all fighters from the database."""
@@ -846,6 +866,7 @@ def parse_result_and_date(soup, fight_date_fallback=None, fighter_name=None):
 def scrape_fight_page_for_fighter(fight_url: str, fighter_name: str, fallback_date: str = None) -> dict:
     """Scrape a single fight page for a fighter's details."""
     data = {
+        "fight_url": fight_url,
         "result": "N/A",
         "fight_date": "N/A",
         "opponent": "N/A",
@@ -1197,84 +1218,148 @@ def get_fighter_latest_fights(fighter_url, fighter_name, max_fights=MAX_FIGHTS, 
     
     # Get fights (either just most recent or all 5)
     fight_data_list = []
-    for date_str, link in fight_info:
+    links_to_process = fight_info[:1] if recent_only else fight_info
+
+    for date_str, link in links_to_process:
         # Scrape each fight's data
         row_data = scrape_fight_page_for_fighter(link, fighter_name, date_str)
+        # Ensure fight_url is in row_data (scrape_fight_page_for_fighter should handle this, but double check)
+        if 'fight_url' not in row_data or not row_data['fight_url']:
+             row_data['fight_url'] = link # Add it if missing
         logger.info(f"Retrieved fight data: {row_data.get('event')} vs {row_data.get('opponent')}")
         fight_data_list.append(row_data)
-        
+
     return fight_data_list
 
 def update_fighter_latest_fight(fighter_name, fighter_url, recent_only=False):
-    """Get and store either all 5 or just most recent fight for a fighter"""
+    """
+    Get and store fighter's fights in fighter_last_5_fights table.
+    - If recent_only=True: Fetch only the most recent fight, combine with existing DB fights,
+      deduplicate, sort, keep top 5, delete old entries, insert the final 5.
+    - If recent_only=False: Fetch the top 5 fights, delete old entries, insert the new 5.
+    """
     try:
         if recent_only:
             logger.info(f"Updating most recent fight for {fighter_name}")
             
-            # First get their existing fights from the database
+            # 1. Get existing fights from the database
             existing_fights = []
             response = supabase.table('fighter_last_5_fights').select('*').eq('fighter_name', fighter_name).execute()
             if response.data:
                 existing_fights = response.data
             logger.info(f"Found {len(existing_fights)} existing fights for {fighter_name}")
             
-            # Get just their most recent fight
-            new_fights = get_fighter_latest_fights(fighter_url, fighter_name, recent_only=True)
-            if not new_fights:
-                logger.warning(f"No new fights found for {fighter_name}")
-                return False
-            
-            # Sort existing fights by date (newest first)
-            existing_fights.sort(key=lambda x: datetime.strptime(x['fight_date'], '%b. %d, %Y' if '.' in x['fight_date'] else '%b %d, %Y'), reverse=True)
+            # 2. Get just their single most recent fight from the website
+            new_fights_scraped = get_fighter_latest_fights(fighter_url, fighter_name, recent_only=True)
+            if not new_fights_scraped:
+                logger.warning(f"No new fights found for {fighter_name}. No update needed.")
+                return True # Return true as no update was strictly necessary if no new fights
             
             # Combine new fight with existing fights
-            all_fights = new_fights + existing_fights
+            all_fights_combined = new_fights_scraped + existing_fights
             
-            # Take only the 5 most recent fights
-            final_fights = all_fights[:MAX_FIGHTS]
+            # 3. Deduplicate based on fight_url (key identifier for a fight)
+            unique_fights = {}
+            for fight in all_fights_combined:
+                f_url = fight.get('fight_url')
+                if not f_url:
+                    logger.warning(f"Skipping fight due to missing fight_url: {fight}")
+                    continue
+                # If URL already exists, keep the one with the most recent *parsed* date
+                # Or if dates are same/invalid, keep the one encountered first (newly scraped)
+                if f_url in unique_fights:
+                    existing_date = parse_fight_date_robust(unique_fights[f_url].get('fight_date'))
+                    new_date = parse_fight_date_robust(fight.get('fight_date'))
+                    if new_date > existing_date:
+                        unique_fights[f_url] = fight # Replace with newer entry
+                    else:
+                        pass # Keep existing (or first encountered if dates equal)
+                else:
+                    unique_fights[f_url] = fight
+
+            unique_fights_list = list(unique_fights.values())
+            logger.info(f"Found {len(unique_fights_list)} unique fights after combining and deduplicating.")
+
+            # 4. Sort by date (newest first) using the robust parser
+            unique_fights_list.sort(key=lambda x: parse_fight_date_robust(x.get('fight_date', '')), reverse=True)
             
-            # Delete existing fights
-            delete_fighter_fights(fighter_name)
+            # 5. Keep only the top 5 most recent fights
+            final_fights_to_store = unique_fights_list[:MAX_FIGHTS]
+            logger.info(f"Keeping the top {len(final_fights_to_store)} fights.")
+
+            # 6. Delete existing fights for this fighter
+            if not delete_fighter_fights(fighter_name):
+                 logger.error(f"Failed to delete existing fights for {fighter_name}. Aborting update.")
+                 return False
             logger.info(f"Deleted existing fights for {fighter_name}")
             
-            # Store the final set of fights in order (newest first)
-            success_count = 0
-            for fight_data in final_fights:
-                logger.info(f"Storing fight for {fighter_name}: {fight_data['event']} vs {fight_data['opponent']} ({fight_data['fight_date']})")
-                if store_fight_data(fighter_name, fight_data['fight_url'], fight_data['fight_date']):
-                    success_count += 1
-                    logger.info(f"Successfully stored fight")
+            # 7. Prepare and insert the final set of fights
+            validated_fights_to_insert = []
+            for fight_data in final_fights_to_store:
+                fight_data['fighter_name'] = fighter_name # Ensure fighter_name is correct
+                
+                # Validate and fill defaults (reuse logic from store_fight_data)
+                validated_data = validate_and_default_fight_data(fight_data)
+                if validated_data:
+                    # Remove 'id' if it exists from previous DB fetch to allow Supabase auto-increment
+                    validated_data.pop('id', None) 
+                    validated_fights_to_insert.append(validated_data)
                 else:
-                    logger.warning(f"Failed to store fight")
+                    logger.warning(f"Skipping invalid fight data for {fighter_name}: {fight_data}")
+
+            if not validated_fights_to_insert:
+                logger.warning(f"No valid fights to insert for {fighter_name} after validation.")
+                return True # No insertion needed, but not an error state
+
+            logger.info(f"Inserting {len(validated_fights_to_insert)} fights for {fighter_name}...")
+            insert_response = supabase.table('fighter_last_5_fights').insert(validated_fights_to_insert).execute()
+
+            if not insert_response.data:
+                logger.error(f"Failed to insert final fights for {fighter_name}")
+                return False
             
-            logger.info(f"Stored {success_count}/{len(final_fights)} fights for {fighter_name}")
-            return success_count > 0
+            logger.info(f"Successfully stored {len(insert_response.data)} fights for {fighter_name}")
+            return True
             
-        else:
-            # All mode - just get and store all 5 fights
-            logger.info(f"Getting all 5 fights for {fighter_name}")
-            fight_data_list = get_fighter_latest_fights(fighter_url, fighter_name, recent_only=False)
+        else: # recent_only=False (usually called by 'all' or 'fighter' mode)
+            logger.info(f"Getting latest {MAX_FIGHTS} fights for {fighter_name}")
+            fight_data_list = get_fighter_latest_fights(fighter_url, fighter_name, max_fights=MAX_FIGHTS, recent_only=False)
             
             if not fight_data_list:
                 logger.warning(f"No fights found for {fighter_name}")
-                return False
+                return False # Return False as we expected fights in 'all' mode
                 
-            # Remove existing fights for this fighter
-            delete_fighter_fights(fighter_name)
+            # Delete existing fights for this fighter
+            if not delete_fighter_fights(fighter_name):
+                 logger.error(f"Failed to delete existing fights for {fighter_name}. Aborting update.")
+                 return False
             logger.info(f"Deleted existing fights for {fighter_name}")
             
-            # Store all fight data in order (newest first)
-            success_count = 0
+            # Prepare and insert all fight data
+            validated_fights_to_insert = []
             for fight_data in fight_data_list:
-                logger.info(f"Storing fight for {fighter_name}: {fight_data['event']} vs {fight_data['opponent']} ({fight_data['fight_date']})")
-                if store_fight_data(fighter_name, fight_data['fight_url'], fight_data['fight_date']):
-                    success_count += 1
-                    logger.info(f"Successfully stored fight")
-                else:
-                    logger.warning(f"Failed to store fight")
-            
-            logger.info(f"Stored {success_count}/{len(fight_data_list)} fights for {fighter_name}")
-            return success_count > 0
+                 fight_data['fighter_name'] = fighter_name # Ensure fighter_name is correct
+                 validated_data = validate_and_default_fight_data(fight_data)
+                 if validated_data:
+                     # Remove 'id' if it exists (though unlikely here)
+                     validated_data.pop('id', None)
+                     validated_fights_to_insert.append(validated_data)
+                 else:
+                     logger.warning(f"Skipping invalid fight data for {fighter_name}: {fight_data}")
+
+            if not validated_fights_to_insert:
+                logger.warning(f"No valid fights to insert for {fighter_name} after validation.")
+                return True # No insertion needed
+
+            logger.info(f"Inserting {len(validated_fights_to_insert)} fights for {fighter_name}...")
+            insert_response = supabase.table('fighter_last_5_fights').insert(validated_fights_to_insert).execute()
+           
+            if not insert_response.data:
+                logger.error(f"Failed to insert fights for {fighter_name}")
+                return False
+
+            logger.info(f"Stored {len(insert_response.data)} fights for {fighter_name}")
+            return True
         
     except Exception as e:
         logger.error(f"Error updating latest fights for {fighter_name}: {e}")
@@ -1282,85 +1367,216 @@ def update_fighter_latest_fight(fighter_name, fighter_url, recent_only=False):
         traceback.print_exc()
         return False
 
+def validate_and_default_fight_data(fight_details: dict) -> dict | None:
+    """Validates required fields and fills defaults for fight data before insertion."""
+    required_fields = [
+        'fighter_name', 'fight_url', 'result', 'fight_date', 'opponent', 
+        'event', 'method', 'round', 'time', 'kd', 'sig_str', 'sig_str_pct',
+        'total_str', 'takedowns', 'td_pct', 'ctrl', 'head_str', 'body_str', 'leg_str'
+    ]
+
+    # Default values for missing or empty fields
+    default_values = {
+        'kd': '0', 'sig_str': '0 of 0', 'sig_str_pct': '0%', 'total_str': '0 of 0',
+        'takedowns': '0 of 0', 'td_pct': '0%', 'ctrl': '0:00', 'head_str': '0 of 0',
+        'body_str': '0 of 0', 'leg_str': '0 of 0', 'round': '0', 'time': '0:00',
+        'result': 'N/A', 'method': 'N/A', 'opponent': 'N/A', 'event': 'N/A',
+        'fight_date': 'Jan 1, 1900', # A default past date
+        'fight_url': 'N/A'
+    }
+
+    validated_data = fight_details.copy()
+
+    # Fill in missing fields with defaults
+    for field, default in default_values.items():
+        if field not in validated_data or validated_data[field] is None or validated_data[field] == '':
+            validated_data[field] = default
+            # logger.debug(f"Using default value for {field}: {default}") # Optional debug log
+
+    # Check if all required fields are now present and have a value
+    missing_or_empty = [field for field in required_fields if field not in validated_data or validated_data[field] is None or validated_data[field] == '']
+    if missing_or_empty:
+        logger.error(f"Missing or empty required fields for {validated_data.get('fighter_name', 'Unknown')} after defaults: {missing_or_empty}")
+        return None
+    
+    # Specific check for potentially problematic fields if needed
+    if not validated_data['fight_url'] or validated_data['fight_url'] == 'N/A':
+         logger.error(f"Fight URL is missing or invalid for {validated_data.get('fighter_name', 'Unknown')}")
+         return None
+
+    return validated_data
+
 def process_recent_event(num_events=1):
     """Process fighters from the most recent UFC events."""
     logger.info(f"Starting to process fighters from the {num_events} most recent UFC events")
     
-    # Get fighters from Supabase first
+    # Get fighter name to URL mapping from Supabase 'fighters' table
+    fighters_dict = {}
     try:
         response = supabase.table("fighters").select("fighter_name, fighter_url").execute()
-        fighters_dict = {}
         if response.data:
             fighters_dict = {row["fighter_url"]: row["fighter_name"] for row in response.data}
+        else:
+             logger.warning("No fighters found in the 'fighters' table. Will rely on names from event pages.")
     except Exception as e:
-        logger.error(f"Error getting fighters from Supabase: {e}")
-        return
-    
-    total_processed = 0
-    events_processed = 0
-    
-    # Keep track of processed events to avoid duplicates
-    processed_events = set()
-    
-    while events_processed < num_events:
-        # Fetch the most recent event
-        latest_event = fetch_most_recent_event()
-        if not latest_event:
-            logger.error("Failed to fetch the most recent event")
-            break
-        
-        # Unpack the tuple returned by fetch_most_recent_event
-        event_url, event_name, event_date = latest_event
-        
-        # Skip if we've already processed this event
-        if event_url in processed_events:
-            logger.info(f"Already processed event: {event_name}. Moving to next event.")
-            continue
-        
-        processed_events.add(event_url)
-        logger.info(f"Processing event: {event_name} ({event_date}) - {event_url}")
-        
-        # Extract fighters from the event
-        fighter_urls = extract_fighters_from_event(event_url)
-        if not fighter_urls:
-            logger.error(f"No fighters found in event: {event_name}")
-            continue
-        
-        logger.info(f"Found {len(fighter_urls)} fighters in the event")
-        
-        # Process each fighter
-        processed_count = 0
-        for fighter_url in fighter_urls:
-            # Get fighter name from the dictionary
-            fighter_name = fighters_dict.get(fighter_url)
-            if not fighter_name:
-                logger.warning(f"Fighter URL {fighter_url} not found in database. Skipping.")
-                continue
-            
-            # Update the fighter's most recent fight only
-            updated = update_fighter_latest_fight(fighter_name, fighter_url, recent_only=True)
-            
-            if updated:
-                processed_count += 1
-                logger.info(f"Successfully updated most recent fight for {fighter_name}")
-            else:
-                logger.warning(f"Failed to update most recent fight for {fighter_name}")
-        
-        total_processed += processed_count
-        events_processed += 1
-        logger.info(f"Processed {processed_count}/{len(fighter_urls)} fighters from {event_name}")
-        logger.info(f"Total events processed: {events_processed}/{num_events}")
-    
-    logger.info(f"Completed processing {events_processed} events. Total fighters processed: {total_processed}")
+        logger.error(f"Error getting fighters from Supabase: {e}. Will rely on names from event pages.")
+        # Don't return, allow processing with scraped names if possible
 
-def process_recent_events(num_events: int) -> bool:
-    """Process recent events wrapper function"""
-    try:
-        process_recent_event(num_events)
-        return True
-    except Exception as e:
-        logger.error(f"Error processing recent events: {e}")
-        return False
+    total_updated_fighters = 0
+    events_processed = 0
+    processed_event_urls = set() # Keep track of URLs we've added
+    event_urls_to_process = [] # List to hold the final URLs
+
+    # Collect unique event URLs first by iterating through pages
+    current_page_url = EVENT_URL
+    max_pages_to_check = 5 # Limit pages to prevent infinite loops
+    pages_checked = 0
+
+    while len(event_urls_to_process) < num_events and pages_checked < max_pages_to_check:
+        pages_checked += 1
+        logger.info(f"Fetching event page {pages_checked}: {current_page_url}")
+        resp = fetch_url_quietly(current_page_url)
+        if not resp:
+             logger.error(f"Failed to fetch event page: {current_page_url}")
+             break
+        
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Find the main table containing completed events
+        events_table = soup.find("table", class_="b-statistics__table")
+        if not events_table:
+            logger.warning(f"Could not find main events table (b-statistics__table) on page {current_page_url}. Trying other tables.")
+            # Fallback: try any table
+            events_table = soup.find("table") 
+            if not events_table:
+                 logger.error(f"Could not find any table on page {current_page_url}. Skipping page.")
+                 break # Stop if no table found
+
+        rows = events_table.find_all("tr")[1:]  # Skip header row
+        if not rows:
+             logger.warning(f"No event rows found in table on page {current_page_url}")
+
+        found_event_on_page = False
+        for row in rows:
+            # Skip header-like rows sometimes found in body
+            if "b-statistics__table-row_type_first" in row.get("class", []) or not row.find_all("td"):
+                continue
+                
+            # Find the event link within the row
+            link_tag = row.find("a", href=lambda href: href and href.startswith("http://ufcstats.com/event-details/"))
+            if not link_tag:
+                continue # No event link in this row
+            
+            event_url = link_tag["href"].strip()
+            event_name = link_tag.get_text(strip=True)
+            
+            # Check if already processed
+            if event_url in processed_event_urls:
+                 continue
+
+            # Find the date and check if it's in the past
+            date_text = ""
+            date_span = row.find("span", class_="b-statistics__date")
+            if date_span:
+                 date_text = date_span.get_text(strip=True)
+            else:
+                 # Try getting date from second td as fallback
+                 tds = row.find_all("td")
+                 if len(tds) > 1:
+                      date_text = tds[1].get_text(strip=True)
+
+            if not date_text:
+                 logger.warning(f"Could not find date for event: {event_name} ({event_url}). Skipping.")
+                 continue
+
+            try:
+                 event_date_obj = parse_fight_date_robust(date_text)
+                 if event_date_obj > datetime.now():
+                      logger.info(f"Skipping future event: {event_name} ({date_text})")
+                      continue # Skip future events
+            except Exception as e:
+                 logger.warning(f"Error parsing date '{date_text}' for event {event_name}: {e}. Skipping.")
+                 continue
+
+            # If we got here, it's a valid, past event URL not yet processed
+            event_urls_to_process.append(event_url)
+            processed_event_urls.add(event_url)
+            found_event_on_page = True
+            logger.info(f"Collected event {len(event_urls_to_process)}/{num_events}: {event_name} ({date_text}) - {event_url}")
+            
+            if len(event_urls_to_process) >= num_events:
+                 break # Stop collecting once we have enough
+
+        if len(event_urls_to_process) >= num_events:
+            break # Exit outer loop if we have enough events
+
+        # Find link to next page if needed
+        next_page_link = soup.select_one('ul.b-statistics__paginate li.b-statistics__paginate-item a[href*="page=next"]')
+        # Alternative selector if the above fails
+        if not next_page_link:
+            next_page_link = soup.select_one('a.b-button[href*="page=next"]')
+
+        if next_page_link and next_page_link.get('href'):
+             current_page_url = next_page_link['href']
+             logger.info("Moving to next event page.")
+        else:
+             logger.info("No next event page link found or reached page limit.")
+             break # No more pages or hit limit
+
+    logger.info(f"Collected {len(event_urls_to_process)} event URLs to process.")
+    if len(event_urls_to_process) < num_events:
+        logger.warning(f"Could only find {len(event_urls_to_process)} events, requested {num_events}.")
+
+    # Now process the collected event URLs
+    for event_url in event_urls_to_process:
+        # Extract fighter info (name, url) from the event page
+        # Note: extract_fighters_from_event returns list of (name, url) tuples
+        event_fighters_info = extract_fighters_from_event(event_url)
+        if not event_fighters_info:
+            logger.warning(f"No fighters extracted from event: {event_url}")
+            continue
+        
+        event_display_name = event_url.split('/')[-1] # Get a short name for logging
+        logger.info(f"Processing event {event_display_name}: Found {len(event_fighters_info)} fighters/entries.")
+        
+        # Process each fighter found in the event
+        processed_in_event = 0
+        unique_fighter_urls_in_event = set() # Track unique fighter URLs processed *for this specific event*
+
+        for fighter_name_from_event, fighter_url_from_event in event_fighters_info:
+             # Skip if we already processed this fighter URL in this event run
+             if fighter_url_from_event in unique_fighter_urls_in_event:
+                  continue 
+             unique_fighter_urls_in_event.add(fighter_url_from_event)
+
+             # Use the name from the main 'fighters' table mapping if available
+             fighter_name_from_db = fighters_dict.get(fighter_url_from_event)
+             
+             if not fighter_name_from_db:
+                 logger.warning(f"Fighter URL {fighter_url_from_event} found in event {event_display_name} but not in 'fighters' table mapping. Using name from event page: '{fighter_name_from_event}'")
+                 # Use the name scraped directly from the event page as a fallback
+                 fighter_name_to_use = fighter_name_from_event
+                 if not fighter_name_to_use:
+                      logger.error(f"Cannot proceed for fighter URL {fighter_url_from_event} - no name available.")
+                      continue
+             else:
+                 fighter_name_to_use = fighter_name_from_db
+
+             # Update the fighter's last 5 fights table, focusing on the most recent fight
+             logger.info(f"Updating recent fight data for: {fighter_name_to_use} ({fighter_url_from_event})")
+             updated = update_fighter_latest_fight(fighter_name_to_use, fighter_url_from_event, recent_only=True)
+            
+             if updated:
+                 processed_in_event += 1
+                 # logger.info(f"Successfully updated recent fight record for {fighter_name_to_use}") # Can be verbose
+             else:
+                 logger.warning(f"Failed to update recent fight record for {fighter_name_to_use}")
+        
+        total_updated_fighters += processed_in_event
+        events_processed += 1
+        logger.info(f"Processed {processed_in_event}/{len(unique_fighter_urls_in_event)} unique fighters from event {events_processed}/{len(event_urls_to_process)} ({event_display_name})")
+    
+    logger.info(f"Completed processing {events_processed} events. Total unique fighters updated: {total_updated_fighters}")
 
 ###############################################################################
 # MAIN
@@ -1654,7 +1870,7 @@ def main():
             return
             
         # Process recent events
-        if not process_recent_events(args.num_events):
+        if not process_recent_event(args.num_events):
             logger.error("Failed to process recent events")
             return
             

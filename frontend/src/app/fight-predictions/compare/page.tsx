@@ -271,14 +271,10 @@ export default function ComparePage() {
   const FighterCard = memo(({ fighter, onRemove }: { fighter: FighterStats, onRemove: () => void }) => {
     return (
       <div className={cn(
-        "relative rounded-xl overflow-hidden shadow-xl group bg-card border border-primary/10",
-        isMobile ? "aspect-[3/2]" : "aspect-[2/3]"
+        "relative group overflow-hidden rounded-xl bg-card/50 border border-primary/10",
+        "aspect-[4/3] md:aspect-[2/3]"
       )}>
-        {/* Background gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-80 z-10" />
-        
-        {/* Fighter image */}
-        <div className="absolute inset-0">
+        {fighter?.image_url && (
           <div className="absolute inset-0 rounded-xl overflow-hidden">
             <img
               src={fighter.image_url || '/placeholder-fighter.png'}
@@ -287,7 +283,7 @@ export default function ComparePage() {
               loading="eager"
             />
           </div>
-        </div>
+        )}
 
         <div className="absolute inset-0 z-20">
           <Button
@@ -307,18 +303,20 @@ export default function ComparePage() {
             </div>
           )}
 
-          <div className="absolute inset-x-0 bottom-0 p-4">
-            <div className="space-y-1.5 relative">
-              <div className="absolute inset-0 -m-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-80 z-[-1]" />
-              <h3 className="text-lg font-bold text-white leading-tight group-hover:text-primary-foreground transition-colors">
+          <div className={cn(
+            "absolute inset-x-0 bottom-0 p-2 md:p-4 min-h-16 md:min-h-20",
+            "bg-gradient-to-t from-black/90 via-black/70 to-transparent"
+          )}>
+            <div className="space-y-1 md:space-y-1.5 relative z-10">
+              <h3 className="text-base md:text-lg font-bold text-white leading-tight group-hover:text-primary-foreground transition-colors">
                 {fighter.name}
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-sm text-white/90 font-medium">{fighter.record}</p>
+                <p className="text-xs md:text-sm text-white/90 font-medium">{fighter.record}</p>
                 {fighter.weight && (
                   <>
-                    <span className="text-white/50">•</span>
-                    <p className="text-sm text-white/90">{fighter.weight}</p>
+                    <span className="text-white/50 text-xs md:text-sm">•</span>
+                    <p className="text-xs md:text-sm text-white/90">{fighter.weight}</p>
                   </>
                 )}
               </div>
@@ -388,11 +386,11 @@ export default function ComparePage() {
     return (
       <div className="relative group">
         <div className={cn(
-          "grid grid-cols-[1fr,auto,1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg",
+          "grid grid-cols-3 gap-4 py-2 items-center hover:bg-accent/5 rounded-lg",
           isMobile ? "gap-2 py-1.5" : "gap-4 py-2.5"
         )}>
           <div className={cn(
-            "relative",
+            "relative text-center",
             isMobile ? "min-h-[24px]" : "min-h-[32px]"
           )}>
             <motion.div
@@ -443,7 +441,7 @@ export default function ComparePage() {
           </div>
 
           <div className={cn(
-            "relative",
+            "relative text-center",
             isMobile ? "min-h-[24px]" : "min-h-[32px]"
           )}>
             <motion.div
@@ -496,7 +494,7 @@ export default function ComparePage() {
     value1: string;
     value2: string;
   }) => (
-    <div className="grid grid-cols-[1fr,auto,1fr] gap-4 py-2 items-center text-center">
+    <div className="grid grid-cols-3 gap-4 py-2 items-center text-center">
       <div className={cn("text-center font-medium", isMobile ? "text-sm" : "text-base")}>
         {value1}
       </div>
@@ -542,30 +540,87 @@ export default function ComparePage() {
             </div>
           </div>
 
-          {/* Main Content */}
+            {/* === Tablet/Desktop Layout (!isMobile) === */}
+            {!isMobile && (
           <div className={cn(
             "flex-1 overflow-visible",
-            isMobile 
-              ? "flex flex-col space-y-4 max-w-md mx-auto" 
-              : "grid grid-cols-[minmax(300px,320px),minmax(500px,600px),minmax(300px,320px)] gap-8 max-w-7xl mx-auto"
+            "grid md:grid-cols-3 gap-6 lg:gap-8 max-w-7xl mx-auto min-w-0"
           )}>
-            {isMobile ? (
-              <>
-                {/* Mobile Layout */}
+                
+                {/* --- Column 1: Fighter 1 --- */}
+                <div className="flex flex-col min-w-0">
+                   {/* ... Fighter 1 Search + Card ... */}
+                   <div className="bg-primary/10 rounded-lg mb-3 py-2"> <h3 className="text-base font-bold mb-0 text-center">FIGHTER 1</h3> </div>
+                   <div className="relative z-30 fighter-search-1"> <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} searchBarId="fighter1" /> </div>
+                   <div className="mt-4 h-96"> 
+                     <div key={`fighter1-${activeTab}`}>{fighter1 && (<MemoizedFighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />)}</div> 
+                   </div>
+                </div>
+
+                {/* --- Column 2: Stats Comparison --- */}
+                <div className="flex flex-col min-w-0">
+                  {/* VS Badge and Predict Button */}
+                   <div className="flex flex-col items-center mb-4 pt-10">
+                     {fighter1 && fighter2 && (
+                        <>
+                          <div className="flex items-center justify-center"> <motion.div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/90 shadow-sm border border-background/20" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3, delay: 0.2 }}> <span className="text-xs font-semibold text-primary-foreground">VS</span> </motion.div> </div>
+                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }} className="w-[250px] mt-4">
+                            <motion.div whileHover={{ scale: 1.02, boxShadow: "0 0 15px 2px rgba(var(--primary), 0.3)" }} whileTap={{ scale: 0.98 }} className="w-full">
+                              <Button size="default" onClick={handlePredictClick} disabled={isPredicting} className={cn( "w-full shadow-xl relative overflow-hidden py-5", "bg-gradient-to-r from-primary/90 to-primary", "hover:from-primary hover:to-primary/90", "text-primary-foreground transition-all duration-300 rounded-xl" )}>
+                                <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent" initial={{ x: "-100%" }} animate={isPredicting ? { x: ["100%", "-100%"], transition: { repeat: Infinity, duration: 1.5, ease: "linear" } } : { x: "100%" }} />
+                                <div className="relative z-10 flex items-center justify-center"> {isPredicting ? (<> <span className="font-bold text-base">Predicting</span> <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop", times: [0, 0.5, 1] }}>...</motion.span> <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="ml-2"> <Swords className="h-4 w-4" /> </motion.div> </>) : (<> <span className="font-bold text-base">Get Prediction</span> <Swords className="ml-2 h-4 w-4" /> </>)} </div>
+                              </Button>
+                            </motion.div>
+                          </motion.div>
+                        </>
+                      )}
+                   </div>
+                   
+                   {/* Stats Comparison Card */}
+                   <div className="flex-1 w-full">
+                      {fighter1 && fighter2 ? (
+                       <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl w-full">
+                         <CardContent className="p-6">
+                           <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
+                             <TabsList className="w-full grid grid-cols-3 h-12 mb-4 bg-primary/5 p-1 rounded-lg"> <TabsTrigger value="physical" className="text-sm font-medium rounded-md">Physical</TabsTrigger> <TabsTrigger value="striking" className="text-sm font-medium rounded-md">Striking</TabsTrigger> <TabsTrigger value="grappling" className="text-sm font-medium rounded-md">Grappling</TabsTrigger> </TabsList>
+                             <motion.div className="w-full" initial={false} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+                               <TabsContent value="physical" className="mt-0 w-full"> <div className="space-y-3 w-full"> <SimpleComparisonRow label="Height" value1={fighter1.height} value2={fighter2.height} /> <SimpleComparisonRow label="Weight" value1={fighter1.weight} value2={fighter2.weight} /> <SimpleComparisonRow label="Reach" value1={fighter1.reach} value2={fighter2.reach} /> <SimpleComparisonRow label="Stance" value1={fighter1.stance} value2={fighter2.stance} /> <SimpleComparisonRow label="Age" value1={fighter1Age} value2={fighter2Age} /> <SimpleComparisonRow label="Experience" value1={fighter1Experience} value2={fighter2Experience} /> </div> </TabsContent>
+                               <TabsContent value="striking" className="mt-0 w-full"> <div className="space-y-1 w-full"> <ComparisonRow label="Strikes/Min" value1={fighter1.slpm} value2={fighter2.slpm} unit="" /> <ComparisonRow label="Accuracy" value1={fighter1.str_acc} value2={fighter2.str_acc} unit="%" /> <ComparisonRow label="Defense" value1={fighter1.str_def} value2={fighter2.str_def} unit="%" /> <ComparisonRow label="Absorbed/Min" value1={fighter1.sapm} value2={fighter2.sapm} higherIsBetter={false} unit="" /> <ComparisonRow label="Striking Differential" value1={fighter1StrikeDiff} value2={fighter2StrikeDiff} unit="" /> </div> </TabsContent>
+                               <TabsContent value="grappling" className="mt-0 w-full"> <div className="space-y-1 w-full"> <ComparisonRow label="TD/15 Min" value1={fighter1.td_avg} value2={fighter2.td_avg} unit="" /> <ComparisonRow label="TD Accuracy" value1={fighter1.td_acc} value2={fighter2.td_acc} unit="%" /> <ComparisonRow label="TD Defense" value1={fighter1.td_def} value2={fighter2.td_def} unit="%" /> <ComparisonRow label="Sub/15 Min" value1={fighter1.sub_avg} value2={fighter2.sub_avg} unit="" /> <ComparisonRow label="Ground Control" value1={calculateGroundControl(fighter1)} value2={calculateGroundControl(fighter2)} unit="%" /> </div> </TabsContent>
+                             </motion.div>
+                           </Tabs>
+                         </CardContent>
+                       </Card>
+                      ) : (
+                       <div className="flex items-center justify-center h-full"> <div className="text-center"> <div className="text-muted-foreground"> <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" /> <p className="text-sm font-medium"> Select two fighters to compare </p> </div> </div> </div>
+                      )}
+                   </div>
+                </div>
+
+                {/* --- Column 3: Fighter 2 --- */}
+                <div className="flex flex-col min-w-0">
+                   {/* ... Fighter 2 Search + Card ... */}
+                   <div className="bg-primary/10 rounded-lg mb-3 py-2"> <h3 className="text-base font-bold mb-0 text-center">FIGHTER 2</h3> </div>
+                   <div className="relative z-30 fighter-search-2"> <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} searchBarId="fighter2" /> </div>
+                   <div className="mt-4 h-96">
+                     <div key={`fighter2-${activeTab}`}>{fighter2 && (<MemoizedFighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />)}</div> 
+                   </div>
+                </div>
+                
+              </div> // End Tablet/Desktop grid
+            )}
+
+            {/* === Mobile Layout Fallback === */}
+            {isMobile && (
+              <div className="flex flex-col space-y-4 max-w-md mx-auto">
                 <div className="space-y-6 pt-4">
-                  {/* Fighters Side by Side */}
                   <div className="grid grid-cols-2 gap-4 relative">
-                    {/* Fighter 1 */}
                     <div className="flex flex-col">
                       <div className="bg-primary/10 rounded-lg mb-3 py-1.5">
                         <h3 className="text-sm font-bold mb-0 text-center">FIGHTER 1</h3>
                       </div>
                       <div className="relative z-30 fighter-search-1">
-                        <FighterSearch 
-                          onSelectFighter={handleFighter1Select} 
-                          clearSearch={!!fighter1}
-                          searchBarId="fighter1"
-                        />
+                        <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} searchBarId="fighter1" />
                       </div>
                       <div className="mt-3">
                         <div key={`fighter1-${activeTab}`}>
@@ -575,32 +630,19 @@ export default function ComparePage() {
                         </div>
                       </div>
                     </div>
-
-                    {/* VS Badge - Only show when both fighters are selected */}
                     {fighter1 && fighter2 && (
                       <div className="absolute left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2 z-40">
-                        <motion.div 
-                          className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/90 shadow-sm border border-background/20"
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          transition={{ duration: 0.3, delay: 0.2 }}
-                        >
+                        <motion.div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/90 shadow-sm border border-background/20" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3, delay: 0.2 }}>
                           <span className="text-[10px] font-semibold text-primary-foreground">VS</span>
                         </motion.div>
                       </div>
                     )}
-
-                    {/* Fighter 2 */}
                     <div className="flex flex-col">
                       <div className="bg-primary/10 rounded-lg mb-3 py-1.5">
                         <h3 className="text-sm font-bold mb-0 text-center">FIGHTER 2</h3>
                       </div>
                       <div className="relative z-30 fighter-search-2">
-                        <FighterSearch 
-                          onSelectFighter={handleFighter2Select} 
-                          clearSearch={!!fighter2}
-                          searchBarId="fighter2"
-                        />
+                        <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} searchBarId="fighter2" />
                       </div>
                       <div className="mt-3">
                         <div key={`fighter2-${activeTab}`}>
@@ -611,64 +653,17 @@ export default function ComparePage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Predict Button */}
                   {fighter1 && fighter2 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: 0.2 }}
-                      className="w-full mx-auto mt-2"
-                    >
-                      <motion.div
-                        whileHover={{ 
-                          scale: 1.02,
-                          boxShadow: "0 0 15px 2px rgba(var(--primary), 0.3)" 
-                        }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full"
-                      >
-                        <Button
-                          size="default"
-                          onClick={handlePredictClick}
-                          disabled={isPredicting}
-                          className={cn(
-                            "w-full shadow-xl relative overflow-hidden py-5",
-                            "bg-gradient-to-r from-primary/90 to-primary",
-                            "hover:from-primary hover:to-primary/90",
-                            "text-primary-foreground transition-all duration-300 rounded-xl"
-                          )}
-                        >
-                          <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent"
-                            initial={{ x: "-100%" }}
-                            animate={isPredicting ? { 
-                              x: ["100%", "-100%"],
-                              transition: { 
-                                repeat: Infinity, 
-                                duration: 1.5, 
-                                ease: "linear"
-                              }
-                            } : { x: "100%" }}
-                          />
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }} className="w-full mx-auto mt-2">
+                      <motion.div whileHover={{ scale: 1.02, boxShadow: "0 0 15px 2px rgba(var(--primary), 0.3)" }} whileTap={{ scale: 0.98 }} className="w-full">
+                        <Button size="default" onClick={handlePredictClick} disabled={isPredicting} className={cn("w-full shadow-xl relative overflow-hidden py-5", "bg-gradient-to-r from-primary/90 to-primary", "hover:from-primary hover:to-primary/90", "text-primary-foreground transition-all duration-300 rounded-xl")}>
+                          <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent" initial={{ x: "-100%" }} animate={isPredicting ? { x: ["100%", "-100%"], transition: { repeat: Infinity, duration: 1.5, ease: "linear" } } : { x: "100%" }} />
                           <div className="relative z-10 flex items-center justify-center">
                             {isPredicting ? (
                               <>
                                 <span className="font-bold text-base">Predicting</span>
-                                <motion.span
-                                  animate={{ opacity: [0, 1, 0] }}
-                                  transition={{
-                                    duration: 1.5,
-                                    repeat: Infinity,
-                                    repeatType: "loop",
-                                    times: [0, 0.5, 1]
-                                  }}
-                                >...</motion.span>
-                                <motion.div
-                                  animate={{ rotate: 360 }}
-                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                  className="ml-2"
-                                >
+                                <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop", times: [0, 0.5, 1] }}>...</motion.span>
+                                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="ml-2">
                                   <Swords className="h-4 w-4" />
                                 </motion.div>
                               </>
@@ -683,8 +678,6 @@ export default function ComparePage() {
                       </motion.div>
                     </motion.div>
                   )}
-
-                  {/* Stats Comparison */}
                   {fighter1 && fighter2 ? (
                     <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl rounded-xl overflow-hidden">
                       <CardContent className="p-4">
@@ -694,12 +687,7 @@ export default function ComparePage() {
                             <TabsTrigger value="striking" className="text-xs font-medium rounded-md">Striking</TabsTrigger>
                             <TabsTrigger value="grappling" className="text-xs font-medium rounded-md">Grappling</TabsTrigger>
                           </TabsList>
-                          <motion.div
-                            className="w-full"
-                            initial={false}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.15 }}
-                          >
+                          <motion.div className="w-full" initial={false} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
                             <TabsContent value="physical" className="mt-0">
                               <div className="space-y-1">
                                 <SimpleComparisonRow
@@ -822,283 +810,8 @@ export default function ComparePage() {
                     </div>
                   )}
                 </div>
-              </>
-            ) : (
-              <>
-                {/* Fighter 1 Column */}
-                <div className="flex flex-col">
-                  <div className="bg-primary/10 rounded-lg mb-3 py-2">
-                    <h3 className="text-base font-bold mb-0 text-center">FIGHTER 1</h3>
                   </div>
-                  <div className="relative z-30 fighter-search-1">
-                    <FighterSearch 
-                      onSelectFighter={handleFighter1Select} 
-                      clearSearch={!!fighter1}
-                      searchBarId="fighter1"
-                    />
-                  </div>
-                  <div className="mt-4">
-                    <div key={`fighter1-${activeTab}`}>
-                      {fighter1 && (
-                        <MemoizedFighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center Stats Column */}
-                <div className="flex flex-col">
-                  {/* VS Badge and Predict Button */}
-                  <div className="flex flex-col items-center mb-4 pt-10">
-                    {fighter1 && fighter2 && (
-                      <>
-                        <div className="flex items-center justify-center">
-                          <motion.div 
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/90 shadow-sm border border-background/20"
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 0.3, delay: 0.2 }}
-                          >
-                            <span className="text-xs font-semibold text-primary-foreground">VS</span>
-                          </motion.div>
-                        </div>
-                        
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3, delay: 0.2 }}
-                          className="w-[250px] mt-4"
-                        >
-                          <motion.div
-                            whileHover={{ 
-                              scale: 1.02,
-                              boxShadow: "0 0 15px 2px rgba(var(--primary), 0.3)" 
-                            }}
-                            whileTap={{ scale: 0.98 }}
-                            className="w-full"
-                          >
-                            <Button
-                              size="default"
-                              onClick={handlePredictClick}
-                              disabled={isPredicting}
-                              className={cn(
-                                "w-full shadow-xl relative overflow-hidden py-5",
-                                "bg-gradient-to-r from-primary/90 to-primary",
-                                "hover:from-primary hover:to-primary/90",
-                                "text-primary-foreground transition-all duration-300 rounded-xl"
-                              )}
-                            >
-                              <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent"
-                                initial={{ x: "-100%" }}
-                                animate={isPredicting ? { 
-                                  x: ["100%", "-100%"],
-                                  transition: { 
-                                    repeat: Infinity, 
-                                    duration: 1.5, 
-                                    ease: "linear"
-                                  }
-                                } : { x: "100%" }}
-                              />
-                              <div className="relative z-10 flex items-center justify-center">
-                                {isPredicting ? (
-                                  <>
-                                    <span className="font-bold text-base">Predicting</span>
-                                    <motion.span
-                                      animate={{ opacity: [0, 1, 0] }}
-                                      transition={{
-                                        duration: 1.5,
-                                        repeat: Infinity,
-                                        repeatType: "loop",
-                                        times: [0, 0.5, 1]
-                                      }}
-                                    >...</motion.span>
-                                    <motion.div
-                                      animate={{ rotate: 360 }}
-                                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                      className="ml-2"
-                                    >
-                                      <Swords className="h-4 w-4" />
-                                    </motion.div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="font-bold text-base">Get Prediction</span>
-                                    <Swords className="ml-2 h-4 w-4" />
-                                  </>
-                                )}
-                              </div>
-                            </Button>
-                          </motion.div>
-                        </motion.div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Stats Comparison */}
-                  <div className="flex-1 w-full">
-                    {fighter1 && fighter2 ? (
-                      <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl w-full">
-                        <CardContent className="p-6">
-                          <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
-                            <TabsList className="w-full grid grid-cols-3 h-12 mb-4 bg-primary/5 p-1 rounded-lg">
-                              <TabsTrigger value="physical" className="text-sm font-medium rounded-md">Physical</TabsTrigger>
-                              <TabsTrigger value="striking" className="text-sm font-medium rounded-md">Striking</TabsTrigger>
-                              <TabsTrigger value="grappling" className="text-sm font-medium rounded-md">Grappling</TabsTrigger>
-                            </TabsList>
-                            <motion.div
-                              className="w-full"
-                              initial={false}
-                              animate={{ opacity: 1 }}
-                              transition={{ duration: 0.15 }}
-                            >
-                              <TabsContent value="physical" className="mt-0 w-full">
-                                <div className="space-y-3 w-full">
-                                  <SimpleComparisonRow
-                                    label="Height"
-                                    value1={fighter1.height}
-                                    value2={fighter2.height}
-                                  />
-                                  <SimpleComparisonRow
-                                    label="Weight"
-                                    value1={fighter1.weight}
-                                    value2={fighter2.weight}
-                                  />
-                                  <SimpleComparisonRow
-                                    label="Reach"
-                                    value1={fighter1.reach}
-                                    value2={fighter2.reach}
-                                  />
-                                  <SimpleComparisonRow
-                                    label="Stance"
-                                    value1={fighter1.stance}
-                                    value2={fighter2.stance}
-                                  />
-                                  <SimpleComparisonRow
-                                    label="Age"
-                                    value1={fighter1Age}
-                                    value2={fighter2Age}
-                                  />
-                                  <SimpleComparisonRow
-                                    label="Experience"
-                                    value1={fighter1Experience}
-                                    value2={fighter2Experience}
-                                  />
-                                </div>
-                              </TabsContent>
-
-                              <TabsContent value="striking" className="mt-0 w-full">
-                                <div className="space-y-1 w-full">
-                                  <ComparisonRow
-                                    label="Strikes/Min"
-                                    value1={fighter1.slpm}
-                                    value2={fighter2.slpm}
-                                    unit=""
-                                  />
-                                  <ComparisonRow
-                                    label="Accuracy"
-                                    value1={fighter1.str_acc}
-                                    value2={fighter2.str_acc}
-                                    unit="%"
-                                  />
-                                  <ComparisonRow
-                                    label="Defense"
-                                    value1={fighter1.str_def}
-                                    value2={fighter2.str_def}
-                                    unit="%"
-                                  />
-                                  <ComparisonRow
-                                    label="Absorbed/Min"
-                                    value1={fighter1.sapm}
-                                    value2={fighter2.sapm}
-                                    higherIsBetter={false}
-                                    unit=""
-                                  />
-                                  <ComparisonRow
-                                    label="Striking Differential"
-                                    value1={fighter1StrikeDiff}
-                                    value2={fighter2StrikeDiff}
-                                    unit=""
-                                  />
-                                </div>
-                              </TabsContent>
-
-                              <TabsContent value="grappling" className="mt-0 w-full">
-                                <div className="space-y-1 w-full">
-                                  <ComparisonRow
-                                    label="TD/15 Min"
-                                    value1={fighter1.td_avg}
-                                    value2={fighter2.td_avg}
-                                    unit=""
-                                  />
-                                  <ComparisonRow
-                                    label="TD Accuracy"
-                                    value1={fighter1.td_acc}
-                                    value2={fighter2.td_acc}
-                                    unit="%"
-                                  />
-                                  <ComparisonRow
-                                    label="TD Defense"
-                                    value1={fighter1.td_def}
-                                    value2={fighter2.td_def}
-                                    unit="%"
-                                  />
-                                  <ComparisonRow
-                                    label="Sub/15 Min"
-                                    value1={fighter1.sub_avg}
-                                    value2={fighter2.sub_avg}
-                                    unit=""
-                                  />
-                                  <ComparisonRow
-                                    label="Ground Control"
-                                    value1={calculateGroundControl(fighter1)}
-                                    value2={calculateGroundControl(fighter2)}
-                                    unit="%"
-                                  />
-                                </div>
-                              </TabsContent>
-                            </motion.div>
-                          </Tabs>
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                          <div className="text-muted-foreground">
-                            <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                            <p className="text-sm font-medium">
-                              Select two fighters to compare
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Fighter 2 Column */}
-                <div className="flex flex-col">
-                  <div className="bg-primary/10 rounded-lg mb-3 py-2">
-                    <h3 className="text-base font-bold mb-0 text-center">FIGHTER 2</h3>
-                  </div>
-                  <div className="relative z-30 fighter-search-2">
-                    <FighterSearch 
-                      onSelectFighter={handleFighter2Select} 
-                      clearSearch={!!fighter2}
-                      searchBarId="fighter2"
-                    />
-                  </div>
-                  <div className="mt-4">
-                    <div key={`fighter2-${activeTab}`}>
-                      {fighter2 && (
-                        <MemoizedFighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </>
             )}
-          </div>
         </motion.div>
         </div>
       </div>

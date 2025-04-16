@@ -52,10 +52,10 @@ export default function HomePage() {
 
   return (
     <PageTransition variant="default">
-      <div className="container relative mx-auto px-4 py-8">
+      <div className="container relative mx-auto px-4 py-4 sm:py-8">
         <div className="max-w-7xl mx-auto">
           {/* Center Badge */}
-          <AnimatedItem variant="fadeDown" className="flex justify-center mb-8">
+          <AnimatedItem variant="fadeDown" className="flex justify-center mb-4 sm:mb-8">
             <Badge variant="outline" className="py-2 px-4 backdrop-blur-sm border-primary/20 bg-card/50">
               <span className="text-primary mr-2">🥊</span>
               <span className="text-sm font-medium">Expert Fight Analysis & Predictions</span>
@@ -63,22 +63,22 @@ export default function HomePage() {
           </AnimatedItem>
 
           {/* Main Title */}
-          <AnimatedContainer className="text-center max-w-4xl mx-auto mb-12" delay={0.1}>
-            <AnimatedItem variant="fadeUp" className="mb-6">
-              <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight">
+          <AnimatedContainer className="text-center max-w-4xl mx-auto mb-6 sm:mb-12" delay={0.1}>
+            <AnimatedItem variant="fadeUp" className="mb-3 sm:mb-6">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
                 Master the
                 <span className="bg-gradient-to-r from-primary via-blue-500 to-purple-500 text-transparent bg-clip-text"> Octagon</span>
               </h1>
             </AnimatedItem>
             <AnimatedItem variant="fadeUp" delay={0.1}>
-              <p className="text-lg sm:text-xl text-muted-foreground">
+              <p className="text-base sm:text-xl text-muted-foreground">
                 Your ultimate fight companion for predicting epic matchups. Get deep insights into every fighter's style, strengths, and path to victory
               </p>
             </AnimatedItem>
           </AnimatedContainer>
 
           {/* CTA Buttons */}
-          <AnimatedItem variant="scale" delay={0.2} className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+          <AnimatedItem variant="scale" delay={0.2} className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 sm:mb-16">
             <Link href="/fight-predictions">
               <Button size="lg" className="bg-primary/90 hover:bg-primary text-primary-foreground px-8">
                 Open App
@@ -93,7 +93,7 @@ export default function HomePage() {
           </AnimatedItem>
 
           {/* Stats Line */}
-          <AnimatedContainer className="mb-16 sm:mb-20" delay={0.3}>
+          <AnimatedContainer className="mb-8 sm:mb-16 md:mb-20" delay={0.3}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 max-w-4xl mx-auto">
               {[
                 { label: "Total Fighters", value: fightersCount.toLocaleString() },
@@ -112,7 +112,7 @@ export default function HomePage() {
           {/* Featured Fighters Line */}
           <AnimatedItem variant="fadeIn" delay={0.4} className="relative w-full overflow-hidden">
             <div 
-              className="animate-marquee whitespace-nowrap py-4"
+              className="animate-marquee whitespace-nowrap py-2 sm:py-4"
               style={{
                 animationDuration: `${isMobile ? 30 : 45}s`,
               }}

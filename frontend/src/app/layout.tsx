@@ -6,7 +6,6 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { MainNav } from "@/components/main-nav";
 import { Toaster } from "@/components/ui/toaster";
 import { PageBackground } from "@/components/page-background";
-import { ScrollbarManager } from "@/components/scrollbar-manager";
 import { PageTransitionsProvider } from "@/components/page-transitions-provider";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -101,15 +100,17 @@ export default function RootLayout({
           `
         }} />
         <style>{`
-          html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
+          html {
+            /* Ensure html takes full height for body min-height to work reliably */
+            height: 100%; 
           }
           body {
+            /* Removed height: 100% from combined rule */
+            margin: 0;
+            padding: 0;
             min-height: 100vh;
           }
-          #main-content {
+          #main-content { /* This style seems unused based on current main tag */
             isolation: isolate;
             min-height: 100vh;
             position: relative;
@@ -117,14 +118,14 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className={`${inter.className} scrollbar-hidden`}>
+      <body className={`${inter.className} overflow-y-auto`}>
         <ThemeProvider
           defaultTheme="dark"
           storageKey="zocratic-ui-theme"
         >
           <PageBackground />
           <SiteHeader />
-          <main className="relative min-h-screen pt-24 pb-8">
+          <main className="relative pt-28 pb-8">
             <div className="mx-auto max-w-[90rem] px-4">
               <PageTransitionsProvider>
                 {children}
@@ -132,7 +133,6 @@ export default function RootLayout({
             </div>
           </main>
           <Toaster />
-          <ScrollbarManager />
         </ThemeProvider>
       </body>
     </html>

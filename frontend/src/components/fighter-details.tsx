@@ -364,16 +364,16 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="relative rounded-lg p-4 md:p-6 bg-card/80 backdrop-blur-sm border border-primary/10"
+      className="relative rounded-lg p-4 md:p-6 bg-card/80 border border-primary/10"
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-center">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-start">
         {/* Fighter Image */}
         <div className="flex justify-center">
-          <motion.div
+          <div
             className={cn(
               "fighter-image-container relative overflow-hidden",
-              isMobile ? "rounded-full ring-2 ring-primary/20" : "",
-              styles.imageSize
+              "flex-shrink-0",
+              isMobile ? "w-32 h-32 rounded-full ring-2 ring-primary/20" : "w-64 h-64 max-w-full rounded-lg"
             )}
           >
             {!imageError ? (
@@ -383,8 +383,10 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
                 width={isMobile ? 128 : 256}
                 height={isMobile ? 128 : 256}
                 className={cn(
-                  "object-cover w-full h-full",
-                  !isMobile && "rounded-lg"
+                  "object-cover",
+                  "object-top",
+                  "w-full h-full",
+                  isMobile ? "rounded-full" : "rounded-lg"
                 )}
                 onError={() => setImageError(true)}
                 priority
@@ -394,7 +396,7 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
                 <span className="text-muted-foreground">No image</span>
               </div>
             )}
-          </motion.div>
+          </div>
         </div>
 
         {/* Fighter Info */}

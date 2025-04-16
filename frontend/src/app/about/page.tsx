@@ -10,12 +10,13 @@ const OPACITY_DURATION_MS = 500;
 
 export default function AboutPage() {
   const [activeSection, setActiveSection] = useState(0)
-  const [previousSection, setPreviousSection] = useState(-1) // Initialize to -1 to handle initial load
+  const [previousSection, setPreviousSection] = useState(-1)
   const sections = ["Overview", "Features", "Stay Tuned"]
   const isTransitioning = useRef(false)
   const [hasScrolled, setHasScrolled] = useState(false)
   const isMobile = useIsMobile()
   const touchStartY = useRef(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null); // Ref for the scroll container
 
   const changeSection = (newSection: number) => {
     if (
@@ -42,7 +43,9 @@ export default function AboutPage() {
   }
 
   useEffect(() => {
-    const container = document.documentElement // Listen on the whole page
+    // Use the specific container for touch events if it exists
+    const wheelTarget = document.documentElement;
+    const touchTarget = scrollContainerRef.current;
 
     let wheelTimeoutId: NodeJS.Timeout
     const handleWheel = (e: WheelEvent) => {
@@ -80,27 +83,32 @@ export default function AboutPage() {
       // touchStartY.current = 0;
 
       if (Math.abs(deltaY) > 40) { // Slightly reduced threshold
+        e.preventDefault(); // Prevent default scroll since we are handling it
         const direction = deltaY > 0 ? 1 : -1
         changeSection(activeSection + direction)
       }
     }
 
-    // Use passive: false for wheel to allow preventDefault
-    container.addEventListener('wheel', handleWheel, { passive: false })
-    if (isMobile) {
-      container.addEventListener('touchstart', handleTouchStart, { passive: true })
-      container.addEventListener('touchend', handleTouchEnd, { passive: true })
+    // Attach wheel listener to documentElement (as before)
+    wheelTarget.addEventListener('wheel', handleWheel, { passive: false })
+    
+    // Attach touch listeners to the specific container IF it exists, regardless of isMobile flag
+    if (touchTarget) { 
+      touchTarget.addEventListener('touchstart', handleTouchStart, { passive: false })
+      touchTarget.addEventListener('touchend', handleTouchEnd, { passive: false })
     }
 
+    // Cleanup function
     return () => {
       clearTimeout(wheelTimeoutId)
-      container.removeEventListener('wheel', handleWheel)
-      if (isMobile) {
-        container.removeEventListener('touchstart', handleTouchStart)
-        container.removeEventListener('touchend', handleTouchEnd)
+      wheelTarget.removeEventListener('wheel', handleWheel)
+      // Ensure cleanup checks if touchTarget existed
+      if (touchTarget) { 
+        touchTarget.removeEventListener('touchstart', handleTouchStart)
+        touchTarget.removeEventListener('touchend', handleTouchEnd)
       }
     }
-  }, [activeSection, hasScrolled, isMobile]) // previousSection is not needed here
+  }, [activeSection, hasScrolled]) // Removed isMobile from dependency array as it's no longer conditional
 
   const scrollToSection = (index: number) => {
     if (isTransitioning.current) return
@@ -257,8 +265,8 @@ export default function AboutPage() {
          </div>
        </AnimatedItem>
 
-      {/* Content Sections Container */}
-      <div className="fixed inset-0 h-full w-full overflow-hidden">
+      {/* Content Sections Container - Added ref */}
+      <div ref={scrollContainerRef} className="fixed inset-0 h-full w-full overflow-hidden">
         {sections.map((_, index) => (
           <section 
             key={index}
@@ -295,21 +303,21 @@ export default function AboutPage() {
                 </AnimatedContainer>
               )}
                {index === 1 && (
-                <AnimatedContainer delay={0.1} className="space-y-8 sm:space-y-12 md:space-y-16">
+                <AnimatedContainer delay={0.1} className="space-y-4 sm:space-y-8 md:space-y-12">
                   <AnimatedItem variant="fadeDown">
                     <h2 className={cn(
                       "font-bold text-foreground mb-3 sm:mb-4 md:mb-6",
-                      "text-3xl sm:text-4xl"
+                      "text-2xl sm:text-3xl md:text-4xl"
                     )}>Key Features</h2>
                     <p className={cn(
                       "text-muted-foreground",
-                      "text-base sm:text-lg md:text-xl"
+                      "text-sm sm:text-base md:text-lg"
                     )}>
                       Discover the powerful features that make our UFC Fighter Data API the ultimate tool for fight analysis.
                     </p>
                   </AnimatedItem>
                   
-                  <AnimatedContainer delay={0.2} className="grid md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 max-w-4xl mx-auto">
+                  <AnimatedContainer delay={0.2} className="grid md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 max-w-4xl mx-auto">
                     {[
                       { title: "Real-time Data", description: "Up-to-date fighter statistics and match outcomes, processed and available instantly" },
                       { title: "Comprehensive Stats", description: "Detailed metrics covering every aspect of fighter performance and history" },
@@ -318,9 +326,9 @@ export default function AboutPage() {
                     ].map((feature, idx) => (
                       <AnimatedItem key={idx} variant="fadeUp" delay={0.05 * idx} className={cn("group relative")}>
                         <div className="absolute -inset-4 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                        <div className="relative space-y-2 sm:space-y-3 md:space-y-4 p-3 sm:p-4">
-                          <h3 className="font-semibold text-foreground text-xl sm:text-2xl">{feature.title}</h3>
-                          <p className="text-muted-foreground text-sm sm:text-base md:text-lg">{feature.description}</p>
+                        <div className="relative space-y-1 sm:space-y-2 md:space-y-3 px-1 py-3 sm:p-4">
+                          <h3 className="font-semibold text-foreground text-base sm:text-lg md:text-xl">{feature.title}</h3>
+                          <p className="text-muted-foreground text-xs sm:text-sm md:text-base">{feature.description}</p>
                         </div>
                       </AnimatedItem>
                     ))}
@@ -328,11 +336,11 @@ export default function AboutPage() {
                 </AnimatedContainer>
                )}
                {index === 2 && (
-                <AnimatedContainer delay={0.1} className="space-y-6 sm:space-y-8 md:space-y-12">
+                <AnimatedContainer delay={0.1} className="space-y-4 sm:space-y-6 md:space-y-8">
                   <AnimatedItem variant="fadeDown">
                     <h2 className={cn(
                       "font-bold text-foreground mb-3 sm:mb-4",
-                      "text-3xl sm:text-4xl"
+                      "text-2xl sm:text-3xl md:text-4xl"
                     )}>Stay Tuned</h2>
                     <p className={cn(
                       "text-muted-foreground",
@@ -340,7 +348,7 @@ export default function AboutPage() {
                     )}>We're actively developing new features and improvements to enhance your fight analysis experience.</p>
                   </AnimatedItem>
                   
-                  <AnimatedContainer delay={0.2} className="grid md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 max-w-4xl mx-auto">
+                  <AnimatedContainer delay={0.2} className="grid md:grid-cols-2 gap-2 sm:gap-3 md:gap-4 max-w-4xl mx-auto">
                     {[
                       { title: "Event Analysis", description: "Coming soon: Comprehensive analysis of upcoming UFC events with detailed breakdowns and predictions for every fight on the card." },
                       { title: "Fighter Career Insights", description: "Deep dive into fighter careers with trend analysis, style matchups, and performance evolution over time." },
@@ -349,9 +357,9 @@ export default function AboutPage() {
                     ].map((feature, idx) => (
                       <AnimatedItem key={idx} variant="fadeUp" delay={0.05 * idx} className={cn("group relative")}>
                         <div className="absolute -inset-2 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
-                        <div className="relative space-y-1.5 sm:space-y-2 p-2 sm:p-3">
-                          <h3 className="font-semibold text-foreground text-lg sm:text-xl">{feature.title}</h3>
-                          <p className="text-muted-foreground leading-relaxed text-xs sm:text-sm">{feature.description}</p>
+                        <div className="relative space-y-1 sm:space-y-1.5 px-1 py-2 sm:p-3">
+                          <h3 className="font-semibold text-foreground text-base sm:text-lg">{feature.title}</h3>
+                          <p className="text-muted-foreground leading-relaxed text-[11px] sm:text-xs">{feature.description}</p>
                         </div>
                       </AnimatedItem>
                     ))}
@@ -366,42 +374,6 @@ export default function AboutPage() {
           </section>
         ))}
       </div>
-
-      <style jsx global>{`
-        /* Ensure html/body have overflow hidden and height 100vh */
-        html, body {
-          overflow: hidden !important; /* Force override */
-          height: 100vh;
-          margin: 0;
-          padding: 0;
-        }
-        
-        .scrollbar-none {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-        .scrollbar-none::-webkit-scrollbar {
-          display: none;
-        }
-
-        @keyframes scroll-bounce {
-          0%, 100% {
-            transform: translateY(0) translateX(-50%);
-          }
-          50% {
-            transform: translateY(16px) translateX(-50%);
-          }
-        }
-
-        .animate-scroll-bounce {
-          animation: scroll-bounce 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-        }
-
-        /* Prevent any transforms on the scroll indicator */
-        .bottom-fixed {
-          transform: none !important;
-        }
-      `}</style>
     </PageTransition>
   )
 } 
