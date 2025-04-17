@@ -9,7 +9,7 @@ if PROJECT_ROOT not in sys.path:
 
 # Import database connection
 from backend.api.database import get_supabase_client
-
+"""URGENT: ONLY RUN TO UPDATE IMAGE URLS TO STICKMAN PLACEHOLDER! WILL REPLACE ALL IMAGE URLS WITH STICKMAN PLACEHOLDER"""
 # Constants
 MAX_WORKERS = 1
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

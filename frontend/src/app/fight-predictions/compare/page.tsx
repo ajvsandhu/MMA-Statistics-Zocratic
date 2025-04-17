@@ -432,7 +432,7 @@ export default function ComparePage() {
             <div className="absolute inset-0 flex">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: width1 > 0 ? `${width1}%` : '0%' }}
+                animate={{ width: Math.max(1, width1) + '%' }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 className={cn(
                   "h-full opacity-10",
@@ -441,7 +441,7 @@ export default function ComparePage() {
                   "bg-yellow-500"
                 )}
                 style={{ 
-                  borderRadius: width1 > 0 ? '4px' : '0'
+                  borderRadius: '4px'
                 }}
               />
             </div>
@@ -482,7 +482,7 @@ export default function ComparePage() {
             <div className="absolute inset-0 flex justify-end">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: width2 > 0 ? `${width2}%` : '0%' }}
+                animate={{ width: Math.max(1, width2) + '%' }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 className={cn(
                   "h-full opacity-10",
@@ -491,7 +491,7 @@ export default function ComparePage() {
                   "bg-yellow-500"
                 )}
                 style={{ 
-                  borderRadius: width2 > 0 ? '4px' : '0'
+                  borderRadius: '4px'
                 }}
               />
             </div>
@@ -675,16 +675,16 @@ export default function ComparePage() {
                                    <div className="space-y-2">
                                      <ComparisonRow 
                                        label="TD/15 Min" 
-                                       value1={`${fighter1.td_avg}${parseFloat(fighter1.td_avg) > parseFloat(fighter2.td_avg) ? ` (+${(parseFloat(fighter1.td_avg) - parseFloat(fighter2.td_avg)).toFixed(2)})` : ''}`} 
-                                       value2={`${fighter2.td_avg}${parseFloat(fighter2.td_avg) > parseFloat(fighter1.td_avg) ? ` (+${(parseFloat(fighter2.td_avg) - parseFloat(fighter1.td_avg)).toFixed(2)})` : ''}`} 
+                                       value1={fighter1.td_avg} 
+                                       value2={fighter2.td_avg} 
                                        unit="" 
                                      />
                                      <ComparisonRow label="TD Accuracy" value1={fighter1.td_acc} value2={fighter2.td_acc} unit="%" />
                                      <ComparisonRow label="TD Defense" value1={fighter1.td_def} value2={fighter2.td_def} unit="%" />
                                      <ComparisonRow 
                                        label="Sub/15 Min" 
-                                       value1={`${fighter1.sub_avg}${parseFloat(fighter1.sub_avg) > parseFloat(fighter2.sub_avg) ? ` (+${(parseFloat(fighter1.sub_avg) - parseFloat(fighter2.sub_avg)).toFixed(2)})` : ''}`} 
-                                       value2={`${fighter2.sub_avg}${parseFloat(fighter2.sub_avg) > parseFloat(fighter1.sub_avg) ? ` (+${(parseFloat(fighter2.sub_avg) - parseFloat(fighter1.sub_avg)).toFixed(2)})` : ''}`} 
+                                       value1={fighter1.sub_avg} 
+                                       value2={fighter2.sub_avg} 
                                        unit="" 
                                      />
                                      <ComparisonRow label="Ground Control" value1={calculateGroundControl(fighter1)} value2={calculateGroundControl(fighter2)} unit="%" />
@@ -831,16 +831,16 @@ export default function ComparePage() {
                                 <div className="space-y-2">
                                   <ComparisonRow 
                                     label="TD/15 Min" 
-                                    value1={`${fighter1.td_avg}${parseFloat(fighter1.td_avg) > parseFloat(fighter2.td_avg) ? ` (+${(parseFloat(fighter1.td_avg) - parseFloat(fighter2.td_avg)).toFixed(2)})` : ''}`} 
-                                    value2={`${fighter2.td_avg}${parseFloat(fighter2.td_avg) > parseFloat(fighter1.td_avg) ? ` (+${(parseFloat(fighter2.td_avg) - parseFloat(fighter1.td_avg)).toFixed(2)})` : ''}`} 
+                                    value1={fighter1.td_avg} 
+                                    value2={fighter2.td_avg} 
                                     unit="" 
                                   />
                                   <ComparisonRow label="TD Accuracy" value1={fighter1.td_acc} value2={fighter2.td_acc} unit="%" />
                                   <ComparisonRow label="TD Defense" value1={fighter1.td_def} value2={fighter2.td_def} unit="%" />
                                   <ComparisonRow 
                                     label="Sub/15 Min" 
-                                    value1={`${fighter1.sub_avg}${parseFloat(fighter1.sub_avg) > parseFloat(fighter2.sub_avg) ? ` (+${(parseFloat(fighter1.sub_avg) - parseFloat(fighter2.sub_avg)).toFixed(2)})` : ''}`} 
-                                    value2={`${fighter2.sub_avg}${parseFloat(fighter2.sub_avg) > parseFloat(fighter1.sub_avg) ? ` (+${(parseFloat(fighter2.sub_avg) - parseFloat(fighter1.sub_avg)).toFixed(2)})` : ''}`} 
+                                    value1={fighter1.sub_avg} 
+                                    value2={fighter2.sub_avg} 
                                     unit="" 
                                   />
                                   <ComparisonRow label="Ground Control" value1={calculateGroundControl(fighter1)} value2={calculateGroundControl(fighter2)} unit="%" />
