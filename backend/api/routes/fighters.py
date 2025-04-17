@@ -368,7 +368,7 @@ def get_fighter(fighter_name: str) -> Dict:
         
         logger.info(f"Cleaned fighter name: {clean_name}")
         
-        # Try exact match first
+        # 1. Try exact match
         response = supabase.table('fighters')\
             .select('*')\
             .eq('fighter_name', clean_name)\
@@ -379,24 +379,67 @@ def get_fighter(fighter_name: str) -> Dict:
             logger.info(f"Found fighter via exact match: {clean_name}")
             return _process_fighter_data(fighter_data)
         
-        # If no exact match, try case-insensitive match
+        # 2. Try case-insensitive exact match
         response = supabase.table('fighters')\
             .select('*')\
-            .ilike('fighter_name', f"%{clean_name}%")\
+            .ilike('fighter_name', clean_name)\
             .execute()
             
         if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
-            fighters = response.data
-            # Convert ranking to int for comparison
-            ranked_fighters = [f for f in fighters if int(f.get('ranking', 99)) < 99]
-            if ranked_fighters:
-                fighter_data = ranked_fighters[0]
-            else:
-                fighter_data = fighters[0]
-            logger.info(f"Found fighter via case-insensitive match: {clean_name}")
-            return _process_fighter_data(fighter_data)
+            # Find the best match among potentially multiple case-insensitive results
+            best_match_fighter = None
+            highest_score = -1
+            for fighter in response.data:
+                # Check for exact case-insensitive match first
+                if fighter.get('fighter_name', '').lower() == clean_name.lower():
+                    best_match_fighter = fighter
+                    break # Found perfect case-insensitive match
+                # Otherwise, keep track of the best partial match (though ilike without % should be exact)
+                score = fuzz.ratio(clean_name.lower(), fighter.get('fighter_name', '').lower())
+                if score > highest_score:
+                    highest_score = score
+                    best_match_fighter = fighter
+
+            if best_match_fighter:
+                logger.info(f"Found fighter via case-insensitive match: {best_match_fighter.get('fighter_name')}")
+                return _process_fighter_data(best_match_fighter)
         
-        logger.warning(f"Fighter not found: {clean_name}")
+        # 3. Try fuzzy matching if no exact/case-insensitive match
+        logger.info(f"Exact/case-insensitive match failed for '{clean_name}'. Trying fuzzy matching.")
+        all_fighters_response = supabase.table('fighters').select('fighter_name').execute()
+        
+        if not all_fighters_response or not hasattr(all_fighters_response, 'data') or not all_fighters_response.data:
+            logger.warning("Could not retrieve fighter list for fuzzy matching.")
+            raise HTTPException(status_code=404, detail=f"Fighter not found and list unavailable: {clean_name}")
+            
+        fighter_names = [f.get('fighter_name', '') for f in all_fighters_response.data if f.get('fighter_name')]
+        
+        if fighter_names:
+            best_match = process.extractOne(
+                clean_name,
+                fighter_names,
+                scorer=fuzz.WRatio, # Use WRatio for better name matching
+                score_cutoff=85 # Keep cutoff at 85, WRatio should be higher for good matches
+            )
+            
+            if best_match:
+                matched_name, score = best_match
+                logger.info(f"Fuzzy match found for '{clean_name}': '{matched_name}' (score: {score})")
+                
+                # Fetch the matched fighter's full data
+                response = supabase.table('fighters')\
+                    .select('*')\
+                    .eq('fighter_name', matched_name)\
+                    .execute()
+                    
+                if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
+                    fighter_data = response.data[0]
+                    return _process_fighter_data(fighter_data)
+                else:
+                     logger.warning(f"Fuzzy match '{matched_name}' found, but failed to retrieve full data.")
+
+
+        logger.warning(f"Fighter not found after all attempts: {clean_name}")
         raise HTTPException(status_code=404, detail=f"Fighter not found: {clean_name}")
         
     except HTTPException:

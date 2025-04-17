@@ -66,14 +66,6 @@ RANKINGS_CACHE_TIMEOUT = int(os.getenv('RANKINGS_CACHE_TIMEOUT', 86400))
 
 # Model Configuration
 MODEL_DIR = str(MODELS_DIR)  # Use the absolute path from MODELS_DIR
-DEFAULT_MODEL_FILE = "fight_predictor_model.joblib"
-MODEL_PATH = str(MODELS_DIR / DEFAULT_MODEL_FILE)
-SCALER_PATH = str(MODELS_DIR / "scaler.joblib")
-FEATURES_PATH = str(MODELS_DIR / "feature_names.joblib")
-FEATURE_NAMES_PATH = FEATURES_PATH
-MODEL_INFO_FILENAME = "model_info.json"
-MODEL_INFO_PATH = MODELS_DIR / MODEL_INFO_FILENAME
-MODEL_VERSION = "v1"
 
 # Web Scraping Configuration
 REQUEST_HEADERS = {
@@ -131,4 +123,4 @@ FIGHTER_STRING_FIELDS = [
 # Create required directories
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(CONFIG_DIR, exist_ok=True)
-os.makedirs(MODELS_DIR, exist_ok=True) 
+# DELETE: os.makedirs(MODELS_DIR, exist_ok=True) 
