@@ -270,12 +270,12 @@ export default function AboutPage() {
         {sections.map((_, index) => (
           <section 
             key={index}
-            className="absolute inset-0 h-full w-full flex items-center justify-center overflow-hidden p-4"
+            className="absolute inset-0 h-full w-full flex items-center justify-center overflow-hidden px-2 py-4 sm:p-4"
             style={getSectionStyles(index)}
           >
             {/* Section Inner Content Container */}
             <div className={cn(
-              "container max-w-5xl px-4 relative",
+              "container max-w-5xl relative px-2 sm:px-4", 
             )}>
               {index === 0 && (
                 <AnimatedContainer delay={0.1} className="max-w-3xl mx-auto text-center space-y-4 sm:space-y-6 md:space-y-8">
@@ -340,11 +340,11 @@ export default function AboutPage() {
                   <AnimatedItem variant="fadeDown">
                     <h2 className={cn(
                       "font-bold text-foreground mb-3 sm:mb-4",
-                      "text-2xl sm:text-3xl md:text-4xl"
+                      "text-xl sm:text-2xl md:text-3xl lg:text-4xl"
                     )}>Stay Tuned</h2>
                     <p className={cn(
                       "text-muted-foreground",
-                      "text-sm sm:text-base"
+                      "text-xs sm:text-sm md:text-base"
                     )}>We're actively developing new features and improvements to enhance your fight analysis experience.</p>
                   </AnimatedItem>
                   
@@ -358,15 +358,24 @@ export default function AboutPage() {
                       <AnimatedItem key={idx} variant="fadeUp" delay={0.05 * idx} className={cn("group relative")}>
                         <div className="absolute -inset-2 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300" />
                         <div className="relative space-y-1 sm:space-y-1.5 px-1 py-2 sm:p-3">
-                          <h3 className="font-semibold text-foreground text-base sm:text-lg">{feature.title}</h3>
-                          <p className="text-muted-foreground leading-relaxed text-[11px] sm:text-xs">{feature.description}</p>
+                          <h3 className={cn(
+                            "font-semibold text-foreground",
+                            "text-sm sm:text-base md:text-lg"
+                            )}>{feature.title}</h3>
+                          <p className={cn(
+                            "text-muted-foreground leading-relaxed",
+                            "text-[10px] sm:text-[11px] md:text-xs"
+                            )}>{feature.description}</p>
                         </div>
                       </AnimatedItem>
                     ))}
                   </AnimatedContainer>
                   
                   <AnimatedItem variant="fadeUp" delay={0.3} className={cn("text-center max-w-2xl mx-auto")}>
-                    <p className="text-muted-foreground text-xs sm:text-sm">Follow our updates as we continue to improve and expand the platform with new features and insights.</p>
+                    <p className={cn(
+                      "text-muted-foreground", 
+                      "text-[10px] sm:text-xs md:text-sm"
+                      )}>Follow our updates as we continue to improve and expand the platform with new features and insights.</p>
                   </AnimatedItem>
                 </AnimatedContainer>
                )}

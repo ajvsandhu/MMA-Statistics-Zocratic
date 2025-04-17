@@ -126,6 +126,7 @@ export default function ComparePage() {
         td_def: data?.['TD Def.'] || data?.td_def || '0%',
         sub_avg: data?.['Sub. Avg.'] || data?.sub_avg || '0',
         ranking: data?.ranking || 0,
+        tap_link: data?.tap_link || '',
       };
       
       return sanitizedData;
@@ -269,28 +270,57 @@ export default function ComparePage() {
 
   // Update the FighterCard component to remove all animations
   const FighterCard = memo(({ fighter, onRemove }: { fighter: FighterStats, onRemove: () => void }) => {
+    const cardContent = (
+      <>
+        <img
+          src={fighter.image_url || '/placeholder-fighter.png'}
+          alt={fighter.name}
+          className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+          loading="eager"
+        />
+        {fighter.tap_link && (
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <span className="text-white text-sm">View on Tapology</span>
+          </div>
+        )}
+      </>
+    );
+
     return (
       <div className={cn(
         "relative group overflow-hidden rounded-xl bg-card/50 border border-primary/10",
-        "aspect-[4/3] md:aspect-[2/3]"
+        "w-full"
       )}>
+        <div className="pb-[100%]" />
+
         {fighter?.image_url && (
-          <div className="absolute inset-0 rounded-xl overflow-hidden">
-            <img
-              src={fighter.image_url || '/placeholder-fighter.png'}
-              alt={fighter.name}
-              className="w-full h-full object-cover object-center"
-              loading="eager"
-            />
-          </div>
+          fighter.tap_link ? (
+            <a 
+              href={fighter.tap_link} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="absolute inset-0 cursor-pointer"
+              aria-label={`View ${fighter.name} on Tapology`}
+            >
+              {cardContent}
+            </a>
+          ) : (
+            <div className="absolute inset-0">
+              {cardContent}
+            </div>
+          )
         )}
 
-        <div className="absolute inset-0 z-20">
+        <div className="absolute inset-0 z-20 pointer-events-none">
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70"
-            onClick={onRemove}
+            className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 hover:bg-black/70 pointer-events-auto"
+            onClick={(e) => { 
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove(); 
+            }} 
           >
             <X className="h-4 w-4 text-white" />
           </Button>
@@ -380,36 +410,42 @@ export default function ComparePage() {
       return String(value);
     };
 
-    const width1 = num1;
-    const width2 = num2;
+    // Use fixed percentages for visualization rather than the actual values
+    // Scale the values for better visualization
+    const maxVisualWidth = 80; // Maximum width in percentage
+    const maxVal = Math.max(num1, num2);
+    
+    // Normalize values between 0 and maxVisualWidth
+    const normalizeValue = (val: number): number => {
+      if (maxVal === 0) return 0;
+      return (val / maxVal) * maxVisualWidth;
+    };
+    
+    const width1 = normalizeValue(num1);
+    const width2 = normalizeValue(num2);
 
     return (
-      <div className="relative group">
-        <div className={cn(
-          "grid grid-cols-3 gap-4 py-2 items-center hover:bg-accent/5 rounded-lg",
-          isMobile ? "gap-2 py-1.5" : "gap-4 py-2.5"
-        )}>
-          <div className={cn(
-            "relative text-center",
-            isMobile ? "min-h-[24px]" : "min-h-[32px]"
-          )}>
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: width1 > 0 ? `calc(${width1}% - 2px)` : '0%' }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className={cn(
-                "absolute top-0 h-full opacity-10",
-                color1.includes("green") ? "bg-green-500" : 
-                color1.includes("red") ? "bg-red-500" : 
-                "bg-yellow-500"
-              )}
-              style={{ 
-                left: width1 > 0 ? '2px' : '0',
-                width: width1 > 0 ? `calc(${width1}% - 2px)` : '0%',
-                borderRadius: width1 > 0 ? '4px' : '0'
-              }}
-            />
-            <div className="relative flex items-center justify-center">
+      <div className="relative group w-full">
+        <div className="grid grid-cols-[1fr_90px_1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg">
+          {/* Left value cell */}
+          <div className="relative text-center min-w-[80px] min-h-[32px] flex items-center justify-center">
+            <div className="absolute inset-0 flex">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: width1 > 0 ? `${width1}%` : '0%' }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className={cn(
+                  "h-full opacity-10",
+                  color1.includes("green") ? "bg-green-500" : 
+                  color1.includes("red") ? "bg-red-500" : 
+                  "bg-yellow-500"
+                )}
+                style={{ 
+                  borderRadius: width1 > 0 ? '4px' : '0'
+                }}
+              />
+            </div>
+            <div className="relative z-10">
               <motion.div 
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -421,46 +457,45 @@ export default function ComparePage() {
                 )}
               >
                 {formatValue(value1)}
-              {num1 !== num2 && isFirstBetter && (
-                <span className={cn(
-                  "ml-1 font-medium text-green-500",
-                  isMobile ? "text-[10px]" : "text-xs"
-                )}>
-                  (+{diff})
-                </span>
-              )}
+                {num1 !== num2 && isFirstBetter && (
+                  <span className={cn(
+                    "ml-1 font-medium text-green-500",
+                    isMobile ? "text-[10px]" : "text-xs"
+                  )}>
+                    (+{diff})
+                  </span>
+                )}
               </motion.div>
             </div>
           </div>
 
+          {/* Label cell */}
           <div className={cn(
-            "text-muted-foreground font-medium px-1.5 whitespace-nowrap min-w-[80px] text-center",
+            "text-muted-foreground font-medium whitespace-nowrap text-center",
             isMobile ? "text-xs" : "text-sm"
           )}>
             {label}
           </div>
 
-          <div className={cn(
-            "relative text-center",
-            isMobile ? "min-h-[24px]" : "min-h-[32px]"
-          )}>
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: width2 > 0 ? `calc(${width2}% - 2px)` : '0%' }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className={cn(
-                "absolute top-0 h-full opacity-10",
-                color2.includes("green") ? "bg-green-500" : 
-                color2.includes("red") ? "bg-red-500" : 
-                "bg-yellow-500"
-              )}
-              style={{ 
-                right: width2 > 0 ? '2px' : '0',
-                width: width2 > 0 ? `calc(${width2}% - 2px)` : '0%',
-                borderRadius: width2 > 0 ? '4px' : '0'
-              }}
-            />
-            <div className="relative flex items-center justify-center">
+          {/* Right value cell */}
+          <div className="relative text-center min-w-[80px] min-h-[32px] flex items-center justify-center">
+            <div className="absolute inset-0 flex justify-end">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: width2 > 0 ? `${width2}%` : '0%' }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className={cn(
+                  "h-full opacity-10",
+                  color2.includes("green") ? "bg-green-500" : 
+                  color2.includes("red") ? "bg-red-500" : 
+                  "bg-yellow-500"
+                )}
+                style={{ 
+                  borderRadius: width2 > 0 ? '4px' : '0'
+                }}
+              />
+            </div>
+            <div className="relative z-10">
               <motion.div 
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -472,14 +507,14 @@ export default function ComparePage() {
                 )}
               >
                 {formatValue(value2)}
-              {num1 !== num2 && !isFirstBetter && (
-                <span className={cn(
-                  "ml-1 font-medium text-green-500",
-                  isMobile ? "text-[10px]" : "text-xs"
-                )}>
-                  (+{diff})
-                </span>
-              )}
+                {num1 !== num2 && !isFirstBetter && (
+                  <span className={cn(
+                    "ml-1 font-medium text-green-500",
+                    isMobile ? "text-[10px]" : "text-xs"
+                  )}>
+                    (+{diff})
+                  </span>
+                )}
               </motion.div>
             </div>
           </div>
@@ -494,15 +529,36 @@ export default function ComparePage() {
     value1: string;
     value2: string;
   }) => (
-    <div className="grid grid-cols-3 gap-4 py-2 items-center text-center">
-      <div className={cn("text-center font-medium", isMobile ? "text-sm" : "text-base")}>
-        {value1}
-      </div>
-      <div className={cn("text-muted-foreground font-medium whitespace-nowrap min-w-[90px] text-center", isMobile ? "text-[11px]" : "text-xs")}>
-        {label}
-      </div>
-      <div className={cn("text-center font-medium", isMobile ? "text-sm" : "text-base")}>
-        {value2}
+    <div className="relative group w-full">
+      <div className="grid grid-cols-[1fr_90px_1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg">
+        <div className="relative text-center min-w-[80px] min-h-[32px] flex items-center justify-center">
+          <div className="relative z-10">
+            <div className={cn(
+              "font-medium", 
+              isMobile ? "" : "text-lg"
+            )}>
+              {value1}
+            </div>
+          </div>
+        </div>
+
+        <div className={cn(
+          "text-muted-foreground font-medium whitespace-nowrap text-center",
+          isMobile ? "text-xs" : "text-sm"
+        )}>
+          {label}
+        </div>
+
+        <div className="relative text-center min-w-[80px] min-h-[32px] flex items-center justify-center">
+          <div className="relative z-10">
+            <div className={cn(
+              "font-medium", 
+              isMobile ? "" : "text-lg"
+            )}>
+              {value2}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   ));
@@ -544,7 +600,8 @@ export default function ComparePage() {
             {!isMobile && (
           <div className={cn(
             "flex-1 overflow-visible",
-            "grid md:grid-cols-3 gap-6 lg:gap-8 max-w-7xl mx-auto min-w-0"
+            "grid md:grid-cols-[2fr_3fr_2fr] gap-6 lg:gap-8 max-w-7xl mx-auto min-w-0",
+            "items-start"
           )}>
                 
                 {/* --- Column 1: Fighter 1 --- */}
@@ -552,8 +609,14 @@ export default function ComparePage() {
                    {/* ... Fighter 1 Search + Card ... */}
                    <div className="bg-primary/10 rounded-lg mb-3 py-2"> <h3 className="text-base font-bold mb-0 text-center">FIGHTER 1</h3> </div>
                    <div className="relative z-30 fighter-search-1"> <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} searchBarId="fighter1" /> </div>
-                   <div className="mt-4 h-96"> 
-                     <div key={`fighter1-${activeTab}`}>{fighter1 && (<MemoizedFighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />)}</div> 
+                   <div className="mt-4">
+                     {fighter1 && (
+                       <MemoizedFighterCard 
+                         key={`fighter1-${activeTab}`} 
+                         fighter={fighter1} 
+                         onRemove={() => setFighter1(null)} 
+                       />
+                     )}
                    </div>
                 </div>
 
@@ -580,19 +643,69 @@ export default function ComparePage() {
                    <div className="flex-1 w-full">
                       {fighter1 && fighter2 ? (
                        <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl w-full">
-                         <CardContent className="p-6">
+                         <CardContent className="p-4 sm:p-6">
                            <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
-                             <TabsList className="w-full grid grid-cols-3 h-12 mb-4 bg-primary/5 p-1 rounded-lg"> <TabsTrigger value="physical" className="text-sm font-medium rounded-md">Physical</TabsTrigger> <TabsTrigger value="striking" className="text-sm font-medium rounded-md">Striking</TabsTrigger> <TabsTrigger value="grappling" className="text-sm font-medium rounded-md">Grappling</TabsTrigger> </TabsList>
-                             <motion.div className="w-full" initial={false} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
-                               <TabsContent value="physical" className="mt-0 w-full"> <div className="space-y-3 w-full"> <SimpleComparisonRow label="Height" value1={fighter1.height} value2={fighter2.height} /> <SimpleComparisonRow label="Weight" value1={fighter1.weight} value2={fighter2.weight} /> <SimpleComparisonRow label="Reach" value1={fighter1.reach} value2={fighter2.reach} /> <SimpleComparisonRow label="Stance" value1={fighter1.stance} value2={fighter2.stance} /> <SimpleComparisonRow label="Age" value1={fighter1Age} value2={fighter2Age} /> <SimpleComparisonRow label="Experience" value1={fighter1Experience} value2={fighter2Experience} /> </div> </TabsContent>
-                               <TabsContent value="striking" className="mt-0 w-full"> <div className="space-y-1 w-full"> <ComparisonRow label="Strikes/Min" value1={fighter1.slpm} value2={fighter2.slpm} unit="" /> <ComparisonRow label="Accuracy" value1={fighter1.str_acc} value2={fighter2.str_acc} unit="%" /> <ComparisonRow label="Defense" value1={fighter1.str_def} value2={fighter2.str_def} unit="%" /> <ComparisonRow label="Absorbed/Min" value1={fighter1.sapm} value2={fighter2.sapm} higherIsBetter={false} unit="" /> <ComparisonRow label="Striking Differential" value1={fighter1StrikeDiff} value2={fighter2StrikeDiff} unit="" /> </div> </TabsContent>
-                               <TabsContent value="grappling" className="mt-0 w-full"> <div className="space-y-1 w-full"> <ComparisonRow label="TD/15 Min" value1={fighter1.td_avg} value2={fighter2.td_avg} unit="" /> <ComparisonRow label="TD Accuracy" value1={fighter1.td_acc} value2={fighter2.td_acc} unit="%" /> <ComparisonRow label="TD Defense" value1={fighter1.td_def} value2={fighter2.td_def} unit="%" /> <ComparisonRow label="Sub/15 Min" value1={fighter1.sub_avg} value2={fighter2.sub_avg} unit="" /> <ComparisonRow label="Ground Control" value1={calculateGroundControl(fighter1)} value2={calculateGroundControl(fighter2)} unit="%" /> </div> </TabsContent>
-                             </motion.div>
+                             <TabsList className="w-full grid grid-cols-3 h-12 mb-2 bg-primary/5 p-1 rounded-lg sticky top-0 z-10">
+                               <TabsTrigger value="physical" className="text-sm font-medium rounded-md">Physical</TabsTrigger>
+                               <TabsTrigger value="striking" className="text-sm font-medium rounded-md">Striking</TabsTrigger>
+                               <TabsTrigger value="grappling" className="text-sm font-medium rounded-md">Grappling</TabsTrigger>
+                             </TabsList>
+                             <div className="w-full" style={{ width: '100%', maxWidth: '100%', minWidth: '300px' }}>
+                               <div className="relative w-full" style={{ width: '100%', minHeight: '300px' }}>
+                                 <TabsContent value="physical" className="absolute inset-0 pt-2">
+                                   <div className="space-y-2">
+                                     <SimpleComparisonRow label="Height" value1={fighter1.height} value2={fighter2.height} />
+                                     <SimpleComparisonRow label="Weight" value1={fighter1.weight} value2={fighter2.weight} />
+                                     <SimpleComparisonRow label="Reach" value1={fighter1.reach} value2={fighter2.reach} />
+                                     <SimpleComparisonRow label="Stance" value1={fighter1.stance} value2={fighter2.stance} />
+                                     <SimpleComparisonRow label="Age" value1={fighter1Age} value2={fighter2Age} />
+                                     <SimpleComparisonRow label="Experience" value1={fighter1Experience} value2={fighter2Experience} />
+                                   </div>
+                                 </TabsContent>
+                                 <TabsContent value="striking" className="absolute inset-0 pt-2">
+                                   <div className="space-y-2">
+                                     <ComparisonRow label="Strikes/Min" value1={fighter1.slpm} value2={fighter2.slpm} unit="" />
+                                     <ComparisonRow label="Accuracy" value1={fighter1.str_acc} value2={fighter2.str_acc} unit="%" />
+                                     <ComparisonRow label="Defense" value1={fighter1.str_def} value2={fighter2.str_def} unit="%" />
+                                     <ComparisonRow label="Absorbed/Min" value1={fighter1.sapm} value2={fighter2.sapm} higherIsBetter={false} unit="" />
+                                     <ComparisonRow label="Striking Differential" value1={fighter1StrikeDiff} value2={fighter2StrikeDiff} unit="" />
+                                   </div>
+                                 </TabsContent>
+                                 <TabsContent value="grappling" className="absolute inset-0 pt-2">
+                                   <div className="space-y-2">
+                                     <ComparisonRow 
+                                       label="TD/15 Min" 
+                                       value1={`${fighter1.td_avg}${parseFloat(fighter1.td_avg) > parseFloat(fighter2.td_avg) ? ` (+${(parseFloat(fighter1.td_avg) - parseFloat(fighter2.td_avg)).toFixed(2)})` : ''}`} 
+                                       value2={`${fighter2.td_avg}${parseFloat(fighter2.td_avg) > parseFloat(fighter1.td_avg) ? ` (+${(parseFloat(fighter2.td_avg) - parseFloat(fighter1.td_avg)).toFixed(2)})` : ''}`} 
+                                       unit="" 
+                                     />
+                                     <ComparisonRow label="TD Accuracy" value1={fighter1.td_acc} value2={fighter2.td_acc} unit="%" />
+                                     <ComparisonRow label="TD Defense" value1={fighter1.td_def} value2={fighter2.td_def} unit="%" />
+                                     <ComparisonRow 
+                                       label="Sub/15 Min" 
+                                       value1={`${fighter1.sub_avg}${parseFloat(fighter1.sub_avg) > parseFloat(fighter2.sub_avg) ? ` (+${(parseFloat(fighter1.sub_avg) - parseFloat(fighter2.sub_avg)).toFixed(2)})` : ''}`} 
+                                       value2={`${fighter2.sub_avg}${parseFloat(fighter2.sub_avg) > parseFloat(fighter1.sub_avg) ? ` (+${(parseFloat(fighter2.sub_avg) - parseFloat(fighter1.sub_avg)).toFixed(2)})` : ''}`} 
+                                       unit="" 
+                                     />
+                                     <ComparisonRow label="Ground Control" value1={calculateGroundControl(fighter1)} value2={calculateGroundControl(fighter2)} unit="%" />
+                                   </div>
+                                 </TabsContent>
+                               </div>
+                             </div>
                            </Tabs>
                          </CardContent>
                        </Card>
                       ) : (
-                       <div className="flex items-center justify-center h-full"> <div className="text-center"> <div className="text-muted-foreground"> <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" /> <p className="text-sm font-medium"> Select two fighters to compare </p> </div> </div> </div>
+                       <div className="flex items-center justify-center h-full min-h-[300px]">
+                         <div className="text-center">
+                           <div className="text-muted-foreground">
+                             <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" />
+                             <p className="text-sm font-medium">
+                               Select two fighters to compare
+                             </p>
+                           </div>
+                         </div>
+                       </div>
                       )}
                    </div>
                 </div>
@@ -602,8 +715,14 @@ export default function ComparePage() {
                    {/* ... Fighter 2 Search + Card ... */}
                    <div className="bg-primary/10 rounded-lg mb-3 py-2"> <h3 className="text-base font-bold mb-0 text-center">FIGHTER 2</h3> </div>
                    <div className="relative z-30 fighter-search-2"> <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} searchBarId="fighter2" /> </div>
-                   <div className="mt-4 h-96">
-                     <div key={`fighter2-${activeTab}`}>{fighter2 && (<MemoizedFighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />)}</div> 
+                   <div className="mt-4">
+                     {fighter2 && (
+                       <MemoizedFighterCard 
+                         key={`fighter2-${activeTab}`} 
+                         fighter={fighter2} 
+                         onRemove={() => setFighter2(null)} 
+                       />
+                     )}
                    </div>
                 </div>
                 
@@ -679,121 +798,56 @@ export default function ComparePage() {
                     </motion.div>
                   )}
                   {fighter1 && fighter2 ? (
-                    <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl rounded-xl overflow-hidden">
-                      <CardContent className="p-4">
+                    <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl w-full">
+                      <CardContent className="p-4 sm:p-6">
                         <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
-                          <TabsList className="w-full grid grid-cols-3 h-10 mb-2 bg-primary/5 p-1 rounded-lg">
-                            <TabsTrigger value="physical" className="text-xs font-medium rounded-md">Physical</TabsTrigger>
-                            <TabsTrigger value="striking" className="text-xs font-medium rounded-md">Striking</TabsTrigger>
-                            <TabsTrigger value="grappling" className="text-xs font-medium rounded-md">Grappling</TabsTrigger>
+                          <TabsList className="w-full grid grid-cols-3 h-12 mb-2 bg-primary/5 p-1 rounded-lg sticky top-0 z-10">
+                            <TabsTrigger value="physical" className="text-sm font-medium rounded-md">Physical</TabsTrigger>
+                            <TabsTrigger value="striking" className="text-sm font-medium rounded-md">Striking</TabsTrigger>
+                            <TabsTrigger value="grappling" className="text-sm font-medium rounded-md">Grappling</TabsTrigger>
                           </TabsList>
-                          <motion.div className="w-full" initial={false} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
-                            <TabsContent value="physical" className="mt-0">
-                              <div className="space-y-1">
-                                <SimpleComparisonRow
-                                  label="Height"
-                                  value1={fighter1.height}
-                                  value2={fighter2.height}
-                                />
-                                <SimpleComparisonRow
-                                  label="Weight"
-                                  value1={fighter1.weight}
-                                  value2={fighter2.weight}
-                                />
-                                <SimpleComparisonRow
-                                  label="Reach"
-                                  value1={fighter1.reach}
-                                  value2={fighter2.reach}
-                                />
-                                <SimpleComparisonRow
-                                  label="Stance"
-                                  value1={fighter1.stance}
-                                  value2={fighter2.stance}
-                                />
-                                <SimpleComparisonRow
-                                  label="Age"
-                                  value1={fighter1Age}
-                                  value2={fighter2Age}
-                                />
-                                <SimpleComparisonRow
-                                  label="Experience"
-                                  value1={fighter1Experience}
-                                  value2={fighter2Experience}
-                                />
-                              </div>
-                            </TabsContent>
-
-                            <TabsContent value="striking" className="mt-0">
-                              <div className="space-y-1">
-                                <ComparisonRow
-                                  label="Strikes/Min"
-                                  value1={fighter1.slpm}
-                                  value2={fighter2.slpm}
-                                  unit=""
-                                />
-                                <ComparisonRow
-                                  label="Accuracy"
-                                  value1={fighter1.str_acc}
-                                  value2={fighter2.str_acc}
-                                  unit="%"
-                                />
-                                <ComparisonRow
-                                  label="Defense"
-                                  value1={fighter1.str_def}
-                                  value2={fighter2.str_def}
-                                  unit="%"
-                                />
-                                <ComparisonRow
-                                  label="Absorbed/Min"
-                                  value1={fighter1.sapm}
-                                  value2={fighter2.sapm}
-                                  higherIsBetter={false}
-                                  unit=""
-                                />
-                                <ComparisonRow
-                                  label="Striking Differential"
-                                  value1={fighter1StrikeDiff}
-                                  value2={fighter2StrikeDiff}
-                                  unit=""
-                                />
-                              </div>
-                            </TabsContent>
-
-                            <TabsContent value="grappling" className="mt-0">
-                              <div className="space-y-1">
-                                <ComparisonRow
-                                  label="TD/15 Min"
-                                  value1={fighter1.td_avg}
-                                  value2={fighter2.td_avg}
-                                  unit=""
-                                />
-                                <ComparisonRow
-                                  label="TD Accuracy"
-                                  value1={fighter1.td_acc}
-                                  value2={fighter2.td_acc}
-                                  unit="%"
-                                />
-                                <ComparisonRow
-                                  label="TD Defense"
-                                  value1={fighter1.td_def}
-                                  value2={fighter2.td_def}
-                                  unit="%"
-                                />
-                                <ComparisonRow
-                                  label="Sub/15 Min"
-                                  value1={fighter1.sub_avg}
-                                  value2={fighter2.sub_avg}
-                                  unit=""
-                                />
-                                <ComparisonRow
-                                  label="Ground Control"
-                                  value1={calculateGroundControl(fighter1)}
-                                  value2={calculateGroundControl(fighter2)}
-                                  unit="%"
-                                />
-                              </div>
-                            </TabsContent>
-                          </motion.div>
+                          <div className="w-full" style={{ width: '100%', maxWidth: '100%', minWidth: '300px' }}>
+                            <div className="relative w-full" style={{ width: '100%', minHeight: '300px' }}>
+                              <TabsContent value="physical" className="absolute inset-0 pt-2">
+                                <div className="space-y-2">
+                                  <SimpleComparisonRow label="Height" value1={fighter1.height} value2={fighter2.height} />
+                                  <SimpleComparisonRow label="Weight" value1={fighter1.weight} value2={fighter2.weight} />
+                                  <SimpleComparisonRow label="Reach" value1={fighter1.reach} value2={fighter2.reach} />
+                                  <SimpleComparisonRow label="Stance" value1={fighter1.stance} value2={fighter2.stance} />
+                                  <SimpleComparisonRow label="Age" value1={fighter1Age} value2={fighter2Age} />
+                                  <SimpleComparisonRow label="Experience" value1={fighter1Experience} value2={fighter2Experience} />
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="striking" className="absolute inset-0 pt-2">
+                                <div className="space-y-2">
+                                  <ComparisonRow label="Strikes/Min" value1={fighter1.slpm} value2={fighter2.slpm} unit="" />
+                                  <ComparisonRow label="Accuracy" value1={fighter1.str_acc} value2={fighter2.str_acc} unit="%" />
+                                  <ComparisonRow label="Defense" value1={fighter1.str_def} value2={fighter2.str_def} unit="%" />
+                                  <ComparisonRow label="Absorbed/Min" value1={fighter1.sapm} value2={fighter2.sapm} higherIsBetter={false} unit="" />
+                                  <ComparisonRow label="Striking Differential" value1={fighter1StrikeDiff} value2={fighter2StrikeDiff} unit="" />
+                                </div>
+                              </TabsContent>
+                              <TabsContent value="grappling" className="absolute inset-0 pt-2">
+                                <div className="space-y-2">
+                                  <ComparisonRow 
+                                    label="TD/15 Min" 
+                                    value1={`${fighter1.td_avg}${parseFloat(fighter1.td_avg) > parseFloat(fighter2.td_avg) ? ` (+${(parseFloat(fighter1.td_avg) - parseFloat(fighter2.td_avg)).toFixed(2)})` : ''}`} 
+                                    value2={`${fighter2.td_avg}${parseFloat(fighter2.td_avg) > parseFloat(fighter1.td_avg) ? ` (+${(parseFloat(fighter2.td_avg) - parseFloat(fighter1.td_avg)).toFixed(2)})` : ''}`} 
+                                    unit="" 
+                                  />
+                                  <ComparisonRow label="TD Accuracy" value1={fighter1.td_acc} value2={fighter2.td_acc} unit="%" />
+                                  <ComparisonRow label="TD Defense" value1={fighter1.td_def} value2={fighter2.td_def} unit="%" />
+                                  <ComparisonRow 
+                                    label="Sub/15 Min" 
+                                    value1={`${fighter1.sub_avg}${parseFloat(fighter1.sub_avg) > parseFloat(fighter2.sub_avg) ? ` (+${(parseFloat(fighter1.sub_avg) - parseFloat(fighter2.sub_avg)).toFixed(2)})` : ''}`} 
+                                    value2={`${fighter2.sub_avg}${parseFloat(fighter2.sub_avg) > parseFloat(fighter1.sub_avg) ? ` (+${(parseFloat(fighter2.sub_avg) - parseFloat(fighter1.sub_avg)).toFixed(2)})` : ''}`} 
+                                    unit="" 
+                                  />
+                                  <ComparisonRow label="Ground Control" value1={calculateGroundControl(fighter1)} value2={calculateGroundControl(fighter2)} unit="%" />
+                                </div>
+                              </TabsContent>
+                            </div>
+                          </div>
                         </Tabs>
                       </CardContent>
                     </Card>

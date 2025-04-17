@@ -45,7 +45,7 @@ const MOBILE_STYLES = {
   statsValue: "text-lg",
   statsLabel: "text-xs",
   chartHeight: "h-[200px]",
-  imageSize: "w-32 h-32",
+  imageSize: "w-20 h-20",
   headerText: "text-2xl",
   subText: "text-sm"
 };
@@ -57,7 +57,7 @@ const DESKTOP_STYLES = {
   statsValue: "text-2xl",
   statsLabel: "text-sm",
   chartHeight: "h-[300px]",
-  imageSize: "w-64 h-64",
+  imageSize: "w-36 h-36",
   headerText: "text-3xl",
   subText: "text-base"
 };
@@ -359,6 +359,12 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
   const isMobile = useIsMobile();
   const styles = isMobile ? MOBILE_STYLES : DESKTOP_STYLES;
 
+  const handleImageClick = () => {
+    if (stats.tap_link) {
+      window.open(stats.tap_link, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -366,31 +372,47 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
       transition={{ duration: 0.5 }}
       className="relative rounded-lg p-4 md:p-6 bg-card/80 border border-primary/10"
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 md:gap-8 items-start">
         {/* Fighter Image */}
         <div className="flex justify-center">
           <div
             className={cn(
-              "fighter-image-container relative overflow-hidden",
+              "fighter-image-container relative overflow-hidden cursor-pointer group",
               "flex-shrink-0",
-              isMobile ? "w-32 h-32 rounded-full ring-2 ring-primary/20" : "w-64 h-64 max-w-full rounded-lg"
+              isMobile ? "w-20 h-20 rounded-full ring-2 ring-primary/20" : "w-36 h-36 max-w-full rounded-lg"
             )}
+            onClick={handleImageClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleImageClick();
+              }
+            }}
           >
             {!imageError ? (
-              <Image
-                src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
-                alt={stats.name}
-                width={isMobile ? 128 : 256}
-                height={isMobile ? 128 : 256}
-                className={cn(
-                  "object-cover",
-                  "object-top",
-                  "w-full h-full",
-                  isMobile ? "rounded-full" : "rounded-lg"
+              <>
+                <Image
+                  src={stats.image_url || DEFAULT_PLACEHOLDER_IMAGE} 
+                  alt={stats.name}
+                  width={isMobile ? 80 : 144}
+                  height={isMobile ? 80 : 144}
+                  className={cn(
+                    "object-cover object-top",
+                    "w-full h-full",
+                    isMobile ? "rounded-full" : "rounded-lg",
+                    "transition-transform duration-300 group-hover:scale-105"
+                  )}
+                  onError={() => setImageError(true)}
+                  priority
+                />
+                {stats.tap_link && (
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                    <span className="text-white text-sm">View on Tapology</span>
+                  </div>
                 )}
-                onError={() => setImageError(true)}
-                priority
-              />
+              </>
             ) : (
               <div className="w-full h-full bg-background/60 flex items-center justify-center">
                 <span className="text-muted-foreground">No image</span>
@@ -400,7 +422,7 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
         </div>
 
         {/* Fighter Info */}
-        <div className="md:col-span-2 flex flex-col justify-between text-center md:text-left">
+        <div className="flex flex-col justify-between text-center md:text-left">
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
