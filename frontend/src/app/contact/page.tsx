@@ -88,7 +88,7 @@ export default function ContactPage() {
             </AnimatedItem>
             <AnimatedItem variant="fadeUp" delay={0.1}>
               <p className="text-base text-muted-foreground">
-                Have questions or feedback? We'd love to hear from you.
+                Have suggestions, found a bug, or want to share feedback? We're eager to hear from you and improve our platform.
               </p>
             </AnimatedItem>
           </AnimatedContainer>

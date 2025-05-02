@@ -7,6 +7,8 @@ import { MainNav } from "@/components/main-nav";
 import { Toaster } from "@/components/ui/toaster";
 import { PageBackground } from "@/components/page-background";
 import { PageTransitionsProvider } from "@/components/page-transitions-provider";
+import { FooterVisibility } from "@/components/footer-visibility";
+import { usePathname } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -83,6 +85,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Only show the footer if we're NOT on a fighter details page
+  // This keeps the footer from overlapping the radar chart and stats
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isFighterPage = pathname.startsWith('/fighters/') && pathname.split('/').length === 3;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -109,6 +116,8 @@ export default function RootLayout({
             margin: 0;
             padding: 0;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
           }
           #main-content { /* This style seems unused based on current main tag */
             isolation: isolate;
@@ -118,20 +127,22 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className={`${inter.className} overflow-y-auto`}>
+      <body className={`${inter.className} min-h-screen flex flex-col overflow-y-auto overflow-x-hidden`}>
+        {/* This layout ensures the footer always stays at the bottom, even if content is short. */}
         <ThemeProvider
           defaultTheme="dark"
           storageKey="zocratic-ui-theme"
         >
           <PageBackground />
           <SiteHeader />
-          <main className="relative pt-28 pb-8">
+          <main className="relative pt-28 flex-1">
             <div className="mx-auto max-w-[90rem] px-4">
               <PageTransitionsProvider>
                 {children}
               </PageTransitionsProvider>
             </div>
           </main>
+          <FooterVisibility />
           <Toaster />
         </ThemeProvider>
       </body>

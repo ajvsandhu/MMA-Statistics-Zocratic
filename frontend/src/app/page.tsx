@@ -8,6 +8,7 @@ import { API_URL, API_VERSION, ENDPOINTS } from "@/lib/api-config"
 import { Badge } from "@/components/ui/badge"
 import { useIsMobile, createFighterSlug } from "@/lib/utils"
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
+import { BuyMeCoffeeButton } from "@/components/ui/buy-me-coffee-button"
 
 const FEATURED_FIGHTERS = [
   { id: "6270", name: "Jon Jones", stat: "28-1" },
@@ -91,6 +92,9 @@ export default function HomePage() {
                 Discover More
               </Button>
             </Link>
+            <div className="flex items-center h-[48px]">
+              <BuyMeCoffeeButton />
+            </div>
           </AnimatedItem>
 
           {/* Stats Line */}

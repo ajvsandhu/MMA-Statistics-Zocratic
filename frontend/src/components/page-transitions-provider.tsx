@@ -11,9 +11,12 @@ interface PageTransitionsProviderProps {
 export function PageTransitionsProvider({ children }: PageTransitionsProviderProps) {
   const pathname = usePathname()
 
-  // Scroll to top on route change
   useEffect(() => {
+    // Always scroll the window to the top on route change
     window.scrollTo(0, 0);
+    // If you have a main content container, scroll it to the top too
+    const main = document.querySelector('main');
+    if (main) main.scrollTop = 0;
   }, [pathname]);
 
   return (

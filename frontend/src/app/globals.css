@@ -452,16 +452,22 @@
   }
 
   html, body {
-    overflow: hidden;
+    /* Hide scrollbars everywhere for a cleaner look. */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
     height: 100%;
     margin: 0;
     padding: 0;
   }
 
+  html::-webkit-scrollbar, body::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+
   body {
     @apply bg-background text-foreground;
     min-height: 100vh;
-    overflow: hidden;
+    /* Removed overflow: hidden so the window can scroll normally. */
   }
 
   #__next {
