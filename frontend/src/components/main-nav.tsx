@@ -37,6 +37,10 @@ export function MainNav() {
       href: "/about",
       label: "About",
     },
+    {
+      href: "/contact",
+      label: "Contact Us",
+    },
   ]
 
   return (

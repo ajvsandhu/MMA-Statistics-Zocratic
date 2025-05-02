@@ -10,10 +10,10 @@ import { useIsMobile, createFighterSlug } from "@/lib/utils"
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
 
 const FEATURED_FIGHTERS = [
-  { id: "6270", name: "Jon Jones", stat: "26-1" },
-  { id: "4487", name: "Israel Adesanya", stat: "24-2" },
-  { id: "8532", name: "Alexander Volkanovski", stat: "26-4-0" },
-  { id: "53", name: "Islam Makhachev", stat: "24-1" },
+  { id: "6270", name: "Jon Jones", stat: "28-1" },
+  { id: "4487", name: "Israel Adesanya", stat: "24-5" },
+  { id: "8532", name: "Alexander Volkanovski", stat: "27-4-0" },
+  { id: "6758", name: "Islam Makhachev", stat: "27-1" },
 ]
 
 export default function HomePage() {
