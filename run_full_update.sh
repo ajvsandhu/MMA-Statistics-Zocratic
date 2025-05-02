@@ -4,6 +4,11 @@ set -e
 # If you use a virtual environment, activate it here:
 source venv/bin/activate
 
+# Export all variables from .env
+set -a
+source .env
+set +a
+
 # Change to the project root (if not already there)
 cd "$(dirname "$0")"
 
@@ -17,7 +22,7 @@ python3 scripts/scrapers/l55.py --mode recent --num-events 1
 
 # Step 3: Run UFC rankings scraper
 echo "[3/4] Running UFC rankings scraper..."
-python3 scripts/scrapers/ufc_rankings_scraper.py
+PYTHONPATH=. python3 scripts/scrapers/ufc_rankings_scraper.py
 
 # Step 4: Retrain the model
 echo "[4/4] Retraining the model..."
