@@ -2,6 +2,7 @@
  * Represents a fighter's statistics and profile information
  */
 export interface FighterStats {
+  id?: string;
   name: string;
   fighter_name?: string;
   record: string;
@@ -31,7 +32,8 @@ export interface FighterStats {
  */
 export interface FightHistory {
   id: string | number;
-  fighter_name: string;
+  fighter_name?: string;
+  fighter_id?: string;
   fight_url: string;
   kd: string;
   sig_str: string;

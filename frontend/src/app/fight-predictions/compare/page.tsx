@@ -72,19 +72,18 @@ export default function ComparePage() {
   
   const animationVariants = useMemo(() => getAnimationVariants(isMobile), [isMobile])
 
-  const fetchFighterData = useCallback(async (fighterName: string): Promise<FighterStats | null> => {
+  const fetchFighterData = useCallback(async (fighterId: string): Promise<FighterStats | null> => {
     try {
-      const cleanName = cleanFighterName(fighterName);
-      if (!cleanName) {
+      if (!fighterId) {
         toast({
           title: 'Error',
-          description: 'Invalid fighter name',
+          description: 'Invalid fighter ID',
           variant: 'destructive',
         });
         return null;
       }
       
-      const response = await fetch(ENDPOINTS.FIGHTER(cleanName));
+      const response = await fetch(ENDPOINTS.FIGHTER(fighterId));
       if (!response.ok) throw new Error('Fighter not found');
       
       const data = await response.json();
@@ -109,7 +108,8 @@ export default function ComparePage() {
       }
       
       const sanitizedData: FighterStats = {
-        name: data?.fighter_name || data?.name || cleanName || '',
+        id: data?.id || fighterId,
+        name: data?.fighter_name || data?.name || '',
         image_url: data?.image_url || '',
         record: data?.Record || data?.record || '',
         height: data?.Height || data?.height || '',
@@ -140,31 +140,27 @@ export default function ComparePage() {
     }
   }, [toast]);
 
-  const handleFighterSelect = useCallback(async (name: string, setFighter: (fighter: FighterStats | null) => void) => {
-    const cleanName = cleanFighterName(name);
-    if (!cleanName) {
+  const handleFighterSelect = useCallback(async (fighter: {id: string, name: string}, setFighter: (fighter: FighterStats | null) => void) => {
+    if (!fighter || !fighter.id) {
       toast({
         title: 'Error',
-        description: 'Invalid fighter name selected',
+        description: 'Invalid fighter selected',
         variant: 'destructive',
       });
       return;
     }
     
     setIsPredicting(true);
-    const data = await fetchFighterData(cleanName);
+    const data = await fetchFighterData(fighter.id);
     setFighter(data);
     setIsPredicting(false);
   }, [fetchFighterData, toast]);
 
-  const handleFighter1Select = useCallback((name: string) => handleFighterSelect(name, setFighter1), [handleFighterSelect]);
-  const handleFighter2Select = useCallback((name: string) => handleFighterSelect(name, setFighter2), [handleFighterSelect]);
+  const handleFighter1Select = useCallback((fighter: {id: string, name: string}) => handleFighterSelect(fighter, setFighter1), [handleFighterSelect]);
+  const handleFighter2Select = useCallback((fighter: {id: string, name: string}) => handleFighterSelect(fighter, setFighter2), [handleFighterSelect]);
 
-  const getPrediction = useCallback(async (fighter1Name: string, fighter2Name: string) => {
-    const cleanFighter1 = cleanFighterName(fighter1Name);
-    const cleanFighter2 = cleanFighterName(fighter2Name);
-    
-    if (!cleanFighter1 || !cleanFighter2) {
+  const getPrediction = useCallback(async () => {
+    if (!fighter1 || !fighter2 || !fighter1.id || !fighter2.id) {
       toast({
         title: 'Error',
         description: 'Please select two fighters to compare',
@@ -175,15 +171,26 @@ export default function ComparePage() {
     
     setIsPredicting(true);
     try {
-      const predictionEndpoint = ENDPOINTS.PREDICTION(cleanFighter1, cleanFighter2);
+      const predictionEndpoint = ENDPOINTS.PREDICTION(fighter1.id, fighter2.id);
+      console.log('Making prediction request with data:', predictionEndpoint);
+      
       const response = await fetch(predictionEndpoint.url, predictionEndpoint.options);
       const data = await response.json();
+      console.log('Prediction response:', data);
 
       if (!response.ok) {
+        console.error('Prediction API error:', data);
         if (response.status === 503) {
           toast({
             title: 'Service Temporarily Unavailable',
             description: data.message || 'The prediction service is temporarily unavailable. Please try again later.',
+            variant: 'destructive',
+          });
+        } else if (response.status === 422) {
+          // Handle validation errors specifically
+          toast({
+            title: 'Validation Error',
+            description: 'Error with fighter data. Using IDs without names is not supported yet.',
             variant: 'destructive',
           });
         } else {
@@ -193,48 +200,42 @@ export default function ComparePage() {
             variant: 'destructive',
           });
         }
+        setIsPredicting(false);
         return;
       }
 
-      // Access data directly from the new API response structure
-      const winnerName: string = data.predicted_winner;
+      // Map the new API response format to our frontend Prediction format
+      const winnerName = data.fighter1_id === data.predicted_winner ? fighter1.name : fighter2.name;
+      const loserName = data.fighter1_id === data.predicted_winner ? fighter2.name : fighter1.name;
       const confidencePercent: number = data.confidence_percent;
       const f1ProbPercent: number = data.fighter1_win_probability_percent;
       const f2ProbPercent: number = data.fighter2_win_probability_percent;
 
-      // Determine loser based on winner (assuming fighter names are consistent)
-      const loserName = winnerName === cleanFighter1 ? cleanFighter2 : cleanFighter1;
-      const loserProbPercent = winnerName === cleanFighter1 ? f2ProbPercent : f1ProbPercent;
-
-      // Construct the prediction state object, mapping new keys to the structure the UI likely expects
-      // Ensure the Prediction type definition matches this structure
+      // Construct the prediction state object
       const validatedPrediction: Prediction = {
-        winner: winnerName, // UI likely expects 'winner'
-        loser: loserName, // Keep structure if UI uses it
-        winner_probability: confidencePercent, // Map confidence to winner_probability for potential UI use
-        loser_probability: loserProbPercent, // Keep structure
-        prediction_confidence: confidencePercent, // Explicit confidence field
-        model_version: '2.0', // Update version display if needed
-        // Head-to-head might not be returned by the new API, provide defaults or remove if unused
+        winner: winnerName,
+        loser: loserName,
+        winner_probability: confidencePercent,
+        loser_probability: 100 - confidencePercent,
+        prediction_confidence: confidencePercent,
+        model_version: '2.0',
         head_to_head: { 
           fighter1_wins: 0,
           fighter2_wins: 0,
-          last_winner: '',
-          last_method: ''
         },
-        fighter1: { // UI needs these for bars/text
-          name: cleanFighter1,
-          record: '', // Data not returned by new predict endpoint
-          image_url: '', // Data not returned by new predict endpoint
-          probability: f1ProbPercent, // UI likely expects 'probability' for the bar/text
-          win_probability: `${f1ProbPercent}%` // Keep if UI uses this string format
+        fighter1: {
+          name: fighter1.name,
+          record: fighter1.record || '',
+          image_url: fighter1.image_url || '',
+          probability: f1ProbPercent,
+          win_probability: `${f1ProbPercent}%`
         },
-        fighter2: { // UI needs these for bars/text
-          name: cleanFighter2,
-          record: '', // Data not returned by new predict endpoint
-          image_url: '', // Data not returned by new predict endpoint
-          probability: f2ProbPercent, // UI likely expects 'probability' for the bar/text
-          win_probability: `${f2ProbPercent}%` // Keep if UI uses this string format
+        fighter2: {
+          name: fighter2.name,
+          record: fighter2.record || '',
+          image_url: fighter2.image_url || '',
+          probability: f2ProbPercent,
+          win_probability: `${f2ProbPercent}%`
         }
       };
 
@@ -250,7 +251,7 @@ export default function ComparePage() {
     } finally {
       setIsPredicting(false);
     }
-  }, [toast]);
+  }, [fighter1, fighter2, toast]);
 
   const handlePredictClick = useCallback(() => {
     if (!isValidFighterData(fighter1) || !isValidFighterData(fighter2)) {
@@ -262,10 +263,7 @@ export default function ComparePage() {
       return;
     }
     
-    const fighter1Name = fighter1!.name;
-    const fighter2Name = fighter2!.name;
-    
-    getPrediction(fighter1Name, fighter2Name);
+    getPrediction();
   }, [fighter1, fighter2, getPrediction, toast]);
 
   // Update the FighterCard component to remove all animations

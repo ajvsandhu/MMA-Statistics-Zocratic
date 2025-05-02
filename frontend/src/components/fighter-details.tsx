@@ -82,7 +82,7 @@ const safeReplacePercent = (value: string | undefined): string => {
 type FightResult = 'win' | 'loss' | 'draw' | 'nc' | 'dq'
 
 interface FighterDetailsProps {
-  fighterName: string
+  fighterId: string
 }
 
 interface ChartData {
@@ -112,7 +112,7 @@ interface FightStatCategory {
 
 interface Fight {
   id?: string | number;
-  fighter_name?: string;
+  fighter_id?: string;
   fight_url?: string;
   opponent: string;
   date?: string;
@@ -956,7 +956,7 @@ const StatsView = ({ stats, chartData }: { stats: FighterStats; chartData: Chart
   );
 };
 
-export function FighterDetails({ fighterName }: FighterDetailsProps) {
+export function FighterDetails({ fighterId }: FighterDetailsProps) {
   const [stats, setStats] = React.useState<FighterStats | null>(null)
   const [fightHistory, setFightHistory] = React.useState<FightHistory[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -972,11 +972,8 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
       setError('');
 
       try {
-        // Clean the fighter name to remove any trailing "- N/A" which causes API issues
-        const cleanedFighterName = fighterName.replace(/ - N\/A$/, '');
-        
-        // Use fetchWithRetries for robust API calls
-        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(cleanedFighterName));
+        // Use fetchWithRetries for robust API calls with the fighter ID
+        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(fighterId));
         
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'Fighter not found' : `Server error: ${response.status}`);
@@ -1005,7 +1002,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
         const processedFightHistory = Array.isArray(data.last_5_fights) 
           ? data.last_5_fights.map((fight: Fight) => ({
               id: fight.id,
-              fighter_name: String(fight.fighter_name || ''),
+              fighter_id: String(fight.fighter_id || ''),
               fight_url: String(fight.fight_url || ''),
               opponent: String(fight.opponent || ''),
               date: String(fight.date || fight.fight_date || 'Unknown Date'),
@@ -1032,7 +1029,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
 
         // Properly map API fields to our expected structure
         const sanitizedData: Record<string, any> = {
-          name: data?.fighter_name || data?.name || fighterName || '',
+          name: data?.fighter_name || data?.name || fighterId || '',
           image_url: data?.image_url || DEFAULT_PLACEHOLDER_IMAGE,
           record: data?.Record || data?.record || DEFAULT_VALUE,
           height: data?.Height || data?.height || DEFAULT_VALUE,
@@ -1066,7 +1063,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
     };
 
     fetchFighterData();
-  }, [fighterName]);
+  }, [fighterId]);
 
   // Create a function to refetch data that can be called from UI
   const refetchFighterData = () => {
@@ -1076,10 +1073,8 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
     // We need to create a new function here because fetchFighterData is scoped to the useEffect
     const refetch = async () => {
       try {
-        // Clean the fighter name to remove any trailing "- N/A" which causes API issues
-        const cleanedFighterName = fighterName.replace(/ - N\/A$/, '');
-        
-        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(cleanedFighterName));
+        // Use fetchWithRetries for robust API calls with the fighter ID
+        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(fighterId));
         
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'Fighter not found' : `Server error: ${response.status}`);
@@ -1108,7 +1103,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
         const processedFightHistory = Array.isArray(data.last_5_fights) 
           ? data.last_5_fights.map((fight: Fight) => ({
               id: fight.id,
-              fighter_name: String(fight.fighter_name || ''),
+              fighter_id: String(fight.fighter_id || ''),
               fight_url: String(fight.fight_url || ''),
               opponent: String(fight.opponent || ''),
               date: String(fight.date || fight.fight_date || 'Unknown Date'),
@@ -1135,7 +1130,7 @@ export function FighterDetails({ fighterName }: FighterDetailsProps) {
 
         // Properly map API fields to our expected structure
         const sanitizedData: Record<string, any> = {
-          name: data?.fighter_name || data?.name || fighterName || '',
+          name: data?.fighter_name || data?.name || fighterId || '',
           image_url: data?.image_url || DEFAULT_PLACEHOLDER_IMAGE,
           record: data?.Record || data?.record || DEFAULT_VALUE,
           height: data?.Height || data?.height || DEFAULT_VALUE,

@@ -41,7 +41,7 @@ def get_cached_fighters():
             logger.error("No database connection available")
             return None
             
-        response = supabase.table('fighters').select('fighter_name,Record,ranking,Weight').execute()
+        response = supabase.table('fighters').select('id,fighter_name,Record,ranking,Weight').execute()
         if response and hasattr(response, 'data'):
             _fighter_cache['data'] = response.data
             _fighter_cache['timestamp'] = current_time
@@ -66,7 +66,7 @@ def get_fighters(
     weight_class: Optional[str] = None,
     is_ranked: Optional[bool] = None,
     min_score: int = Query(45, ge=0, le=100)
-) -> Dict[str, List[str]]:
+) -> Dict[str, List[Dict]]:
     """
     Get all fighters or search for fighters by name with optional filters.
     
@@ -90,12 +90,13 @@ def get_fighters(
         # Format and filter fighters
         for fighter in fighter_data:
             fighter_name = fighter.get('fighter_name', '')
+            fighter_id = fighter.get('id', '')
             record = fighter.get('Record', DEFAULT_RECORD)
             weight_class_info = fighter.get('Weight', '')
             ranking = fighter.get('ranking', '99')
             
             # Skip invalid entries
-            if not fighter_name:
+            if not fighter_name or not fighter_id:
                 continue
 
             # Apply weight class filter
@@ -151,20 +152,20 @@ def get_fighters(
                 
                 # Add to results if score is good enough
                 if best_score >= min_score:
-                    fighters_list.append((formatted_name, best_score, rank_val))
+                    fighters_list.append({"name": formatted_name, "id": fighter_id, "score": best_score, "rank": rank_val})
             else:
-                fighters_list.append((formatted_name, 0, rank_val))
+                fighters_list.append({"name": formatted_name, "id": fighter_id, "score": 0, "rank": rank_val})
         
         # Sort and limit results
         if query:
             # Sort by score first, then by ranking
-            fighters_list.sort(key=lambda x: (-x[1], x[2]))
+            fighters_list.sort(key=lambda x: (-x["score"], x["rank"]))
         else:
             # Sort by ranking only when no search query
-            fighters_list.sort(key=lambda x: x[2])
+            fighters_list.sort(key=lambda x: x["rank"])
             
         # Take top 5 results
-        result = [fighter[0] for fighter in fighters_list[:5]]
+        result = fighters_list[:5]
         
         logger.info(f"Returning {len(result)} fighters")
         return {"fighters": result}
@@ -173,98 +174,34 @@ def get_fighters(
         logger.error(f"Error in get_fighters: {str(e)}")
         return {"fighters": []}
 
-@router.get("/fighter-stats/{fighter_name}")
-def get_fighter_stats(fighter_name: str):
-    """Get fighter stats by name."""
+@router.get("/fighter-stats/{fighter_id}")
+def get_fighter_stats(fighter_id: str):
+    """Get fighter stats by ID."""
     try:
         # Log the request
-        logger.info(f"Fetching stats for fighter: {fighter_name}")
+        logger.info(f"Fetching stats for fighter ID: {fighter_id}")
         
         supabase = get_db_connection()
         if not supabase:
             logger.error("No database connection available")
             return {"status": "error", "detail": "Database connection error, please try again later"}
         
-        # URL decode and clean fighter name
-        fighter_name = unquote(fighter_name)
+        # Try to get fighter by ID
+        response = supabase.table('fighters')\
+            .select('*')\
+            .eq('id', fighter_id)\
+            .execute()
         
-        # Clean fighter name - remove record if present
-        if "(" in fighter_name:
-            fighter_name = fighter_name.split("(")[0].strip()
+        if response and hasattr(response, 'data') and response.data:
+            logger.info(f"Found stats for fighter ID: {fighter_id}")
+            return sanitize_json(response.data[0])
         
-        # First try exact match (case-sensitive)
-        try:
-            response = supabase.table('fighters')\
-                .select('*')\
-                .eq('fighter_name', fighter_name)\
-                .execute()
-            
-            if response and hasattr(response, 'data') and response.data:
-                logger.info(f"Exact match found for fighter: {fighter_name}")
-                return sanitize_json(response.data[0])
-        except Exception as e:
-            logger.warning(f"Error during exact match query: {str(e)}")
-        
-        # Try case-insensitive match
-        try:
-            all_fighters = supabase.table('fighters').select('fighter_name').execute()
-            if not all_fighters or not hasattr(all_fighters, 'data') or not all_fighters.data:
-                logger.warning(f"No fighters found in database")
-                return {"status": "error", "detail": "Fighter database is empty or unavailable"}
-            
-            # First try case-insensitive exact match
-            for f in all_fighters.data:
-                if f.get('fighter_name', '').lower() == fighter_name.lower():
-                    logger.info(f"Case-insensitive match found for {fighter_name}: {f['fighter_name']}")
-                    response = supabase.table('fighters')\
-                        .select('*')\
-                        .eq('fighter_name', f['fighter_name'])\
-                        .execute()
-                    if response and hasattr(response, 'data') and response.data:
-                        return sanitize_json(response.data[0])
-        except Exception as e:
-            logger.warning(f"Error during case-insensitive match: {str(e)}")
-        
-        # If no exact match, try fuzzy matching
-        try:
-            fighter_names = [f.get('fighter_name', '') for f in all_fighters.data if f.get('fighter_name')]
-            
-            if fighter_names:
-                # Use fuzzy matching with higher threshold for more accurate matches
-                best_match = process.extractOne(
-                    fighter_name,
-                    fighter_names,
-                    scorer=fuzz.token_sort_ratio,
-                    score_cutoff=85  # Slightly lowered threshold for more matches
-                )
-                
-                if best_match:
-                    matched_name, score = best_match
-                    logger.info(f"Fuzzy match found for {fighter_name}: {matched_name} (score: {score})")
-                    
-                    # Fetch the matched fighter's data
-                    response = supabase.table('fighters')\
-                        .select('*')\
-                        .eq('fighter_name', matched_name)\
-                        .execute()
-                        
-                    if response and hasattr(response, 'data') and response.data:
-                        return sanitize_json(response.data[0])
-        except Exception as e:
-            logger.warning(f"Error during fuzzy matching: {str(e)}")
-        
-        # Create fallback default fighter data
-        logger.warning(f"Fighter not found, returning default: {fighter_name}")
-        return {
-            "status": "error", 
-            "fighter_name": fighter_name,
-            "detail": "Fighter not found in database"
-        }
+        logger.warning(f"Fighter with ID {fighter_id} not found")
+        return {"status": "error", "detail": f"Fighter with ID {fighter_id} not found"}
         
     except Exception as e:
-        logger.error(f"Error fetching fighter stats: {str(e)}")
-        logger.error(traceback.format_exc())
-        return {"status": "error", "detail": f"Server error: {str(e)}"}
+        logger.error(f"Error in get_fighter_stats: {str(e)}")
+        return {"status": "error", "detail": str(e)}
 
 def _sanitize_string(value, default=""):
     """Ensure a value is a valid string to prevent frontend errors."""
@@ -340,107 +277,34 @@ def _sanitize_fighter_data(fighter_data):
         
     return sanitized
 
-@router.get("/fighter/{fighter_name}")
-def get_fighter(fighter_name: str) -> Dict:
-    """Get fighter by name."""
+@router.get("/fighter/{fighter_id}")
+def get_fighter(fighter_id: str) -> Dict:
+    """Get fighter by ID."""
     try:
-        if fighter_name is None:
-            logger.warning("Fighter name is None")
-            raise HTTPException(status_code=400, detail="Fighter name is required")
+        if fighter_id is None:
+            logger.warning("Fighter ID is None")
+            raise HTTPException(status_code=400, detail="Fighter ID is required")
             
-        try:
-            fighter_name = unquote(fighter_name)
-        except Exception as e:
-            logger.error(f"Error decoding fighter name: {str(e)}")
-            raise HTTPException(status_code=400, detail="Invalid fighter name")
-        
-        logger.info(f"Fighter lookup requested for: {fighter_name}")
+        logger.info(f"Fighter lookup requested for ID: {fighter_id}")
         
         supabase = get_db_connection()
         if not supabase:
             logger.error("No database connection available")
             raise HTTPException(status_code=500, detail="Database connection error")
         
-        # Clean the fighter name - remove record if present
-        clean_name = fighter_name
-        if "(" in fighter_name:
-            clean_name = fighter_name.split("(")[0].strip()
-        
-        logger.info(f"Cleaned fighter name: {clean_name}")
-        
-        # 1. Try exact match
+        # Try to get fighter by ID
         response = supabase.table('fighters')\
             .select('*')\
-            .eq('fighter_name', clean_name)\
+            .eq('id', fighter_id)\
             .execute()
             
         if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
             fighter_data = response.data[0]
-            logger.info(f"Found fighter via exact match: {clean_name}")
+            logger.info(f"Found fighter with ID: {fighter_id}")
             return _process_fighter_data(fighter_data)
         
-        # 2. Try case-insensitive exact match
-        response = supabase.table('fighters')\
-            .select('*')\
-            .ilike('fighter_name', clean_name)\
-            .execute()
-            
-        if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
-            # Find the best match among potentially multiple case-insensitive results
-            best_match_fighter = None
-            highest_score = -1
-            for fighter in response.data:
-                # Check for exact case-insensitive match first
-                if fighter.get('fighter_name', '').lower() == clean_name.lower():
-                    best_match_fighter = fighter
-                    break # Found perfect case-insensitive match
-                # Otherwise, keep track of the best partial match (though ilike without % should be exact)
-                score = fuzz.ratio(clean_name.lower(), fighter.get('fighter_name', '').lower())
-                if score > highest_score:
-                    highest_score = score
-                    best_match_fighter = fighter
-
-            if best_match_fighter:
-                logger.info(f"Found fighter via case-insensitive match: {best_match_fighter.get('fighter_name')}")
-                return _process_fighter_data(best_match_fighter)
-        
-        # 3. Try fuzzy matching if no exact/case-insensitive match
-        logger.info(f"Exact/case-insensitive match failed for '{clean_name}'. Trying fuzzy matching.")
-        all_fighters_response = supabase.table('fighters').select('fighter_name').execute()
-        
-        if not all_fighters_response or not hasattr(all_fighters_response, 'data') or not all_fighters_response.data:
-            logger.warning("Could not retrieve fighter list for fuzzy matching.")
-            raise HTTPException(status_code=404, detail=f"Fighter not found and list unavailable: {clean_name}")
-            
-        fighter_names = [f.get('fighter_name', '') for f in all_fighters_response.data if f.get('fighter_name')]
-        
-        if fighter_names:
-            best_match = process.extractOne(
-                clean_name,
-                fighter_names,
-                scorer=fuzz.WRatio, # Use WRatio for better name matching
-                score_cutoff=85 # Keep cutoff at 85, WRatio should be higher for good matches
-            )
-            
-            if best_match:
-                matched_name, score = best_match
-                logger.info(f"Fuzzy match found for '{clean_name}': '{matched_name}' (score: {score})")
-                
-                # Fetch the matched fighter's full data
-                response = supabase.table('fighters')\
-                    .select('*')\
-                    .eq('fighter_name', matched_name)\
-                    .execute()
-                    
-                if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
-                    fighter_data = response.data[0]
-                    return _process_fighter_data(fighter_data)
-                else:
-                     logger.warning(f"Fuzzy match '{matched_name}' found, but failed to retrieve full data.")
-
-
-        logger.warning(f"Fighter not found after all attempts: {clean_name}")
-        raise HTTPException(status_code=404, detail=f"Fighter not found: {clean_name}")
+        logger.warning(f"Fighter with ID {fighter_id} not found")
+        raise HTTPException(status_code=404, detail=f"Fighter with ID {fighter_id} not found")
         
     except HTTPException:
         raise
@@ -452,8 +316,9 @@ def get_fighter(fighter_name: str) -> Dict:
 def _process_fighter_data(fighter_data: Dict) -> Dict:
     """Process fighter data and fetch last 5 fights."""
     try:
-        fighter_name_from_db = fighter_data.get('fighter_name', '')
-        logger.info(f"Fetching fights using exact fighter name from database: '{fighter_name_from_db}'")
+        fighter_id = fighter_data.get('id', '')
+        fighter_name = fighter_data.get('fighter_name', '')
+        logger.info(f"Fetching fights for fighter ID: '{fighter_id}', name: '{fighter_name}'")
         
         supabase = get_db_connection()
         if not supabase:
@@ -461,17 +326,28 @@ def _process_fighter_data(fighter_data: Dict) -> Dict:
             return fighter_data
         
         last_5_fights = []
-        if fighter_name_from_db:
-            fights_response = supabase.table('fighter_last_5_fights')\
-                .select('*')\
-                .eq('fighter_name', fighter_name_from_db)\
-                .order('id', desc=False)\
-                .limit(MAX_FIGHTS_DISPLAY)\
-                .execute()
-            
-            if fights_response and hasattr(fights_response, 'data') and fights_response.data:
-                last_5_fights = fights_response.data
-                logger.info(f"SUCCESS! Found {len(last_5_fights)} fights for fighter '{fighter_name_from_db}'")
+        
+        # Skip fighter_id lookup for now since the column doesn't exist yet
+        # Just use fighter_name directly
+        if fighter_name:
+            try:
+                fights_response = supabase.table('fighter_last_5_fights')\
+                    .select('*')\
+                    .eq('fighter_name', fighter_name)\
+                    .order('id', desc=False)\
+                    .limit(MAX_FIGHTS_DISPLAY)\
+                    .execute()
+                
+                if fights_response and hasattr(fights_response, 'data') and fights_response.data:
+                    last_5_fights = fights_response.data
+                    logger.info(f"SUCCESS! Found {len(last_5_fights)} fights using fighter_name '{fighter_name}'")
+                    
+                    # Add the fighter_id to each fight for future reference
+                    for fight in last_5_fights:
+                        if fighter_id and 'fighter_id' not in fight:
+                            fight['fighter_id'] = fighter_id
+            except Exception as e:
+                logger.error(f"Error fetching fights by fighter_name: {str(e)}")
         
         fighter_data['last_5_fights'] = last_5_fights
         return fighter_data
@@ -480,9 +356,10 @@ def _process_fighter_data(fighter_data: Dict) -> Dict:
         logger.error(traceback.format_exc())
         return fighter_data
 
-def _get_default_fighter(name: str) -> Dict:
-    """Return a default fighter object with the given name."""
+def _get_default_fighter(fighter_id: str, name: str = "") -> Dict:
+    """Return a default fighter object with the given ID and name."""
     return {
+        "id": fighter_id,
         "fighter_name": name,
         "Record": "0-0-0",
         "Height": "",
@@ -503,13 +380,13 @@ def _get_default_fighter(name: str) -> Dict:
         "is_champion": False
     }
 
-@router.get("/fighter-details/{fighter_name}")
-def get_fighter_details(fighter_name: str):
-    """Get detailed fighter information by name."""
+@router.get("/fighter-details/{fighter_id}")
+def get_fighter_details(fighter_id: str):
+    """Get detailed fighter information by ID."""
     try:
-        # Use the same logic as get_fighter_stats but with more detailed logging
-        fighter_data = get_fighter_stats(fighter_name)
-        logger.info(f"Retrieved detailed information for fighter: {fighter_name}")
+        # Use the same logic as get_fighter_stats
+        fighter_data = get_fighter_stats(fighter_id)
+        logger.info(f"Retrieved detailed information for fighter ID: {fighter_id}")
         return sanitize_json(fighter_data)
     except HTTPException:
         raise
@@ -625,8 +502,37 @@ def scrape_and_store_fighters(fighters: List[Dict]):
                 
             try:
                 # Upsert the fighter data to the database
-                response = supabase.table("fighters").upsert(fighter, on_conflict="fighter_name").execute()
+                # Note: We now use 'id' as the conflict column if available, otherwise fallback to fighter_name
+                conflict_column = "id" if "id" in fighter else "fighter_name"
+                response = supabase.table("fighters").upsert(fighter, on_conflict=conflict_column).execute()
+                
                 if response and hasattr(response, 'data') and response.data:
+                    # Get the fighter ID - either from the response or from the original fighter data
+                    fighter_id = None
+                    if response.data and len(response.data) > 0:
+                        fighter_id = response.data[0].get('id')
+                    elif "id" in fighter:
+                        fighter_id = fighter.get('id')
+                        
+                    if fighter_id:
+                        # If this fighter has fights data, update the last_5_fights table with the fighter_id
+                        if "fights" in fighter:
+                            for fight in fighter["fights"]:
+                                # Add fighter_id to each fight record
+                                fight["fighter_id"] = fighter_id
+                                # Keep fighter_name for backward compatibility if needed
+                                if "fighter_name" not in fight and "fighter_name" in fighter:
+                                    fight["fighter_name"] = fighter["fighter_name"]
+                                
+                                # Upsert the fight data
+                                fight_response = supabase.table("fighter_last_5_fights").upsert(
+                                    fight, 
+                                    on_conflict=["fighter_id", "opponent"] if "opponent" in fight else "id"
+                                ).execute()
+                                
+                                if not fight_response or not hasattr(fight_response, 'data'):
+                                    logger.warning(f"Failed to insert fight for fighter ID {fighter_id}")
+                    
                     success_count += 1
                 else:
                     error_count += 1

@@ -146,7 +146,7 @@ def main():
         logger.info(f"Test Accuracy: {test_score:.4f}")
         
         # 6. Save Model (now includes features)
-        model_path = os.path.join(DATA_DIR, 'advanced_lea`  kproof_model.pkl') # New name
+        model_path = os.path.join(DATA_DIR, 'advanced_leakproof_model.pkl') # Corrected name
         trainer.save_model(model_path)
         logger.info(f"Model saved successfully to {model_path}")
         

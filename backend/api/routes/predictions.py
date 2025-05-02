@@ -30,8 +30,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=f"{API_V1_STR}/prediction", tags=["Predictions"])
 
 class FighterInput(BaseModel):
-    fighter1_name: str
-    fighter2_name: str
+    fighter1_name: Optional[str] = None
+    fighter2_name: Optional[str] = None
+    fighter1_id: Optional[str] = None
+    fighter2_id: Optional[str] = None
 
 class PredictionResponse(BaseModel):
     fighter1_name: str
@@ -43,16 +45,75 @@ class PredictionResponse(BaseModel):
     status: str = "success"
     probability_adjusted_for_weight: Optional[bool] = Field(None, description="Indicates if probability was adjusted due to large weight difference (>20 lbs)")
 
-@router.post("/predict", response_model=PredictionResponse)
-async def predict_fight(request: Request, fight_data: FighterInput):
+@router.post("/predict")
+async def predict_fight(request: Request):
     """
     Predict the winner of a fight between two fighters using the advanced ML model,
     ensuring consistency regardless of input order.
     """
     try:
-        original_fighter1_name = fight_data.fighter1_name
-        original_fighter2_name = fight_data.fighter2_name
-        logger.info(f"Received prediction request for {original_fighter1_name} vs {original_fighter2_name}")
+        # Get raw request body first for debugging
+        body = await request.json()
+        logger.info(f"Received prediction request with data: {body}")
+        
+        # Extract the fighter IDs from the request body
+        fighter1_id = body.get('fighter1_id')
+        fighter2_id = body.get('fighter2_id')
+        
+        if not fighter1_id or not fighter2_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Invalid input",
+                    "message": "Both fighter IDs are required",
+                    "status": "invalid_input"
+                }
+            )
+        
+        # Get fighter names from IDs using the database
+        supabase = get_db_connection()
+        if not supabase:
+            logger.error("No database connection available")
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "Database connection error"}
+            )
+            
+        # Get fighter 1 name
+        response1 = supabase.table('fighters')\
+            .select('fighter_name')\
+            .eq('id', fighter1_id)\
+            .execute()
+            
+        if not response1.data or len(response1.data) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": f"Fighter with ID {fighter1_id} not found"}
+            )
+            
+        # Get fighter 2 name  
+        response2 = supabase.table('fighters')\
+            .select('fighter_name')\
+            .eq('id', fighter2_id)\
+            .execute()
+            
+        if not response2.data or len(response2.data) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": f"Fighter with ID {fighter2_id} not found"}
+            )
+        
+        # Set the fighter names from database
+        fighter1_name = response1.data[0]['fighter_name']
+        fighter2_name = response2.data[0]['fighter_name']
+        
+        logger.info(f"Resolved fighter names from IDs: {fighter1_id} -> {fighter1_name}, {fighter2_id} -> {fighter2_name}")
+    
+        # Now proceed with names as before
+        original_fighter1_name = fighter1_name
+        original_fighter2_name = fighter2_name
+        
+        logger.info(f"Processing prediction for {original_fighter1_name} vs {original_fighter2_name}")
         
         # --- Get Pre-loaded ML Components --- 
         analyzer = getattr(request.app.state, 'analyzer', None)
@@ -175,21 +236,33 @@ async def predict_fight(request: Request, fight_data: FighterInput):
         # --- End Re-orientation --- 
         
         # --- Determine Winner and Confidence (based on original F1's final probability) --- 
-        predicted_winner = original_fighter1_name if final_probability_for_original_f1 >= 0.5 else original_fighter2_name
-        confidence = final_probability_for_original_f1 if predicted_winner == original_fighter1_name else 1.0 - final_probability_for_original_f1
+        predicted_winner_name = original_fighter1_name if final_probability_for_original_f1 >= 0.5 else original_fighter2_name
+        # Also store the winner ID
+        predicted_winner_id = fighter1_id if predicted_winner_name == original_fighter1_name else fighter2_id
+        confidence = final_probability_for_original_f1 if predicted_winner_name == original_fighter1_name else 1.0 - final_probability_for_original_f1
         
         # --- Format Response (using original names and re-oriented probabilities) --- 
-        response_data = PredictionResponse(
-            fighter1_name=original_fighter1_name,
-            fighter2_name=original_fighter2_name,
-            predicted_winner=predicted_winner,
-            confidence_percent=round(confidence * 100, 2),
-            fighter1_win_probability_percent=round(final_probability_for_original_f1 * 100, 2),
-            fighter2_win_probability_percent=round((1.0 - final_probability_for_original_f1) * 100, 2),
-            probability_adjusted_for_weight=probability_adjusted 
-        )
+        response_data = {
+            "fighter1_name": original_fighter1_name,
+            "fighter2_name": original_fighter2_name,
+            "fighter1_id": fighter1_id,
+            "fighter2_id": fighter2_id,
+            "predicted_winner": predicted_winner_id,  # Return ID instead of name
+            "predicted_winner_name": predicted_winner_name,  # Also include name for reference
+            "confidence_percent": float(round(confidence * 100, 2)),
+            "fighter1_win_probability_percent": float(round(final_probability_for_original_f1 * 100, 2)),
+            "fighter2_win_probability_percent": float(round((1.0 - final_probability_for_original_f1) * 100, 2)),
+            "probability_adjusted_for_weight": bool(probability_adjusted),
+            "status": "success"
+        }
         
-        logger.info(f"Prediction successful for {original_fighter1_name} vs {original_fighter2_name}: Winner {predicted_winner}")
+        # Ensure all values are regular Python types, not NumPy types
+        for key, value in response_data.items():
+            if hasattr(value, "item") and callable(getattr(value, "item")):
+                # Convert NumPy types to Python native types
+                response_data[key] = value.item()
+        
+        logger.info(f"Prediction successful for {original_fighter1_name} vs {original_fighter2_name}: Winner {predicted_winner_name}")
         return response_data
         
     except HTTPException as e:

@@ -10,10 +10,10 @@ import { useIsMobile, createFighterSlug } from "@/lib/utils"
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
 
 const FEATURED_FIGHTERS = [
-  { name: "Jon Jones", stat: "26-1" },
-  { name: "Israel Adesanya", stat: "24-2" },
-  { name: "Alexander Volkanovski", stat: "26-4-0" },
-  { name: "Islam Makhachev", stat: "24-1" },
+  { id: "6270", name: "Jon Jones", stat: "26-1" },
+  { id: "4487", name: "Israel Adesanya", stat: "24-2" },
+  { id: "8532", name: "Alexander Volkanovski", stat: "26-4-0" },
+  { id: "53", name: "Islam Makhachev", stat: "24-1" },
 ]
 
 export default function HomePage() {
@@ -32,12 +32,13 @@ export default function HomePage() {
         // Fetch updated data for featured fighters
         const updatedFighters = await Promise.all(
           FEATURED_FIGHTERS.map(async (fighter) => {
-            const response = await fetch(ENDPOINTS.FIGHTER(fighter.name));
+            const response = await fetch(ENDPOINTS.FIGHTER(fighter.id));
             if (!response.ok) return fighter;
             const data = await response.json();
             return {
+              id: fighter.id,
               name: fighter.name,
-              stat: data.Record || fighter.stat
+              stat: data.Record || data.record || fighter.stat
             };
           })
         );
@@ -120,7 +121,7 @@ export default function HomePage() {
               {[...featuredFighters, ...featuredFighters, ...featuredFighters].map((fighter, index) => (
                 <Link 
                   key={index} 
-                  href={`/fighters/${createFighterSlug(`${fighter.name} (${fighter.stat})`)}`}
+                  href={`/fighters/${fighter.id}`}
                   className="inline-flex items-center gap-2 mx-4 sm:mx-8 text-foreground/50 hover:text-foreground/90 transition-colors"
                 >
                   <span className="text-sm font-medium">{fighter.name}</span>

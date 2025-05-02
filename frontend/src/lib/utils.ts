@@ -165,10 +165,21 @@ export function useIsMobile() {
 
 /**
  * Creates a clean URL slug for a fighter
- * @param name - The fighter's full name with record
+ * @param input - The fighter's full name with record or a Fighter object
  * @returns A clean URL-friendly slug
  */
-export const createFighterSlug = (name: string): string => {
+export const createFighterSlug = (input: string | { id?: string, name: string }): string => {
+  // If input is a Fighter object with ID, just return the ID as the slug
+  if (typeof input !== 'string' && input && input.id) {
+    return input.id;
+  }
+  
+  // Get the name string to process
+  const name = typeof input === 'string' ? input : (input?.name || '');
+  
+  // If no valid name, return empty string
+  if (!name) return '';
+  
   // Remove any " - N/A" or weight class information after the record
   const cleanedName = name.replace(/ - .*$/, '');
   

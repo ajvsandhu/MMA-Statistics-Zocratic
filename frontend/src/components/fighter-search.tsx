@@ -27,8 +27,8 @@ import { useEffect, useState } from 'react'
 import { getAnimationVariants, fadeAnimation } from '@/lib/animations'
 
 interface Fighter {
+  id: string;
   name: string;
-  record: string;
 }
 
 const SEARCH_HISTORY_KEY = "fighter-search-history"
@@ -70,7 +70,7 @@ type RankingType = typeof RANKING_TYPES[number]['value']
 type FilterValue = WeightClass | RankingType | "all"
 
 interface FighterSearchProps {
-  onSelectFighter: (fighter: string) => void
+  onSelectFighter: (fighter: Fighter) => void
   clearSearch?: boolean
   searchBarId?: string
 }
@@ -91,28 +91,35 @@ const FighterBasicInfo = React.memo(({ name }: { name: string }) => (
 
 const FighterDetailedInfo = React.memo(({ fighter }: { fighter: string }) => {
   try {
+    // Handle the case where fighter is undefined or empty
+    if (!fighter) return <span>Unknown Fighter</span>;
+    
     const [baseName, ...rest] = fighter.split('(');
-    const info = '(' + rest.join('(');
+    // Only attempt to join if there's something to join
+    const info = rest.length > 0 ? '(' + rest.join('(') : '';
     return (
       <div className="flex flex-col">
         <span className="font-medium">{baseName.trim()}</span>
-        <span className="text-sm text-muted-foreground">{info}</span>
+        {info && <span className="text-sm text-muted-foreground">{info}</span>}
       </div>
     );
   } catch (err) {
     console.error('Error creating fighter display element:', err);
-    return <span>{fighter}</span>;
+    return <span>{fighter || 'Unknown Fighter'}</span>;
   }
 });
 
+// Add a constant for filter storage
+const FILTER_STORAGE_KEY = "fighter-search-filters";
+
 export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: FighterSearchProps) {
   const [searchTerm, setSearchTerm] = React.useState("")
-  const [fighters, setFighters] = React.useState<string[]>([])
+  const [fighters, setFighters] = React.useState<Fighter[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [showSuggestions, setShowSuggestions] = React.useState(false)
   const [selectedIndex, setSelectedIndex] = React.useState(-1)
-  const [searchHistory, setSearchHistory] = React.useState<string[]>([])
+  const [searchHistory, setSearchHistory] = React.useState<Fighter[]>([])
   const [filters, setFilters] = React.useState<SearchFilters>({
     weightClass: null,
     rankingType: "all"
@@ -124,6 +131,28 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const isComparePage = pathname?.includes('/fight-predictions/compare')
+  
+  // Load saved filters on component mount
+  React.useEffect(() => {
+    try {
+      const savedFilters = sessionStorage.getItem(FILTER_STORAGE_KEY);
+      if (savedFilters) {
+        const parsedFilters = JSON.parse(savedFilters);
+        setFilters(parsedFilters);
+      }
+    } catch (err) {
+      console.error('Error loading saved filters:', err);
+    }
+    
+    // Cleanup function to clear filters when component unmounts
+    return () => {
+      try {
+        sessionStorage.removeItem(FILTER_STORAGE_KEY);
+      } catch (err) {
+        console.error('Error clearing filters on unmount:', err);
+      }
+    };
+  }, []);
   
   // Determine which history key to use based on the searchBarId prop
   const historyKey = React.useMemo(() => {
@@ -140,7 +169,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         const parsedHistory = JSON.parse(storedHistory)
         if (Array.isArray(parsedHistory)) {
           const validHistory = parsedHistory
-            .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+            .filter((item): item is Fighter => typeof item === 'object' && item.id)
             .slice(0, MAX_HISTORY_ITEMS)
           setSearchHistory(validHistory)
         }
@@ -152,11 +181,11 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   }, [historyKey])
 
   // Save search history
-  const saveToHistory = (fighter: string) => {
+  const saveToHistory = (fighter: Fighter) => {
     try {
       // Get current history from localStorage for this specific search bar
       const currentHistory = localStorage.getItem(historyKey)
-      let existingHistory: string[] = []
+      let existingHistory: Fighter[] = []
       
       if (currentHistory) {
         try {
@@ -170,7 +199,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
       }
 
       // Remove any existing instance of this fighter and add to beginning
-      const filteredHistory = existingHistory.filter(f => f !== fighter)
+      const filteredHistory = existingHistory.filter(f => f.id !== fighter.id)
       const newHistory = [fighter, ...filteredHistory].slice(0, MAX_HISTORY_ITEMS)
       
       // Update both state and localStorage
@@ -212,7 +241,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
           const parsedHistory = JSON.parse(storedHistory)
           if (Array.isArray(parsedHistory)) {
             const validHistory = parsedHistory
-              .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+              .filter((item): item is Fighter => typeof item === 'object' && item.id)
               .slice(0, MAX_HISTORY_ITEMS)
             setSearchHistory(validHistory)
           }
@@ -229,33 +258,45 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   // Memoize expensive calculations
   const validFighters = React.useMemo(() => 
     fighters.filter(fighter => 
-      fighter !== undefined && fighter !== null && typeof fighter === 'string'
+      fighter !== undefined && fighter !== null && typeof fighter === 'object' && fighter.id
     ), [fighters]);
 
   // Use callback for event handlers
-  const handleFighterSelect = React.useCallback((fighterName: string) => {
+  const handleFighterSelect = React.useCallback((fighter: Fighter) => {
     try {
+      // Validate fighter object
+      if (!fighter || typeof fighter !== 'object') {
+        console.error('Invalid fighter object', fighter);
+        return;
+      }
+      
+      // Ensure fighter has an id
+      if (!fighter.id) {
+        console.error('Fighter missing ID', fighter);
+        return;
+      }
+      
+      // Close the suggestions dropdown and reset search
       setShowSuggestions(false);
       setSearchTerm("");
       setSelectedIndex(-1);
-      saveToHistory(fighterName);
+      
+      // Add to history
+      saveToHistory(fighter);
       
       const isComparisonPage = pathname?.includes('/fight-predictions/compare');
       
       if (isComparisonPage) {
-        onSelectFighter(fighterName);
+        onSelectFighter(fighter);
         return; // Stop here for compare page
       }
       
-      const slug = createFighterSlug(fighterName);
-      const url = `/fighters/${slug}`;
-      router.push(url);
-      onSelectFighter(fighterName); // Call callback after potential navigation
-
+      // Navigate to the fighter page using ID instead of slug
+      router.push(`/fighters/${fighter.id}`);
     } catch (err) {
-      console.error('Error processing fighter selection:', err);
+      console.error('Error selecting fighter:', err);
     }
-  }, [onSelectFighter, router, pathname, saveToHistory]);
+  }, [onSelectFighter, pathname, router, saveToHistory]);
 
   const handleInputChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -281,13 +322,14 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   }, []);
 
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
-    const items = [...(searchTerm ? fighters : searchHistory)]
+    // Get current list of items to navigate
+    const currentItems = searchTerm ? fighters : searchHistory;
     
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault()
         setSelectedIndex(prev => 
-          prev < items.length - 1 ? prev + 1 : prev
+          prev < currentItems.length - 1 ? prev + 1 : prev
         )
         break
       case "ArrowUp":
@@ -296,8 +338,8 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         break
       case "Enter":
         e.preventDefault()
-        if (selectedIndex > -1 && items[selectedIndex]) {
-          handleFighterSelect(items[selectedIndex])
+        if (selectedIndex > -1 && currentItems[selectedIndex]) {
+          handleFighterSelect(currentItems[selectedIndex])
         }
         break
       case "Escape":
@@ -309,21 +351,35 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   }, [searchTerm, fighters, searchHistory, selectedIndex, handleFighterSelect]);
 
   const clearFilters = React.useCallback(() => {
-    setFilters({
+    const clearedFilters = {
       weightClass: null,
       rankingType: "all"
-    });
+    };
+    
+    // Save cleared filters to sessionStorage
+    try {
+      sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(clearedFilters));
+    } catch (err) {
+      console.error('Error saving cleared filters:', err);
+    }
+    
+    setFilters(clearedFilters);
   }, []);
 
-  const getFighterDisplayElement = React.useCallback((fighter: string, isHistory: boolean = false) => {
-    if (!fighter) return <span>No name</span>;
+  const getFighterDisplayElement = React.useCallback((fighter: Fighter, isHistory: boolean = false) => {
+    // Check if fighter is null/undefined first
+    if (!fighter) return <span>No fighter data</span>;
+    
+    // Ensure fighter.name is defined before using includes()
+    // Use empty string as fallback if name is undefined
+    const fighterName = fighter.name || '';
     
     return (
       <div className="flex items-center gap-2">
         {isHistory && <FighterHistoryIcon />}
-        {!fighter.includes('(') ? 
-          <FighterBasicInfo name={fighter} /> : 
-          <FighterDetailedInfo fighter={fighter} />}
+        {!fighterName.includes('(') ? 
+          <FighterBasicInfo name={fighterName} /> : 
+          <FighterDetailedInfo fighter={fighterName} />}
       </div>
     );
   }, []);
@@ -336,13 +392,23 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
     // Prevent default behavior
     e?.preventDefault();
     
-    setFilters(prev => ({
-      ...prev,
+    const newFilters = {
+      ...filters,
       [type]: value
-    }));
-    setSearchTerm("");
+    };
+    
+    // Save filters to sessionStorage
+    try {
+      sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(newFilters));
+    } catch (err) {
+      console.error('Error saving filters:', err);
+    }
+    
+    setFilters(newFilters);
+    // Don't clear the search term when changing filters
+    // setSearchTerm("");
     setSelectedIndex(-1);
-  }, []);
+  }, [filters]);
 
   // Improved Framer Motion animations with variants
   const dropdownVariants = {
@@ -403,6 +469,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
       setFighters([])
       setShowSuggestions(false)
       setSelectedIndex(-1)
+      // Don't clear filters to maintain filter state between searches
     }
   }, [clearSearch])
 
@@ -448,6 +515,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         if (!data.fighters) {
           setFighters([]);
         } else {
+          // API now returns an array of objects with name and id fields
           setFighters(data.fighters);
           // Explicitly force the suggestions to show when we have results
           if (data.fighters.length > 0) {
@@ -487,13 +555,13 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
 
   // Optimization: use React.memo for CommandItem to prevent unnecessary re-renders
   const MemoizedCommandItem = React.memo(({ item, index, isHistory }: { 
-    item: string, 
+    item: Fighter, 
     index: number, 
     isHistory?: boolean 
   }) => (
     <CommandItem
-      value={item}
-      key={`${item}-${index}`}
+      value={item.name}
+      key={`${item.name}-${index}`}
       className={cn(
         isMobile ? "py-2 px-2" : "py-2.5 px-4",
         selectedIndex === index && "bg-accent",
@@ -652,13 +720,13 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
                       ) : (
                         validFighters.map((fighter, index) => (
                           <motion.div
-                            key={`fighter-${fighter}-${index}`}
+                            key={`fighter-${fighter.name}-${index}`}
                             variants={itemVariants}
                             initial="hidden"
                             animate="visible"
                           >
                             <MemoizedCommandItem 
-                              key={`fighter-${fighter}-${index}`}
+                              key={`fighter-${fighter.name}-${index}`}
                               item={fighter} 
                               index={index}
                               isHistory={false} 
@@ -681,13 +749,13 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
                       <CommandGroup>
                         {searchHistory.map((fighter, index) => (
                           <motion.div
-                            key={`history-${fighter}-${index}`}
+                            key={`history-${fighter.name}-${index}`}
                             variants={itemVariants}
                             initial="hidden"
                             animate="visible"
                           >
                             <MemoizedCommandItem 
-                              key={`history-${fighter}-${index}`}
+                              key={`history-${fighter.name}-${index}`}
                               item={fighter} 
                               index={index}
                               isHistory={true} 

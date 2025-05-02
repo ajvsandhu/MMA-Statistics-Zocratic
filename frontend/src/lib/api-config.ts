@@ -52,7 +52,9 @@ export async function fetchWithRetries(url: string, options = {}) {
 // API Endpoints
 export const ENDPOINTS = {
   FIGHTERS_SEARCH: (query: string) => `${API_URL}/api/${API_VERSION}/fighters?query=${encodeURIComponent(query)}`,
-  FIGHTER: (name: string) => `${API_URL}/api/${API_VERSION}/fighter/${encodeURIComponent(name)}`,
+  FIGHTER: (id: string) => `${API_URL}/api/${API_VERSION}/fighter/${encodeURIComponent(id)}`,
+  FIGHTER_STATS: (id: string) => `${API_URL}/api/${API_VERSION}/fighter-stats/${encodeURIComponent(id)}`,
+  FIGHTER_DETAILS: (id: string) => `${API_URL}/api/${API_VERSION}/fighter-details/${encodeURIComponent(id)}`,
   FIGHTERS_COUNT: `${API_URL}/api/${API_VERSION}/fighters-count`,
   PREDICTION: (fighter1: string, fighter2: string) => ({
     url: `${API_URL}/api/${API_VERSION}/prediction/predict`,
@@ -62,8 +64,8 @@ export const ENDPOINTS = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        fighter1_name: fighter1,
-        fighter2_name: fighter2,
+        fighter1_id: fighter1,
+        fighter2_id: fighter2
       }),
     },
   }),

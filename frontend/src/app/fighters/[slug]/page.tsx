@@ -4,32 +4,18 @@ import { useState, useEffect } from "react"
 import { FighterDetails } from "@/components/fighter-details"
 import { PageTransition } from "@/components/page-transition"
 import { FighterSearch } from "@/components/fighter-search"
-import { parseFighterSlug } from "@/lib/utils"
 import { useParams } from "next/navigation"
 
-export default function FighterSlugPage() {
+export default function FighterIdPage() {
   const params = useParams();
-  const slug = params?.slug as string;
-  const [fighterName, setFighterName] = useState<string>("");
-
-  useEffect(() => {
-    if (!slug) return;
-    
-    // Parse the slug to get fighter name and record
-    const { name, record } = parseFighterSlug(slug);
-    
-    // Combine name and record into the full fighter name format expected by the components
-    const fullFighterName = record ? `${name} ${record}` : name;
-    
-    setFighterName(fullFighterName);
-  }, [slug]);
+  const fighterId = params?.slug as string; // The route parameter is still called slug but contains the ID
   
   const handleSelectFighter = () => {
     // Empty function to satisfy the prop requirement
     // This is explicitly defined in the component to avoid the event handler error
   };
   
-  if (!fighterName) {
+  if (!fighterId) {
     return (
       <div className="container relative mx-auto px-4 py-8">
         <div className="flex items-center justify-center min-h-[300px]">
@@ -50,7 +36,7 @@ export default function FighterSlugPage() {
             />
           </div>
           
-          <FighterDetails fighterName={fighterName} />
+          <FighterDetails fighterId={fighterId} />
         </div>
       </div>
     </PageTransition>

@@ -1577,6 +1577,7 @@ def process_recent_event(num_events=1):
         logger.info(f"Processed {processed_in_event}/{len(unique_fighter_urls_in_event)} unique fighters from event {events_processed}/{len(event_urls_to_process)} ({event_display_name})")
     
     logger.info(f"Completed processing {events_processed} events. Total unique fighters updated: {total_updated_fighters}")
+    return True  # Return True to indicate successful completion
 
 ###############################################################################
 # MAIN

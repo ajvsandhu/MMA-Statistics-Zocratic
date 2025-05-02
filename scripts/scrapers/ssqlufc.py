@@ -871,6 +871,7 @@ def main():
     print(f"[INFO] Data processing complete. Updating database with {len(df)} fighters...")
     # Update database with smart diffing instead of replacing
     update_fighter_database(df)
+    return True  # Return True to indicate successful completion
 
 if __name__ == "__main__":
     main()

@@ -9,32 +9,36 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn, createFighterSlug } from "@/lib/utils"
 
+// Define Fighter interface matching the one in FighterSearch
+interface Fighter {
+  id: string;
+  name: string;
+}
+
 function FightersContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [selectedFighter, setSelectedFighter] = useState<string | null>(null)
+  const [selectedFighter, setSelectedFighter] = useState<Fighter | null>(null)
   const [isRedirecting, setIsRedirecting] = useState<boolean>(false)
 
   // Handle initial load and URL changes - maintain backward compatibility with query params
   useEffect(() => {
     const name = searchParams.get('name') || searchParams.get('fighter')
     if (name) {
-      // If query parameters are used, redirect to the new slug-based URL
+      // If query parameters are used, redirect to the new ID-based URL if available
+      // For backward compatibility we still support name-based redirects
       const slug = createFighterSlug(name)
       setIsRedirecting(true)
       router.replace(`/fighters/${slug}`)
     }
   }, [searchParams, router])
 
-  const handleFighterSelect = (name: string) => {
-    // Create a slug for clean URLs
-    const slug = createFighterSlug(name)
-    
-    // Navigate to the fighter details page using the slug-based URL
-    router.push(`/fighters/${slug}`)
+  const handleFighterSelect = (fighter: Fighter) => {
+    // Navigate to the fighter details page using the ID-based URL
+    router.push(`/fighters/${fighter.id}`)
     
     // Also update the selected fighter
-    setSelectedFighter(name)
+    setSelectedFighter(fighter)
   }
 
   // Show loading state during redirect
@@ -70,7 +74,7 @@ function FightersContent() {
 
           {selectedFighter && (
             <AnimatedContainer delay={0.4} className="max-w-4xl mx-auto">
-              <FighterDetails fighterName={selectedFighter} />
+              <FighterDetails fighterId={selectedFighter.id} />
             </AnimatedContainer>
           )}
         </div>
