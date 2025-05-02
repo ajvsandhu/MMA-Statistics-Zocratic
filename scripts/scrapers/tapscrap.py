@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 """
-Tapology Data Scraper
-
-A simplified, human-like scraper for collecting fighter data from Tapology
-with careful rate limiting to avoid detection.
+Tapology Fighter Data Scraper
+Collects UFC fighter data with reasonable rate limiting.
 """
 
 import argparse
@@ -175,17 +173,15 @@ def parse_args():
     return parser.parse_args()
 
 def safe_request(url, timeout=30, max_retries=3, cooldown_time=180):
-    """Make a request with error handling and rate limit detection."""
+    """Request with error handling and rate limit detection."""
     for attempt in range(1, max_retries + 1):
         try:
          
             actual_timeout = timeout + random.uniform(-5, 5)
             actual_timeout = max(10, actual_timeout)  # Ensure minimum timeout
             
-            # Get fresh headers for each request
+            # Fresh headers each request
             headers = get_human_headers()
-            
-            # Remove the small pre-request delay since we're using a flat delay before calling this function
             
             logger.info(f"Requesting {url}")
             response = requests.get(url, headers=headers, timeout=actual_timeout)

@@ -156,9 +156,7 @@ class DataLoader:
             return pd.Series([0, 0, 0])
 
     def load_fighters(self):
-        """
-        Load and preprocess fighter data
-        """
+        """Load and clean fighter data from database"""
         fighters_df = self.fetch_all_data("fighters")
         
         # Log column names
@@ -198,9 +196,7 @@ class DataLoader:
         return fighters_df
     
     def load_fights(self):
-        """
-        Load and preprocess fight data
-        """
+        """Load and clean fight data from database"""
         fights_df = self.fetch_all_data("fighter_last_5_fights")
         
         # Log column names
@@ -223,9 +219,7 @@ class DataLoader:
         return fights_df
     
     def calculate_fight_features(self, fights_df, fighter_name):
-        """
-        Calculate features from a fighter's last fights
-        """
+        """Extract performance metrics from a fighter's recent history"""
         fighter_fights = fights_df[fights_df['fighter_name'] == fighter_name].sort_values('fight_date', ascending=False)
         
         if len(fighter_fights) == 0:
