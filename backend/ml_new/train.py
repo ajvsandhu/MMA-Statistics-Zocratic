@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import timezone # Import timezone
+from dotenv import load_dotenv
 
 # Add project root directory to Python path
 project_root = Path(__file__).parent.parent.parent
@@ -24,6 +25,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
 
 def main():
     logger.info("--- Starting Training Pipeline (with Data Leakage Prevention) ---")

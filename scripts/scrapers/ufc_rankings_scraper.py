@@ -77,6 +77,9 @@ WEIGHT_CLASSES = {
 # Cache file location
 CACHED_RANKINGS_PATH = os.path.join(DATA_DIR, "cached_rankings.json")
 
+# Load .env from project root
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
+
 def cache_rankings(rankings: Dict[str, Any]) -> bool:
     """Cache rankings in a local file"""
     try:

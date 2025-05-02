@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, '.')
 
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
 
 # Setup logging
 logger = logging.getLogger(__name__)
