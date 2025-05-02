@@ -21,6 +21,9 @@ import {
 } from "@/components/ui/form"
 import { toast } from "@/components/ui/use-toast"
 
+// Formspree endpoint
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/mldbjbww"
+
 export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -36,7 +39,8 @@ export default function ContactPage() {
   const onSubmit = async (data: ContactFormValues) => {
     setIsSubmitting(true)
     try {
-      const response = await fetch("/api/contact", {
+      // Send form data to Formspree
+      const response = await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -44,10 +48,8 @@ export default function ContactPage() {
         body: JSON.stringify(data),
       })
 
-      const result = await response.json()
-
       if (!response.ok) {
-        throw new Error(result.error || "Something went wrong")
+        throw new Error("Something went wrong")
       }
 
       toast({

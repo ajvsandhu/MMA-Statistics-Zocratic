@@ -724,8 +724,12 @@ const FightHistoryView = ({
                   "group relative z-10 w-full text-left",
                   "rounded-xl p-6",
                   "bg-card/50 backdrop-blur-sm border border-primary/10",
-                  "hover:bg-card/60 hover:border-primary/20",
-                  "transition-all duration-300",
+                  "hover:bg-card/70 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/30",
+                  "transition-all duration-300 ease-in-out",
+                  "after:absolute after:inset-0 after:rounded-xl after:opacity-0 after:transition-opacity after:duration-300",
+                  "after:border-2 after:border-primary/30 after:pointer-events-none",
+                  "hover:after:opacity-100",
                   selectedFight === fight && "ring-2 ring-primary"
                 )}
                 onClick={() => setSelectedFight(fight)}
@@ -733,7 +737,7 @@ const FightHistoryView = ({
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
-                      <span className="font-medium truncate group-hover:text-foreground/90">{displayName}</span>
+                      <span className="font-medium truncate group-hover:text-foreground group-hover:font-semibold transition-all duration-200">{displayName}</span>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>{formatDate(fightDate)}</span>
                         <span className={`text-sm ${styles.text}`}>
@@ -746,6 +750,13 @@ const FightHistoryView = ({
                       <span role="img" aria-label={fight.method} className="text-base">{methodIcon}</span>
                       <span className="text-sm text-muted-foreground">{fight.method || "N/A"}</span>
                     </div>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <span className="text-primary flex items-center justify-center rounded-full h-6 w-6 bg-primary/10">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m9 18 6-6-6-6"/>
+                      </svg>
+                    </span>
                   </div>
                 </div>
               </motion.button>

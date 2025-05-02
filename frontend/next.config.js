@@ -29,7 +29,7 @@ const nextConfig = {
     return config
   },
   env: {
-    NEXT_PUBLIC_SITE_URL: 'https://www.zocraticmma.com'
+    NEXT_PUBLIC_SITE_URL: 'https://www.zocraticmma.com',
   },
   async headers() {
     return [
