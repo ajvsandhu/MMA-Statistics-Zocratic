@@ -10,7 +10,7 @@ from datetime import datetime
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../../.env'))
 
 logger = logging.getLogger(__name__)
 
