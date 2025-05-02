@@ -351,7 +351,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
   }, [searchTerm, fighters, searchHistory, selectedIndex, handleFighterSelect]);
 
   const clearFilters = React.useCallback(() => {
-    const clearedFilters = {
+    const clearedFilters: SearchFilters = {
       weightClass: null,
       rankingType: "all"
     };
