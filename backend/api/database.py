@@ -9,16 +9,9 @@ from supabase import create_client, Client
 import time
 import traceback
 
-# Load environment variables
-load_dotenv()
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Get Supabase credentials from environment variables
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # Connection settings
 CONNECTION_TIMEOUT = int(os.getenv("CONNECTION_TIMEOUT", "15"))  # 15-second timeout by default
@@ -33,7 +26,11 @@ _connection_expiry = 3600  # 1 hour expiry for connection
 class SimpleSupabaseClient:
     """A simplified client for Supabase that uses direct HTTP requests instead of SDK."""
     
-    def __init__(self, url: str, key: str):
+    def __init__(self, url: str = None, key: str = None):
+        if url is None:
+            url = os.getenv("SUPABASE_URL")
+        if key is None:
+            key = os.getenv("SUPABASE_KEY")
         self.base_url = url
         self.key = key
         self.headers = {
@@ -196,16 +193,11 @@ def get_db_connection() -> Optional[Client]:
         if _supabase_client is not None and (current_time - _last_connection_attempt) < _connection_expiry:
             return _supabase_client
             
-        # Check if credentials are available
-        if not SUPABASE_URL or not SUPABASE_KEY:
-            logger.error("Missing Supabase credentials. Please check environment variables.")
-            return None
-        
         # Create new connection with retries
         for attempt in range(MAX_RETRIES):
             try:
                 logger.info(f"Connecting to Supabase (attempt {attempt+1}/{MAX_RETRIES})...")
-                _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+                _supabase_client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
                 
                 # Test connection
                 test_response = _supabase_client.table('fighters').select('id').limit(1).execute()
@@ -263,5 +255,12 @@ def test_connection() -> bool:
         logger.error(traceback.format_exc())
         return False
 
-# Alias for get_db_connection to maintain compatibility
-get_supabase_client = get_db_connection
+def get_supabase_client() -> SimpleSupabaseClient:
+    """
+    Get a SimpleSupabaseClient instance using current environment variables.
+    """
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    if not url or not key:
+        raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables.")
+    return SimpleSupabaseClient(url, key)
