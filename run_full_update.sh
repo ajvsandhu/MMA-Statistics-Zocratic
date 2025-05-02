@@ -4,11 +4,6 @@ set -e
 # If you use a virtual environment, activate it here:
 source venv/bin/activate
 
-# Export all variables from .env
-set -a
-source .env
-set +a
-
 # Change to the project root (if not already there)
 cd "$(dirname "$0")"
 
