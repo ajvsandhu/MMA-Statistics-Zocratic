@@ -5,10 +5,12 @@ This module centralizes all configuration values and constants used throughout t
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+if not os.getenv("SUPABASE_URL"):
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
 # Base Directories
 BASE_DIR = Path(__file__).resolve().parent.parent  # Gets the backend directory parent

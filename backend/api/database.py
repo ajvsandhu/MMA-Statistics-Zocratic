@@ -4,13 +4,10 @@ import json
 import requests
 from functools import lru_cache
 from typing import Optional, Dict, Any, List
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from supabase import create_client, Client
 import time
 import traceback
-
-# Load environment variables
-load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

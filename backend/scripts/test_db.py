@@ -1,6 +1,6 @@
 import os
 import logging
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from backend.api.database import get_db_connection, test_connection # Import from the correct module
 
 # Set up logging
@@ -11,7 +11,7 @@ def test_database():
     """Test database connection and perform basic queries using backend.api.database."""
     try:
         # Load environment variables (already done by database module, but good practice)
-        load_dotenv()
+        # load_dotenv()
 
         # Use the test_connection function from database module
         logger.info("Testing database connection...")

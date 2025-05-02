@@ -1,9 +1,11 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../../.env'))
+if not os.getenv("SUPABASE_URL"):
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
 # Project paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent

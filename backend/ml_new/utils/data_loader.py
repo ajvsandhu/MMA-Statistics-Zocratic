@@ -3,14 +3,14 @@ import pandas as pd
 import numpy as np
 from supabase import create_client
 import os
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from backend.ml_new.config.settings import SUPABASE_URL, SUPABASE_KEY, RANDOM_STATE, TEST_SIZE, VAL_SIZE
 import logging
 from datetime import datetime
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../../.env'))
+# load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../../.env'))
 
 logger = logging.getLogger(__name__)
 
