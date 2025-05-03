@@ -1,14 +1,12 @@
 import os
 from pathlib import Path
-if not os.getenv("SUPABASE_URL"):
-    try:
-        from dotenv import load_dotenv
-        load_dotenv()
-    except ImportError:
-        pass
+from dotenv import load_dotenv
+
+# Always load .env from the project root
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+load_dotenv(dotenv_path=PROJECT_ROOT / '.env')
 
 # Project paths
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 DATA_DIR = os.path.join(PROJECT_ROOT, 'backend', 'ml_new', 'data')
 MODELS_DIR = PROJECT_ROOT / "models"
 FEATURES_DIR = PROJECT_ROOT / "features"
