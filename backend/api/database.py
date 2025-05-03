@@ -4,10 +4,15 @@ import json
 import requests
 from functools import lru_cache
 from typing import Optional, Dict, Any, List
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 from supabase import create_client, Client
 import time
 import traceback
+
+# Load environment variables from project root
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+load_dotenv(dotenv_path=PROJECT_ROOT / '.env')
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +21,10 @@ logger = logging.getLogger(__name__)
 # Get Supabase credentials from environment variables
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# Check credentials are loaded
+if not SUPABASE_URL or not SUPABASE_KEY:
+    logger.error("Missing Supabase credentials. Please check environment variables.")
 
 # Connection settings
 CONNECTION_TIMEOUT = int(os.getenv("CONNECTION_TIMEOUT", "15"))  # 15-second timeout by default
