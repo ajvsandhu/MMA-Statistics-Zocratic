@@ -375,7 +375,7 @@ export default function AboutPage() {
                     <p className={cn(
                       "text-muted-foreground", 
                       "text-[10px] sm:text-xs md:text-sm"
-                      )}>Follow our updates as we continue to improve and expand the platform with new features and insights.</p>
+                      )}>Follow our <a href="https://trello.com/b/02woA6Ny/zocratic-mma" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">updates</a> as we continue to improve and expand the platform with new features and insights.</p>
                   </AnimatedItem>
                 </AnimatedContainer>
                )}
