@@ -290,4 +290,4 @@ yarl==1.19.0
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.27.1
 
-xgboost==2.0.3
+xgboost==3.0.0
