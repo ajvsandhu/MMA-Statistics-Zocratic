@@ -50,7 +50,6 @@
 
 ## Version 1.05 - Upcoming Events Analysis and UI Improvements
 - Added new upcoming event scraper to fetch and analyze upcoming UFC events
-- Implemented fighter matchup analysis with ML-powered fight predictions
 - Created dedicated event analysis page showing fighter card comparisons
 - Improved mobile display with responsive layouts for all screen sizes
 - Enhanced page loading experience with smooth transitions and animations
