@@ -286,3 +286,6 @@ wsproto==1.2.0
     # via trio-websocket
 yarl==1.19.0
     # via aiohttp
+
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.27.1

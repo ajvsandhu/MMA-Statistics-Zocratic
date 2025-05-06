@@ -47,3 +47,16 @@
 - Updated training (`train.py`) and prediction logic (`predict.py`, API endpoint) to utilize the new pipeline, improving prediction accuracy and reliability.
 - Refactored application (`main.py`) to integrate the new ML components during startup.
 - Removed legacy `ml` module dependencies from the core application.
+
+## Version 1.05 - Upcoming Events Analysis and UI Improvements
+- Added new upcoming event scraper to fetch and analyze upcoming UFC events
+- Implemented fighter matchup analysis with ML-powered fight predictions
+- Created dedicated event analysis page showing fighter card comparisons
+- Improved mobile display with responsive layouts for all screen sizes
+- Enhanced page loading experience with smooth transitions and animations
+- Fixed image sizing and display issues on mobile devices
+- Implemented multi-line text handling for fighter names
+- Optimized data fetching and storage to frontend public directory
+- Added support for cronjob automation for scrapers on server deployment
+- Fixed dependency issues in scrapers by updating requirements.txt
+- Improved error handling and loading states throughout the application

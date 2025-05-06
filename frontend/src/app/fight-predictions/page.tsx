@@ -47,16 +47,15 @@ export default function FightPredictionsPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <h2 className="text-2xl font-semibold">Event Analysis</h2>
-                      <span className="text-xs font-medium bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded-full">WIP</span>
+                      <span className="text-xs font-medium bg-green-500/20 text-green-500 px-2 py-1 rounded-full">NEW</span>
                     </div>
                     <p className="text-muted-foreground">
                       Get comprehensive predictions and analysis for upcoming UFC events.
                     </p>
                   </div>
                   <Button 
-                    className="w-full bg-card hover:bg-card/80 text-foreground transition-all duration-300"
-                    variant="outline"
-                    disabled
+                    className="w-full bg-primary/90 hover:bg-primary text-primary-foreground transition-all duration-300 hover:scale-[1.02]"
+                    onClick={() => router.push('/fight-predictions/events')}
                   >
                     View Events <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
