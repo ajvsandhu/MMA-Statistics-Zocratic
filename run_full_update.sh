@@ -32,4 +32,7 @@ PYTHONPATH=. python scripts/scrapers/ufc_rankings_scraper.py
 echo "[4/4] Retraining the model..."
 python backend/ml_new/train.py
 
+# Restart the server to load the new model
+sudo systemctl restart zocratic
+
 echo "All steps completed successfully!" 

@@ -291,3 +291,5 @@ fuzzywuzzy==0.18.0
 python-Levenshtein==0.27.1
 
 xgboost==3.0.0
+
+tqdm
