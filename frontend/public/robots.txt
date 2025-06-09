@@ -1,0 +1,14 @@
+User-agent: *
+Disallow: /fighters/0
+Disallow: /fighters/1
+Disallow: /fighters/2
+Disallow: /fighters/3
+Disallow: /fighters/4
+Disallow: /fighters/5
+Disallow: /fighters/6
+Disallow: /fighters/7
+Disallow: /fighters/8
+Disallow: /fighters/9
+Allow: /
+
+Sitemap: https://zocraticmma.com/sitemap.xml 

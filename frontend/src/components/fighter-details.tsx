@@ -402,7 +402,9 @@ const FighterHeader = ({ stats, imageError, setImageError }: {
                     "object-cover object-top",
                     "w-full h-full",
                     isMobile ? "rounded-full" : "rounded-lg",
-                    "transition-transform duration-300 group-hover:scale-105"
+                    "transition-transform duration-300 group-hover:scale-105",
+                    // Add special class for default image
+                    (stats.image_url?.includes('static1.cbrimages.com') || !stats.image_url) && "default-fighter-image"
                   )}
                   onError={() => setImageError(true)}
                   priority
