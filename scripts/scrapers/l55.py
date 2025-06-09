@@ -1562,8 +1562,8 @@ def process_all_fighters(batch_size: int) -> bool:
                         
                         logger.info(f"Processing fighter: {fighter_name}")
                         try:
-                            # Use the same process_fighter function that works in fighter mode
-                            if process_fighter(fighter_name, fighter_url, 'all'):
+                            # Update the fighter's latest fight data
+                            if update_fighter_latest_fight(fighter_name, fighter_url, recent_only=False):
                                 total_success += 1
                                 logger.info(f"Successfully processed fighter: {fighter_name}")
                             else:
@@ -1888,7 +1888,7 @@ def main():
             return
             
         # Process the fighter
-        if not process_fighter(args.fighter, fighter_url, args.mode):
+        if not update_fighter_latest_fight(args.fighter, fighter_url, recent_only=(args.mode == 'recent')):
             logger.error(f"Failed to process fighter {args.fighter}")
             return
             
