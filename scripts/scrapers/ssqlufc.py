@@ -678,19 +678,135 @@ def extract_fighters_from_event(event_url, max_retries=3):
     
     return []
 
-def update_recent_fighters(num_events=2):
-    """Update only fighters who competed in the most recent events"""
-    print(f"[INFO] Running in recent fighters mode, checking last {num_events} events")
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="UFC Stats Scraper")
+    parser.add_argument('--mode', choices=['full', 'recent'], default='full',
+                      help='Scraping mode: full (all fighters) or recent (fighters from recent events)')
+    parser.add_argument('--events', type=int, default=2,
+                      help='Number of recent events to process in recent mode (default: 2)')
+    parser.add_argument('--upcoming', action='store_true',
+                      help='In recent mode, fetch fighters from upcoming events instead of completed events')
     
-    # Get recent events
-    recent_events = fetch_recent_events(num_events)
+    return parser.parse_args()
+
+def fetch_upcoming_events(num_events=1, max_retries=3):
+    """Fetch the most recent upcoming UFC events"""
+    url = "http://ufcstats.com/statistics/events/upcoming"
+    print(f"[INFO] Fetching upcoming events from {url}")
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            time.sleep(random.uniform(1.0, 2.0))
+            resp = session.get(url, timeout=(5, 30))
+            resp.raise_for_status()
+            
+            soup = BeautifulSoup(resp.text, "html.parser")
+            
+            # Find the table containing upcoming events
+            table_container = soup.find("div", class_="b-statistics__table-wrap")
+            if not table_container:
+                print("[WARN] Could not find table container, trying alternative approach")
+                events_table = soup.find("table")
+            else:
+                events_table = table_container.find("table")
+                
+            if not events_table:
+                print("[ERROR] Could not find events table")
+                # Try a more generic approach
+                event_links = []
+                all_links = soup.find_all("a", href=lambda href: href and href.startswith("http://ufcstats.com/event-details/"))
+                
+                for link in all_links[:num_events]:
+                    event_url = link["href"].strip()
+                    event_name = link.get_text(strip=True)
+                    date_text = ""
+                    
+                    # Look for a nearby date element
+                    parent = link.parent
+                    date_span = parent.find("span", class_="b-statistics__date")
+                    if date_span:
+                        date_text = date_span.get_text(strip=True)
+                    
+                    event_links.append({
+                        "url": event_url,
+                        "name": event_name,
+                        "date": date_text
+                    })
+                
+                if event_links:
+                    print(f"[INFO] Found {len(event_links)} upcoming events using alternative method")
+                    return event_links
+                
+                return []
+            
+            event_links = []
+            rows = events_table.find_all("tr")[1:]  # Skip header row
+            
+            for row in rows:
+                # Find the event link
+                link_tag = row.find("a", href=lambda href: href and href.startswith("http://ufcstats.com/event-details/"))
+                if not link_tag:
+                    continue
+                
+                event_url = link_tag["href"].strip()
+                event_name = link_tag.get_text(strip=True)
+                date_text = ""
+                
+                # Try to find the date
+                date_cell = row.find("span", class_="b-statistics__date")
+                if date_cell:
+                    date_text = date_cell.get_text(strip=True)
+                
+                event_links.append({
+                    "url": event_url,
+                    "name": event_name,
+                    "date": date_text
+                })
+                
+                if len(event_links) >= num_events:
+                    break
+            
+            print(f"[INFO] Found {len(event_links)} upcoming events")
+            return event_links
+            
+        except requests.exceptions.Timeout as e:
+            print(f"[WARN] Timeout fetching upcoming events, attempt {attempt}/{max_retries}: {e}")
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                print(f"[INFO] Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+        except Exception as e:
+            print(f"[ERROR] Failed to fetch upcoming events: {e}")
+            import traceback
+            traceback.print_exc()
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                print(f"[INFO] Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                return []
+    
+    return []
+
+def update_recent_fighters(num_events=2, use_upcoming=False):
+    """Update only fighters who competed in the most recent events or upcoming events"""
+    event_type = "upcoming" if use_upcoming else "completed"
+    print(f"[INFO] Running in recent fighters mode, checking last {num_events} {event_type} events")
+    
+    # Get recent events (completed or upcoming)
+    if use_upcoming:
+        recent_events = fetch_upcoming_events(num_events)
+    else:
+        recent_events = fetch_recent_events(num_events)
+        
     if not recent_events:
-        print("[ERROR] Could not find recent events. Exiting.")
+        print(f"[ERROR] Could not find recent {event_type} events. Exiting.")
         return False
     
     # Display events being processed
     print("\n" + "="*50)
-    print(f"Processing the following {len(recent_events)} events:")
+    print(f"Processing the following {len(recent_events)} {event_type} events:")
     for i, event in enumerate(recent_events, 1):
         print(f"{i}. {event['name']} - {event['date']}")
     print("="*50 + "\n")
@@ -705,10 +821,10 @@ def update_recent_fighters(num_events=2):
     all_fighter_urls = list(set(all_fighter_urls))
     
     if not all_fighter_urls:
-        print("[ERROR] Could not find any fighters in the recent events. Exiting.")
+        print(f"[ERROR] Could not find any fighters in the recent {event_type} events. Exiting.")
         return False
     
-    print(f"[INFO] Found {len(all_fighter_urls)} unique fighters across {len(recent_events)} events")
+    print(f"[INFO] Found {len(all_fighter_urls)} unique fighters across {len(recent_events)} {event_type} events")
     
     # Get existing fighters before starting the scrape
     existing_fighters = get_existing_fighters()
@@ -774,17 +890,11 @@ def update_recent_fighters(num_events=2):
 
 def main():
     # Create argument parser
-    parser = argparse.ArgumentParser(description='UFC Stats Scraper')
-    parser.add_argument('--mode', choices=['full', 'recent'], default='full',
-                        help='Scraping mode: full (all fighters) or recent (fighters from recent events)')
-    parser.add_argument('--events', type=int, default=2,
-                        help='Number of recent events to process in recent mode (default: 2)')
-    
-    args = parser.parse_args()
+    args = parse_args()
     
     # Check if we should only update recent fighters
     if args.mode == 'recent':
-        return update_recent_fighters(num_events=args.events)
+        return update_recent_fighters(num_events=args.events, use_upcoming=args.upcoming)
     
     # Otherwise run the full scrape
     # Get existing fighters before starting the scrape

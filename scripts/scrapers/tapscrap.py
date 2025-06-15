@@ -16,7 +16,10 @@ import time
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote_plus
-
+import requests
+from bs4 import BeautifulSoup
+from fuzzywuzzy import fuzz
+import Levenshtein
 # Check required packages
 required_packages = {
     'requests': 'requests>=2.31.0',
@@ -40,10 +43,7 @@ if missing_packages:
     print("\npip install " + " ".join(missing_packages))
     sys.exit(1)
 
-import requests
-from bs4 import BeautifulSoup
-from fuzzywuzzy import fuzz
-import Levenshtein  # Explicit import
+
 
 # Fix import by correctly adding the project root to sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -170,6 +170,8 @@ def parse_args():
     parser.add_argument('--batch-size', type=int, default=5, help='Number of fighters to process in each batch (default: 5)')
     parser.add_argument('--test', action='store_true', help='Run in test mode with a specific fighter')
     parser.add_argument('--test-fighter', type=str, default="Jon Jones", help='Specify the fighter name to test')
+    parser.add_argument('--mode', choices=['all', 'recent'], default='all', help='Mode: all=process all fighters, recent=process most recent fighters only')
+    parser.add_argument('--count', type=int, default=25, help='Number of recent fighters to process in recent mode (default: 25)')
     return parser.parse_args()
 
 def safe_request(url, timeout=30, max_retries=3, cooldown_time=180):
@@ -555,6 +557,108 @@ def load_progress():
         logger.warning(f"Failed to load progress: {str(e)}")
         return 0
 
+def get_recent_fighters(count=25):
+    """Get the most recent fighters from the database (highest IDs)."""
+    try:
+        supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Failed to get Supabase client")
+            return []
+        
+        logger.info(f"Fetching the most recent {count} fighters from database...")
+        
+        # Get fighters ordered by ID descending (most recent first)
+        response = supabase.table('fighters').select('fighter_name, tap_link, image_url').order('id', desc=True).limit(count).execute()
+        
+        if not response.data:
+            logger.warning("No fighters found in database")
+            return []
+        
+        recent_fighters = response.data
+        logger.info(f"Retrieved {len(recent_fighters)} recent fighters")
+        
+        # Log the fighters we're about to process
+        logger.info("Recent fighters to process:")
+        for i, fighter in enumerate(recent_fighters, 1):
+            fighter_name = fighter['fighter_name']
+            has_tap_link = bool(fighter.get('tap_link'))
+            has_image = bool(fighter.get('image_url')) and fighter.get('image_url') != DEFAULT_IMAGE_URL
+            status = []
+            if not has_tap_link:
+                status.append("needs tap_link")
+            if not has_image:
+                status.append("needs image")
+            status_str = ", ".join(status) if status else "complete"
+            logger.info(f"  {i}. {fighter_name} ({status_str})")
+        
+        return recent_fighters
+        
+    except Exception as e:
+        logger.error(f"Error getting recent fighters: {str(e)}")
+        return []
+
+def process_recent_fighters(count=25):
+    """Process only the most recent fighters in the database."""
+    try:
+        logger.info(f"=== RECENT MODE: Processing last {count} fighters ===")
+        
+        # Get recent fighters
+        recent_fighters = get_recent_fighters(count)
+        if not recent_fighters:
+            logger.error("No recent fighters to process")
+            return False
+        
+        # Process statistics
+        success_count = 0
+        error_count = 0
+        
+        for i, fighter in enumerate(recent_fighters):
+            fighter_name = fighter['fighter_name']
+            
+            logger.info(f"\n--- Processing recent fighter {i+1}/{len(recent_fighters)}: {fighter_name} ---")
+            
+            try:
+                # Check if fighter already has complete data
+                has_complete_data = (fighter.get('tap_link') and 
+                                   fighter.get('image_url') and 
+                                   fighter.get('image_url') != DEFAULT_IMAGE_URL)
+                
+                if has_complete_data:
+                    logger.info(f"Skipping {fighter_name} - already has complete data")
+                    success_count += 1
+                else:
+                    # Process fighter that needs data
+                    if process_fighter(fighter):
+                        success_count += 1
+                        logger.info(f"✓ Successfully processed {fighter_name}")
+                    else:
+                        error_count += 1
+                        logger.warning(f"✗ Failed to process {fighter_name}")
+                
+                # Add a small delay between fighters to be respectful
+                if i < len(recent_fighters) - 1:  # Don't delay after the last fighter
+                    logger.info("Brief pause before next fighter...")
+                    time.sleep(2)
+                    
+            except Exception as e:
+                logger.error(f"Error processing recent fighter {fighter_name}: {str(e)}")
+                error_count += 1
+                continue
+        
+        # Final summary
+        logger.info("\n" + "="*60)
+        logger.info("RECENT MODE PROCESSING COMPLETE!")
+        logger.info(f"Total recent fighters processed: {len(recent_fighters)}")
+        logger.info(f"Successfully updated: {success_count}")
+        logger.info(f"Errors: {error_count}")
+        logger.info("="*60)
+        
+        return success_count > 0
+        
+    except Exception as e:
+        logger.error(f"Fatal error in recent mode: {str(e)}")
+        return False
+
 def main():
     """Main scraper process."""
     try:
@@ -574,6 +678,11 @@ def main():
             process_fighter(test_fighter)
             return
         
+        # Recent mode - process most recent fighters
+        if args.mode == 'recent':
+            return process_recent_fighters(args.count)
+        
+        # All mode - existing functionality
         logger.info("Connecting to database...")
         supabase = get_supabase_client()
         
