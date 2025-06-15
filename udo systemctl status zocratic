@@ -1,0 +1,23 @@
+[0;1;32m●[0m zocratic.service - Zocratic MMA Statistics Backend
+     Loaded: loaded (/etc/systemd/system/zocratic.service; enabled; vendor preset: enabled)
+     Active: [0;1;32mactive (running)[0m since Tue 2025-05-06 02:36:18 UTC; 20h ago
+   Main PID: 428008 (gunicorn)
+      Tasks: 45 (limit: 28632)
+     Memory: 665.4M
+     CGroup: /system.slice/zocratic.service
+             ├─428008 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/python3.13 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/gunicorn backend.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+             ├─428009 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/python3.13 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/gunicorn backend.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+             ├─428010 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/python3.13 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/gunicorn backend.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+             ├─428011 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/python3.13 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/gunicorn backend.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+             └─428012 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/python3.13 /home/ubuntu/MMA-Statistics-Zocratic/venv/bin/gunicorn backend.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+
+May 06 23:02:19 web-server-hosting gunicorn[428012]: AttributeError: 'SyncSupabaseAuthClient' object has no attribute '_refresh_token_timer'
+May 06 23:02:19 web-server-hosting gunicorn[428012]: INFO:backend.api.database:Connecting to Supabase (attempt 3/3)...
+May 06 23:02:19 web-server-hosting gunicorn[428012]: WARNING:backend.api.database:Connection attempt 3 failed: [Errno 2] No such file or directory
+May 06 23:02:19 web-server-hosting gunicorn[428012]: INFO:backend.api.database:Retrying in 4 seconds...
+May 06 23:02:23 web-server-hosting gunicorn[428012]: Exception ignored in: <function SyncGoTrueClient.__del__ at 0xffff8c8d5c60>
+May 06 23:02:23 web-server-hosting gunicorn[428012]: Traceback (most recent call last):
+May 06 23:02:23 web-server-hosting gunicorn[428012]:   File "/home/ubuntu/MMA-Statistics-Zocratic/venv/lib/python3.13/site-packages/gotrue/_sync/gotrue_client.py", line 1237, in __del__
+May 06 23:02:23 web-server-hosting gunicorn[428012]: AttributeError: 'SyncSupabaseAuthClient' object has no attribute '_refresh_token_timer'
+May 06 23:02:23 web-server-hosting gunicorn[428012]: ERROR:backend.api.database:Failed to connect to Supabase after 3 attempts
+May 06 23:02:23 web-server-hosting gunicorn[428012]: ERROR:backend.api.routes.fighters:No database connection available
