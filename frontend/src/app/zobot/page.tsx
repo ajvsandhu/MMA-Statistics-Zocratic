@@ -167,14 +167,71 @@ function ZobotChatContent() {
     })
   }
 
-  // Format message text with better line breaks and structure
+  // Format message text with basic markdown rendering
   const formatMessageText = (text: string) => {
-    return text.split('\n').map((line, index) => (
-      <span key={index}>
-        {line}
-        {index < text.split('\n').length - 1 && <br />}
-      </span>
-    ))
+    // Split text into lines and process each line
+    const lines = text.split('\n')
+    
+    return (
+      <div className="space-y-2">
+        {lines.map((line, lineIndex) => {
+          // Handle empty lines
+          if (!line.trim()) {
+            return <div key={lineIndex} className="h-2" />
+          }
+          
+          // Process markdown formatting in the line
+          const parts = []
+          let currentText = line
+          let partIndex = 0
+          
+          // Process **bold** text
+          const boldRegex = /\*\*(.*?)\*\*/g
+          let lastIndex = 0
+          let match
+          
+          while ((match = boldRegex.exec(line)) !== null) {
+            // Add text before the bold part
+            if (match.index > lastIndex) {
+              parts.push(
+                <span key={`text-${partIndex++}`}>
+                  {line.slice(lastIndex, match.index)}
+                </span>
+              )
+            }
+            
+            // Add the bold part
+            parts.push(
+              <strong key={`bold-${partIndex++}`} className="font-semibold">
+                {match[1]}
+              </strong>
+            )
+            
+            lastIndex = match.index + match[0].length
+          }
+          
+          // Add remaining text after the last bold part
+          if (lastIndex < line.length) {
+            parts.push(
+              <span key={`text-${partIndex++}`}>
+                {line.slice(lastIndex)}
+              </span>
+            )
+          }
+          
+          // If no bold formatting found, just return the line as is
+          if (parts.length === 0) {
+            parts.push(<span key={`text-${partIndex++}`}>{line}</span>)
+          }
+          
+          return (
+            <div key={lineIndex} className="leading-relaxed">
+              {parts}
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
