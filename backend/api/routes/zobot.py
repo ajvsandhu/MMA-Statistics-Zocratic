@@ -199,6 +199,43 @@ ML PREDICTION FROM ZOCRATIC MMA MODEL:
 CRITICAL: Use these EXACT numbers from the Zocratic MMA prediction model. Do not make up different percentages."""
                     break
         
+        # Check if user is asking about any statistics
+        elif any(word in user_message.lower() for word in ["stats", "statistics", "accuracy", "average", "percentage", "%", "best striker", "best wrestler", "most accurate", "highest", "top fighters"]):
+            additional_context = f"""
+
+STATISTICAL ANALYSIS CONTEXT: The user is asking about fighter statistics. Apply these principles:
+
+SAMPLE SIZE AWARENESS:
+- High percentages with low volume are often misleading
+- Always consider fighter style vs the statistic being discussed
+- Mention when sample sizes make stats unreliable
+
+FIGHTING STYLE CONTEXT:
+- Wrestlers: Focus on TD accuracy, control time, ground strikes
+- Strikers: Focus on striking accuracy, defense, knockdowns  
+- Grapplers: Focus on submission attempts, ground control
+- Well-rounded: Can excel in multiple areas
+
+SPECIFIC STAT GUIDELINES:
+- Takedown Accuracy: Wrestlers (Khabib, Usman) vs Strikers (Adesanya, Holloway)
+- Striking Accuracy: Volume strikers vs counter-strikers have different contexts
+- Submission Average: Grapplers vs strikers who rarely attempt subs
+- Defense Stats: Consider what threats each fighter typically faces
+
+CRITICAL: Never rank fighters by raw percentages without volume and style context."""
+
+        # Check if user is asking about techniques/instruction
+        elif any(word in user_message.lower() for word in ["how to", "technique", "submission", "choke", "armbar", "takedown", "guard", "position", "escape", "setup", "triangle", "kimura", "guillotine", "rnc", "rear naked"]):
+            additional_context = f"""
+
+TECHNIQUE INSTRUCTION CONTEXT: The user wants to learn martial arts techniques. Focus on:
+- Step-by-step instruction with proper form
+- Safety considerations and when to practice with supervision
+- Which fighters are known for these techniques (with real examples)
+- Common mistakes and how to avoid them
+- Setups and combinations that work well together
+- Always emphasize training safely with qualified instructors"""
+
         # Check if user is asking about a specific fighter
         elif any(word in user_message.lower() for word in ["tell me about", "stats", "record", "who is"]):
             # Extract fighter name (simple approach)
@@ -253,6 +290,16 @@ CRITICAL GUIDELINES:
 - Provide detailed analysis based on actual fighter stats when available
 - Be conversational and engaging, not robotic
 - When uncertain about facts not in the provided data, be honest about limitations
+
+STATISTICAL ACCURACY REQUIREMENTS:
+- ALWAYS provide context for ALL statistics - sample size matters for every stat
+- Takedown Accuracy: Distinguish high-volume wrestlers vs strikers with few attempts
+- Striking Accuracy: Context for volume strikers vs defensive fighters with low output  
+- Submission Average: Grapplers vs strikers who rarely attempt submissions
+- Defense Stats: Consider fighting style - strikers vs grapplers face different threats
+- Never present misleading stats without proper context about fighter style and volume
+- A fighter who is 1/1 (100%) is NOT better than someone who is 15/20 (75%) with high volume
+- Always mention if a stat might be misleading due to small sample size or fighting style
 
 TECHNIQUE INSTRUCTION:
 - Always explain proper form and safety when teaching techniques
