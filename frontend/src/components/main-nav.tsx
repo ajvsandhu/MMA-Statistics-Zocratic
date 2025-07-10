@@ -34,6 +34,10 @@ export function MainNav() {
       label: "Fight Predictions",
     },
     {
+      href: "/zobot",
+      label: "Zobot AI",
+    },
+    {
       href: "/about",
       label: "About",
     },

@@ -250,6 +250,10 @@ async def sanitize_json_response(request: Request, call_next) -> Response:
 app.include_router(fighters.router)
 app.include_router(predictions.router)
 
+# Import and include Zobot router
+from backend.api.routes import zobot
+app.include_router(zobot.router)
+
 @app.get("/")
 def read_root():
     """Root endpoint that checks database connection."""

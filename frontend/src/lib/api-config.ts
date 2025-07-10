@@ -71,5 +71,7 @@ export const ENDPOINTS = {
   }),
   TRAIN_MODEL: `${API_URL}/api/${API_VERSION}/prediction/train`,
   MODEL_STATUS: `${API_URL}/api/${API_VERSION}/prediction/status`,
-  UPDATE_RANKINGS: `${API_URL}/api/${API_VERSION}/prediction/update-rankings`
+  UPDATE_RANKINGS: `${API_URL}/api/${API_VERSION}/prediction/update-rankings`,
+  ZOBOT_CHAT: `${API_URL}/api/${API_VERSION}/zobot/chat`,
+  ZOBOT_STATUS: `${API_URL}/api/${API_VERSION}/zobot/status`
 } as const; 
