@@ -127,9 +127,30 @@ async def setup_dependencies(app: FastAPI):
         # 4. Load Model Trainer
         logger.info("Initializing UFCTrainer...")
         app.state.trainer = UFCTrainer()
-        model_path = os.path.join(DATA_DIR, 'advanced_leakproof_model.pkl')
-        logger.info(f"Loading model from {model_path}...")
-        app.state.trainer.load_model(model_path)
+        
+        # Try to load from bucket first
+        try:
+            logger.info("🪣 Attempting to load model from Supabase bucket...")
+            model_info = app.state.trainer.load_model_from_bucket("advanced_leakproof_model")
+            logger.info(f"✅ Model loaded from bucket: version {model_info['model_version']}")
+            logger.info(f"📊 Training accuracy: {model_info.get('training_accuracy', 'N/A')}")
+            logger.info(f"📊 Validation accuracy: {model_info.get('validation_accuracy', 'N/A')}")
+            logger.info(f"📊 Test accuracy: {model_info.get('test_accuracy', 'N/A')}")
+            logger.info(f"💾 File size: {model_info.get('file_size', 0) / 1024 / 1024:.2f} MB")
+        except Exception as bucket_error:
+            logger.warning(f"❌ Failed to load model from bucket: {str(bucket_error)}")
+            logger.info("⬇️ Falling back to file-based model loading...")
+            
+            # Fallback to file-based loading
+            try:
+                model_path = os.path.join(DATA_DIR, 'advanced_leakproof_model.pkl')
+                logger.info(f"Loading model from {model_path}...")
+                app.state.trainer.load_model(model_path)
+                logger.info("✅ Model loaded from file")
+            except Exception as file_error:
+                logger.error(f"❌ Failed to load model from file: {str(file_error)}")
+                raise RuntimeError("Could not load model from bucket or file")
+        
         logger.info("UFCTrainer initialized and model loaded.")
         if app.state.trainer.features is None:
             logger.warning("Loaded model does not contain feature names.")

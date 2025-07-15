@@ -2,10 +2,15 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
+import tempfile
+import logging
+from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 from backend.ml_new.config.settings import DATA_DIR, RANDOM_STATE, TEST_SIZE, VAL_SIZE
+
+logger = logging.getLogger(__name__)
 
 class UFCTrainer:
     def __init__(self):
@@ -80,6 +85,159 @@ class UFCTrainer:
         X_scaled = self.scaler.transform(X)
         return self.model.predict_proba(X_scaled)
     
+    def save_model_to_bucket(self, model_name: str, model_version: str, training_scores: dict = None):
+        """Save model to Supabase storage bucket."""
+        if self.features is None:
+            raise RuntimeError("Cannot save model without feature list.")
+        
+        # Import here to avoid circular imports
+        from backend.api.database import get_supabase_client
+        
+        # Prepare model data
+        model_data = {
+            'model': self.model,
+            'scaler': self.scaler,
+            'features': self.features
+        }
+        
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as temp_file:
+            joblib.dump(model_data, temp_file.name)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Connect to database
+            supabase = get_supabase_client()
+            if not supabase:
+                raise RuntimeError("Database connection failed")
+            
+            # Upload to bucket
+            bucket_path = f"{model_name}/{model_version}.pkl"
+            
+            with open(temp_file_path, 'rb') as f:
+                response = supabase.storage.from_('ml-models').upload(
+                    file=f,
+                    path=bucket_path,
+                    file_options={"upsert": "true"}
+                )
+            
+            # Check if upload failed (response will be None or have error attribute)
+            if response is None:
+                raise RuntimeError("Failed to upload model: No response from storage")
+            if hasattr(response, 'error') and response.error:
+                raise RuntimeError(f"Failed to upload model: {response.error}")
+            
+            # Get file size
+            file_size = os.path.getsize(temp_file_path)
+            
+            # Set all existing models of this name to inactive
+            supabase.table('ml_models').update({
+                'is_active': False
+            }).eq('model_name', model_name).execute()
+            
+            # Save metadata to database
+            model_record = {
+                'model_name': model_name,
+                'model_version': model_version,
+                'bucket_path': bucket_path,
+                'model_type': 'xgboost',
+                'features': self.features,
+                'is_active': True,
+                'file_size': file_size,
+                'model_metadata': {
+                    'feature_count': len(self.features),
+                    'model_params': self.model.get_params()
+                }
+            }
+            
+            # Add training scores if provided
+            if training_scores:
+                model_record.update({
+                    'training_accuracy': training_scores.get('train_accuracy'),
+                    'validation_accuracy': training_scores.get('val_accuracy'),
+                    'test_accuracy': training_scores.get('test_accuracy')
+                })
+            
+            # Insert metadata
+            db_response = supabase.table('ml_models').insert(model_record).execute()
+            
+            if db_response.data:
+                logger.info(f"✅ Model '{model_name}' v{model_version} saved to bucket successfully")
+                logger.info(f"📁 File size: {file_size / 1024 / 1024:.2f} MB")
+                return db_response.data[0]['id']
+            else:
+                raise RuntimeError("Failed to save model metadata to database")
+                
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
+    
+    def load_model_from_bucket(self, model_name: str, model_version: str = None):
+        """Load model from Supabase storage bucket."""
+        # Import here to avoid circular imports
+        from backend.api.database import get_supabase_client
+        
+        supabase = get_supabase_client()
+        if not supabase:
+            raise RuntimeError("Database connection failed")
+        
+        try:
+            # Build query for metadata
+            query = supabase.table('ml_models').select('*').eq('model_name', model_name)
+            
+            if model_version:
+                query = query.eq('model_version', model_version)
+            else:
+                # Get the active model
+                query = query.eq('is_active', True)
+            
+            # Order by creation date (newest first)
+            query = query.order('created_at', desc=True).limit(1)
+            
+            response = query.execute()
+            
+            if not response.data:
+                raise RuntimeError(f"No model found with name '{model_name}'" + 
+                                 (f" version '{model_version}'" if model_version else ""))
+            
+            model_record = response.data[0]
+            bucket_path = model_record['bucket_path']
+            
+            # Download from bucket
+            file_response = supabase.storage.from_('ml-models').download(bucket_path)
+            
+            if not file_response:
+                raise RuntimeError(f"Failed to download model from bucket: {bucket_path}")
+            
+            # Create temporary file and load model
+            with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as temp_file:
+                temp_file.write(file_response)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Load model data
+                model_data = joblib.load(temp_file_path)
+                
+                # Set trainer attributes
+                self.model = model_data['model']
+                self.scaler = model_data['scaler']
+                self.features = model_data['features']
+                
+                logger.info(f"✅ Model '{model_name}' v{model_record['model_version']} loaded from bucket")
+                logger.info(f"📁 File size: {model_record['file_size'] / 1024 / 1024:.2f} MB")
+                
+                return model_record
+                
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                
+        except Exception as e:
+            logger.error(f"❌ Error loading model from bucket: {str(e)}")
+            raise
+
     def save_model(self, model_path):
         """Save model, scaler and features to disk."""
         if self.features is None:

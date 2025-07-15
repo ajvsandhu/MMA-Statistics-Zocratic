@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import timezone # Import timezone
+from datetime import datetime # Import datetime for model version
 # from dotenv import load_dotenv
 
 # Add project root directory to Python path
@@ -148,10 +149,29 @@ def main():
         logger.info(f"Validation Accuracy: {val_score:.4f}")
         logger.info(f"Test Accuracy: {test_score:.4f}")
         
-        # 6. Save Model (now includes features)
-        model_path = os.path.join(DATA_DIR, 'advanced_leakproof_model.pkl') # Corrected name
+        # 6. Save Model to file (backward compatibility)
+        model_path = os.path.join(DATA_DIR, 'advanced_leakproof_model.pkl')
         trainer.save_model(model_path)
         logger.info(f"Model saved successfully to {model_path}")
+        
+        # 7. Save Model to Supabase Storage Bucket
+        training_scores = {
+            'train_accuracy': train_score,
+            'val_accuracy': val_score,
+            'test_accuracy': test_score
+        }
+        
+        model_version = datetime.now().strftime("%Y%m%d_%H%M%S")
+        try:
+            model_id = trainer.save_model_to_bucket(
+                model_name="advanced_leakproof_model",
+                model_version=model_version,
+                training_scores=training_scores
+            )
+            logger.info(f"🪣 Model saved to bucket with ID: {model_id}")
+        except Exception as e:
+            logger.error(f"❌ Failed to save model to bucket: {str(e)}")
+            logger.info("📁 Model saved to local file only")
         
     except Exception as e:
         logger.error(f"An error occurred during model training or evaluation: {str(e)}", exc_info=True)
