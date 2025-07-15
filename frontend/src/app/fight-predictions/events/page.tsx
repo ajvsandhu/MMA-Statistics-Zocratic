@@ -11,6 +11,7 @@ import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/pa
 import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
+import { ENDPOINTS } from "@/lib/api-config"
 
 interface Fighter {
   fighter_name: string
@@ -75,7 +76,7 @@ export default function EventAnalysisPage() {
   useEffect(() => {
     async function fetchEventData() {
       try {
-        const response = await fetch('/upcoming_event.json')
+        const response = await fetch(ENDPOINTS.UPCOMING_EVENTS)
         if (!response.ok) {
           throw new Error('Failed to fetch event data')
         }

@@ -620,16 +620,54 @@ def add_predictions_to_matchups(matchups):
     
     return matchups
 
+def save_to_database(event_data):
+    """Save event data to the database"""
+    if not db_available or not supabase:
+        logger.error("Database not available. Cannot save event data.")
+        return False
+    
+    try:
+        # First, deactivate any existing active events
+        logger.info("Deactivating existing active events...")
+        supabase.table('upcoming_events').update({'is_active': False}).eq('is_active', True).execute()
+        
+        # Insert the new event
+        logger.info("Inserting new event into database...")
+        response = supabase.table('upcoming_events').insert({
+            'event_name': event_data['event_name'],
+            'event_date': event_data['event_date'],
+            'event_url': event_data['event_url'],
+            'scraped_at': event_data['scraped_at'],
+            'fights': event_data['fights'],
+            'is_active': True
+        }).execute()
+        
+        if response.data:
+            logger.info(f"Successfully saved event to database with ID: {response.data[0]['id']}")
+            return True
+        else:
+            logger.error("Failed to save event to database")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error saving event to database: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description='UFC Upcoming Event Scraper')
     parser.add_argument('--output', type=str, default='frontend/public/upcoming_event.json',
-                       help='Output file path (default: frontend/public/upcoming_event.json)')
+                       help='Output file path (default: frontend/public/upcoming_event.json) - DEPRECATED, now saves to database')
     parser.add_argument('--no-predictions', action='store_true',
                        help='Skip generating predictions for matchups')
+    parser.add_argument('--save-to-file', action='store_true',
+                       help='Also save to JSON file (for backward compatibility)')
     args = parser.parse_args()
     
-    # Create the directory if it doesn't exist
-    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    # Create the directory if it doesn't exist (only if saving to file)
+    if args.save_to_file:
+        os.makedirs(os.path.dirname(args.output), exist_ok=True)
     
     # Fetch the upcoming event
     event = fetch_upcoming_event()
@@ -664,12 +702,20 @@ def main():
         "fights": enriched_matchups
     }
     
-    # Write to JSON file
-    output_path = args.output
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(event_data, f, indent=2, ensure_ascii=False)
+    # Save to database (primary method)
+    database_success = save_to_database(event_data)
     
-    logger.info(f"Successfully saved upcoming event data to {output_path}")
+    # Optionally save to JSON file for backward compatibility
+    if args.save_to_file:
+        try:
+            output_path = args.output
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(event_data, f, indent=2, ensure_ascii=False)
+            logger.info(f"Successfully saved upcoming event data to {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to save to JSON file: {str(e)}")
+    
+    # Log results
     logger.info(f"Event: {event['name']}")
     logger.info(f"Date: {event['date']}")
     logger.info(f"Fights: {len(enriched_matchups)}")
@@ -678,7 +724,13 @@ def main():
     predictions_count = sum(1 for m in enriched_matchups if m.get('prediction') is not None)
     logger.info(f"Predictions generated: {predictions_count}/{len(enriched_matchups)}")
     
-    return True
+    # Return success status
+    if database_success:
+        logger.info("✅ Event data successfully saved to database")
+        return True
+    else:
+        logger.error("❌ Failed to save event data to database")
+        return False
 
 if __name__ == "__main__":
     main() 

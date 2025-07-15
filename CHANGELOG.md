@@ -59,3 +59,21 @@
 - Added support for cronjob automation for scrapers on server deployment
 - Fixed dependency issues in scrapers by updating requirements.txt
 - Improved error handling and loading states throughout the application
+
+## Version 1.06 - Zobot AI Assistant Integration
+- **Major Feature**: Introduced Zobot AI, an intelligent MMA chat assistant powered by Groq's LLM (llama-3.1-8b-instant)
+- **Real-time Data Integration**: Zobot has access to complete fighter database with 4,305+ fighters and real-time statistics
+- **ML Prediction Integration**: Seamlessly integrates with the advanced leakproof prediction model for accurate fight analysis
+- **Intelligent Fighter Recognition**: Advanced name matching system with extensive fighter nickname mappings (40+ common names)
+- **Multiple Analysis Contexts**: 
+  - Fighter vs Fighter comparisons with detailed breakdowns and ML predictions
+  - Individual fighter statistics and career analysis
+  - Statistical analysis with sample size and fighting style context
+  - Martial arts technique instruction with safety guidelines
+- **Smart Response System**: Dynamic token allocation based on request complexity (600-1200 tokens)
+- **Modern Chat Interface**: Real-time chat with proper message formatting, session management, and status indicators
+- **Error Handling**: Comprehensive error handling with graceful degradation and user-friendly messages
+- **Navigation Integration**: Added Zobot AI to main navigation menu
+- **Safety Features**: Built-in safety protocols for technique instruction and educational context
+- **Statistical Accuracy**: Context-aware statistical analysis that considers fighter styles and sample sizes
+- **API Infrastructure**: Complete REST API with `/chat` and `/status` endpoints for reliable service management

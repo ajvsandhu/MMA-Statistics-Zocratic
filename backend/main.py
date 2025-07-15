@@ -41,7 +41,7 @@ from backend.constants import (
 )
 from backend.utils import sanitize_json
 from backend.api.database import get_db_connection, test_connection
-from backend.api.routes import fighters, predictions
+from backend.api.routes import fighters, predictions, upcoming_events
 
 # Configure logging
 logging.basicConfig(
@@ -249,6 +249,7 @@ async def sanitize_json_response(request: Request, call_next) -> Response:
 # Include routers
 app.include_router(fighters.router)
 app.include_router(predictions.router)
+app.include_router(upcoming_events.router, prefix="/api/v1")
 
 # Import and include Zobot router
 from backend.api.routes import zobot
