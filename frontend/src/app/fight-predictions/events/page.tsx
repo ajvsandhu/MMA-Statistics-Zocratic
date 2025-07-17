@@ -12,6 +12,7 @@ import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft } from 'lucide-r
 import { useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
 import { ENDPOINTS } from "@/lib/api-config"
+import { FighterOdds } from "@/components/ui/odds-display"
 
 interface Fighter {
   fighter_name: string
@@ -33,6 +34,20 @@ interface Prediction {
   fighter2_win_probability_percent: number
 }
 
+interface OddsData {
+  event_id: string
+  home_team: string
+  away_team: string
+  best_odds: {
+    home_team: { odds: number | null; bookmaker: string | null }
+    away_team: { odds: number | null; bookmaker: string | null }
+  }
+  fighter1_odds: { odds: number | null; bookmaker: string | null }
+  fighter2_odds: { odds: number | null; bookmaker: string | null }
+  bookmaker_count: number
+  last_update: string
+}
+
 interface Fight {
   fighter1_name: string
   fighter1_url: string
@@ -45,6 +60,8 @@ interface Fight {
   fighter2_tap_link: string
   fighter2_image: string
   prediction: Prediction
+  odds_data?: OddsData | null
+  odds_event_id?: string | null
 }
 
 interface Event {
@@ -76,23 +93,31 @@ export default function EventAnalysisPage() {
   useEffect(() => {
     async function fetchEventData() {
       try {
+        // Fetch the event data (includes both predictions and odds)
         const response = await fetch(ENDPOINTS.UPCOMING_EVENTS)
         if (!response.ok) {
           throw new Error('Failed to fetch event data')
         }
-        const data = await response.json()
-        setEventData(data)
+        const eventData = await response.json()
         
-        setTimeout(() => {
-          setIsLoading(false)
-          setTimeout(() => {
-            setIsContentReady(true)
-          }, 100)
-        }, 300)
+        console.log('Event data loaded successfully:', eventData.event_name)
+        console.log('Total fights:', eventData.total_fights)
+        
+        // Log first fight to debug
+        if (eventData.fights && eventData.fights.length > 0) {
+          const firstFight = eventData.fights[0]
+          console.log('First fight prediction:', firstFight.prediction)
+          console.log('First fight odds:', firstFight.odds_data)
+        }
+        
+        setEventData(eventData)
+        setError(null)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error occurred')
         console.error('Error fetching event data:', err)
+        setError(err instanceof Error ? err.message : 'Failed to fetch event data')
+      } finally {
         setIsLoading(false)
+        setTimeout(() => setIsContentReady(true), 100)
       }
     }
 
@@ -279,6 +304,18 @@ export default function EventAnalysisPage() {
                           <div className="min-h-[2.5rem] sm:min-h-[3rem] flex items-center justify-center">
                             <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter1_name}</h3>
                           </div>
+                          
+                          {/* Display odds for fighter 1 */}
+                          <div className="mt-1 flex justify-center">
+                            <FighterOdds
+                              fighterName={fight.fighter1_name}
+                              odds={fight.odds_data?.fighter1_odds?.odds || null}
+                              bookmaker={fight.odds_data?.fighter1_odds?.bookmaker || null}
+                              size="sm"
+                              className="text-center"
+                            />
+                          </div>
+                          
                           <div className="flex items-center gap-1 mt-1 justify-center">
                             <Link 
                               href={fight.fighter1_tap_link || '#'} 
@@ -336,6 +373,18 @@ export default function EventAnalysisPage() {
                           <div className="min-h-[2.5rem] sm:min-h-[3rem] flex items-center justify-center">
                             <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter2_name}</h3>
                           </div>
+                          
+                          {/* Display odds for fighter 2 */}
+                          <div className="mt-1 flex justify-center">
+                            <FighterOdds
+                              fighterName={fight.fighter2_name}
+                              odds={fight.odds_data?.fighter2_odds?.odds || null}
+                              bookmaker={fight.odds_data?.fighter2_odds?.bookmaker || null}
+                              size="sm"
+                              className="text-center"
+                            />
+                          </div>
+                          
                           <div className="flex items-center gap-1 mt-1 justify-center">
                             <Link 
                               href={fight.fighter2_tap_link || '#'} 
@@ -382,6 +431,8 @@ export default function EventAnalysisPage() {
                           <div className="text-[9px] sm:text-[10px] md:text-sm text-muted-foreground">
                             Predicted Winner: <span className="font-semibold break-words line-clamp-1 inline-block align-bottom">{fight.prediction?.predicted_winner_name}</span>
                           </div>
+                          
+
                         </div>
                       </div>
                     </CardContent>

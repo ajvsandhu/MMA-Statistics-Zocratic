@@ -52,6 +52,9 @@ logging.basicConfig(
     ]
 )
 
+# Reduce httpx logging level to prevent URL exposure
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # Removed old global predictor instance
@@ -275,6 +278,10 @@ app.include_router(upcoming_events.router, prefix="/api/v1")
 # Import and include Zobot router
 from backend.api.routes import zobot
 app.include_router(zobot.router)
+
+# Import and include Odds router
+from backend.api.routes import odds
+app.include_router(odds.router)
 
 @app.get("/")
 def read_root():

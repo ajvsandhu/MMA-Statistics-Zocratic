@@ -50,8 +50,8 @@ def test_database():
         # Test fighter search (replicating get_fighter_data logic)
         test_fighter = "Israel Adesanya"
         logger.info(f"Testing fighter search for: {test_fighter}")
-        # Use ilike for case-insensitive search on the 'name' column
-        response = client.table('fighters').select('*').ilike('name', f"%{test_fighter}%").limit(1).execute()
+        # Use ilike for case-insensitive search on the 'fighter_name' column
+        response = client.table('fighters').select('*').ilike('fighter_name', f"%{test_fighter}%").limit(1).execute()
 
         if response.data:
             fighter_data = response.data[0]

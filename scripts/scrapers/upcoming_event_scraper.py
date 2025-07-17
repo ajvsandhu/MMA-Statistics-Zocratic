@@ -135,6 +135,22 @@ except Exception as e:
     logger.warning("Fight predictions will not be available.")
     predictions_available = False
 
+# Try to import odds service
+try:
+    from backend.api.utils.odds_service import get_odds_service
+    odds_service_available = True
+    logger.info("Odds service imported successfully")
+except ImportError as e:
+    logger.warning(f"Error importing odds service: {str(e)}")
+    logger.warning("Odds data will not be available.")
+    odds_service_available = False
+    get_odds_service = None
+except Exception as e:
+    logger.warning(f"Error setting up odds service: {str(e)}")
+    logger.warning("Odds data will not be available.")
+    odds_service_available = False
+    get_odds_service = None
+
 def fetch_upcoming_event(max_retries=3):
     """Fetch the next upcoming UFC event from ufcstats.com"""
     # First try the upcoming events page
@@ -620,19 +636,97 @@ def add_predictions_to_matchups(matchups):
     
     return matchups
 
+def add_odds_to_matchups(matchups):
+    """Add betting odds to each matchup"""
+    if not odds_service_available:
+        logger.warning("Odds service is not available. Skipping odds step.")
+        return matchups
+    
+    logger.info("Fetching betting odds for all matchups...")
+    
+    # Get odds service instance
+    odds_service = get_odds_service()
+    if not odds_service:
+        logger.warning("Failed to initialize odds service. Skipping odds.")
+        return matchups
+    
+    try:
+        # Get all MMA odds from the API
+        logger.info("Fetching MMA odds from Odds API...")
+        odds_events = odds_service.get_mma_odds()
+        
+        if not odds_events:
+            logger.warning("No MMA odds found from API")
+            # Add empty odds data to all matchups
+            for matchup in matchups:
+                matchup['odds_data'] = None
+                matchup['odds_event_id'] = None
+            return matchups
+        
+        logger.info(f"Found {len(odds_events)} MMA events with odds")
+        
+        # Match fighters to odds events
+        enriched_matchups = odds_service.match_fighters_to_odds(matchups, odds_events)
+        
+        # Count how many matches got odds
+        odds_count = sum(1 for m in enriched_matchups if m.get('odds_data') is not None)
+        logger.info(f"Successfully matched {odds_count}/{len(enriched_matchups)} fights with odds data")
+        
+        return enriched_matchups
+        
+    except Exception as e:
+        logger.error(f"Error fetching odds: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # Add empty odds data to all matchups
+        for matchup in matchups:
+            matchup['odds_data'] = None
+            matchup['odds_event_id'] = None
+    return matchups
+
 def save_to_database(event_data):
-    """Save event data to the database"""
+    """Save event data to the database using upsert to prevent duplicates"""
     if not db_available or not supabase:
         logger.error("Database not available. Cannot save event data.")
         return False
     
     try:
+        # First, check if this event already exists based on event_url
+        logger.info(f"Checking if event already exists: {event_data['event_name']}")
+        existing_response = supabase.table('upcoming_events').select('*').eq('event_url', event_data['event_url']).execute()
+        
+        if existing_response.data and len(existing_response.data) > 0:
+            # Event exists, update it
+            existing_event = existing_response.data[0]
+            logger.info(f"Event already exists with ID {existing_event['id']}, updating...")
+            
+            # First, deactivate all other events
+            supabase.table('upcoming_events').update({'is_active': False}).neq('id', existing_event['id']).execute()
+            
+            # Update the existing event
+            response = supabase.table('upcoming_events').update({
+                'event_name': event_data['event_name'],
+                'event_date': event_data['event_date'],
+                'scraped_at': event_data['scraped_at'],
+                'fights': event_data['fights'],
+                'is_active': True
+            }).eq('id', existing_event['id']).execute()
+            
+            if response.data:
+                logger.info(f"Successfully updated existing event with ID: {existing_event['id']}")
+                return True
+            else:
+                logger.error("Failed to update existing event")
+                return False
+        else:
+            # Event doesn't exist, create new one
+            logger.info("Event doesn't exist, creating new one...")
+            
         # First, deactivate any existing active events
-        logger.info("Deactivating existing active events...")
         supabase.table('upcoming_events').update({'is_active': False}).eq('is_active', True).execute()
         
         # Insert the new event
-        logger.info("Inserting new event into database...")
         response = supabase.table('upcoming_events').insert({
             'event_name': event_data['event_name'],
             'event_date': event_data['event_date'],
@@ -643,10 +737,10 @@ def save_to_database(event_data):
         }).execute()
         
         if response.data:
-            logger.info(f"Successfully saved event to database with ID: {response.data[0]['id']}")
+            logger.info(f"Successfully created new event with ID: {response.data[0]['id']}")
             return True
         else:
-            logger.error("Failed to save event to database")
+            logger.error("Failed to create new event")
             return False
             
     except Exception as e:
@@ -661,6 +755,8 @@ def main():
                        help='Output file path (default: frontend/public/upcoming_event.json) - DEPRECATED, now saves to database')
     parser.add_argument('--no-predictions', action='store_true',
                        help='Skip generating predictions for matchups')
+    parser.add_argument('--no-odds', action='store_true',
+                       help='Skip fetching betting odds for matchups')
     parser.add_argument('--save-to-file', action='store_true',
                        help='Also save to JSON file (for backward compatibility)')
     args = parser.parse_args()
@@ -693,6 +789,10 @@ def main():
     if not args.no_predictions:
         enriched_matchups = add_predictions_to_matchups(enriched_matchups)
     
+    # Add odds if requested
+    if not args.no_odds:
+        enriched_matchups = add_odds_to_matchups(enriched_matchups)
+    
     # Create the final event data structure
     event_data = {
         "event_name": event["name"],
@@ -723,6 +823,10 @@ def main():
     # Count how many predictions were generated
     predictions_count = sum(1 for m in enriched_matchups if m.get('prediction') is not None)
     logger.info(f"Predictions generated: {predictions_count}/{len(enriched_matchups)}")
+    
+    # Count how many odds were fetched
+    odds_count = sum(1 for m in enriched_matchups if m.get('odds_data') is not None)
+    logger.info(f"Odds fetched: {odds_count}/{len(enriched_matchups)}")
     
     # Return success status
     if database_success:

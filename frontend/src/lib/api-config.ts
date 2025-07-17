@@ -74,5 +74,9 @@ export const ENDPOINTS = {
   UPDATE_RANKINGS: `${API_URL}/api/${API_VERSION}/prediction/update-rankings`,
   ZOBOT_CHAT: `${API_URL}/api/${API_VERSION}/zobot/chat`,
   ZOBOT_STATUS: `${API_URL}/api/${API_VERSION}/zobot/status`,
-  UPCOMING_EVENTS: `${API_URL}/api/${API_VERSION}/upcoming-events`
+  UPCOMING_EVENTS: `${API_URL}/api/${API_VERSION}/upcoming-events`,
+  ODDS_MMA: `${API_URL}/api/${API_VERSION}/odds/mma`,
+  ODDS_EVENT: (eventId: string) => `${API_URL}/api/${API_VERSION}/odds/event/${encodeURIComponent(eventId)}`,
+  ODDS_UPCOMING_WITH_ODDS: `${API_URL}/api/${API_VERSION}/odds/upcoming-with-odds`,
+  ODDS_HEALTH: `${API_URL}/api/${API_VERSION}/odds/health`
 } as const; 

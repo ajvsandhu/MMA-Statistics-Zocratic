@@ -170,7 +170,7 @@ def parse_args():
     parser.add_argument('--batch-size', type=int, default=5, help='Number of fighters to process in each batch (default: 5)')
     parser.add_argument('--test', action='store_true', help='Run in test mode with a specific fighter')
     parser.add_argument('--test-fighter', type=str, default="Jon Jones", help='Specify the fighter name to test')
-    parser.add_argument('--mode', choices=['all', 'recent'], default='all', help='Mode: all=process all fighters, recent=process most recent fighters only')
+    parser.add_argument('--mode', choices=['all', 'recent', 'maintenance'], default='all', help='Mode: all=process all fighters, recent=process most recent fighters only, maintenance=fix fighters with missing/broken data')
     parser.add_argument('--count', type=int, default=25, help='Number of recent fighters to process in recent mode (default: 25)')
     return parser.parse_args()
 
@@ -460,6 +460,134 @@ def get_fighter_details(url):
     
     return details
 
+def validate_image_url(image_url, timeout=10):
+    """Check if an image URL is still valid and returns an actual image."""
+    if not image_url:
+        return False
+    
+    try:
+        # Use GET request to actually check the content (not just headers)
+        response = requests.get(image_url, timeout=timeout, stream=True)
+        
+        if response.status_code == 200:
+            # Check content-type header first
+            content_type = response.headers.get('content-type', '').lower()
+            
+            # If content-type suggests it's not an image, it's likely an error page
+            if 'text/xml' in content_type or 'application/xml' in content_type:
+                logger.warning(f"Image URL returned XML (likely an error): {image_url}")
+                return False
+            
+            if 'text/html' in content_type:
+                logger.warning(f"Image URL returned HTML (likely an error page): {image_url}")
+                return False
+            
+            # Read a small portion of the content to validate it's actually an image
+            chunk = response.raw.read(1024)  # Read first 1KB
+            
+            # Check for XML error content (Tapology's Access Denied response)
+            if b'<Error>' in chunk or b'AccessDenied' in chunk or b'<Code>' in chunk:
+                logger.warning(f"Image URL contains XML error content: {image_url}")
+                return False
+            
+            # Check for common image file signatures
+            image_signatures = [
+                b'\xFF\xD8\xFF',  # JPEG
+                b'\x89PNG\r\n\x1a\n',  # PNG
+                b'GIF87a',  # GIF87a
+                b'GIF89a',  # GIF89a
+                b'\x00\x00\x01\x00',  # ICO
+                b'RIFF',  # WebP (starts with RIFF)
+            ]
+            
+            # Check if content starts with any image signature
+            for signature in image_signatures:
+                if chunk.startswith(signature):
+                    logger.info(f"✓ Image URL is valid: {image_url}")
+                    return True
+            
+            # If we have image content-type but no valid signature, it might still be an image
+            if 'image' in content_type:
+                logger.warning(f"Content-Type says image but signature unrecognized: {image_url}")
+                return True
+            
+            logger.warning(f"URL doesn't appear to be a valid image: {image_url}")
+            return False
+            
+        else:
+            logger.warning(f"Image URL returned status {response.status_code}: {image_url}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Error validating image URL {image_url}: {str(e)}")
+        return False
+
+def get_fighters_needing_maintenance():
+    """Get fighters that need maintenance (missing data or broken images)."""
+    try:
+        supabase = get_supabase_client()
+        if not supabase:
+            logger.error("Failed to get Supabase client")
+            return []
+        
+        logger.info("Finding fighters needing maintenance...")
+        
+        # Get all fighters
+        response = supabase.table('fighters').select('fighter_name, tap_link, image_url').execute()
+        
+        if not response.data:
+            logger.warning("No fighters found in database")
+            return []
+        
+        maintenance_fighters = []
+        for fighter in response.data:
+            fighter_name = fighter['fighter_name']
+            tap_link = fighter.get('tap_link')
+            image_url = fighter.get('image_url')
+            
+            issues = []
+            
+            # Check for missing tap_link
+            if not tap_link:
+                issues.append("missing tap_link")
+            
+            # Check for missing image
+            if not image_url or image_url == DEFAULT_IMAGE_URL:
+                issues.append("missing image")
+            
+            # Check for broken image (only if image exists)
+            elif image_url and image_url != DEFAULT_IMAGE_URL:
+                if not validate_image_url(image_url):
+                    issues.append("broken image")
+            
+            # Add to maintenance list if any issues found
+            if issues:
+                maintenance_fighters.append(fighter)
+                logger.info(f"Needs maintenance: {fighter_name} ({', '.join(issues)})")
+        
+        logger.info(f"Found {len(maintenance_fighters)} fighters needing maintenance")
+        return maintenance_fighters
+        
+    except Exception as e:
+        logger.error(f"Error getting fighters needing maintenance: {str(e)}")
+        return []
+
+def clear_fighter_cache():
+    """Clear any cached fighter data to force refresh."""
+    try:
+        # This could trigger a cache refresh in your application
+        # For now, we'll just log that we're clearing the cache
+        logger.info("Clearing fighter cache to force refresh...")
+        
+        # You could add specific cache clearing logic here
+        # For example, calling an API endpoint that clears cache
+        # or deleting cache files
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error clearing cache: {str(e)}")
+        return False
+
 def update_fighter_in_database(fighter_name, tap_link, image_url=None):
     """Update fighter info in database."""
     try:
@@ -499,8 +627,15 @@ def process_fighter(fighter_data):
     needs_link = not current_link
     needs_image = not current_image or current_image == DEFAULT_IMAGE_URL
     
-    if not needs_link and not needs_image:
-        logger.info(f"Skipping {fighter_name} - has both link and proper image")
+    # Also check if existing image is broken/invalid
+    needs_image_fix = False
+    if current_image and current_image != DEFAULT_IMAGE_URL:
+        if not validate_image_url(current_image):
+            needs_image_fix = True
+            logger.info(f"Image validation failed for {fighter_name}, needs new image")
+    
+    if not needs_link and not needs_image and not needs_image_fix:
+        logger.info(f"Skipping {fighter_name} - has both link and working image")
         return True
 
     # Search for fighter - add delay before web request
@@ -513,7 +648,7 @@ def process_fighter(fighter_data):
     
     # Only get details if we need an image or found a new link
     fighter_details = {}
-    if needs_image or (needs_link and tap_link != current_link):
+    if needs_image or needs_image_fix or (needs_link and tap_link != current_link):
         # Remove delay after best match selection
         fighter_details = get_fighter_details(tap_link)
     
@@ -611,6 +746,7 @@ def process_recent_fighters(count=25):
         # Process statistics
         success_count = 0
         error_count = 0
+        failed_fighters = []  # Track fighters that failed processing
         
         for i, fighter in enumerate(recent_fighters):
             fighter_name = fighter['fighter_name']
@@ -633,6 +769,7 @@ def process_recent_fighters(count=25):
                         logger.info(f"✓ Successfully processed {fighter_name}")
                     else:
                         error_count += 1
+                        failed_fighters.append(fighter_name)
                         logger.warning(f"✗ Failed to process {fighter_name}")
                 
                 # Add a small delay between fighters to be respectful
@@ -643,6 +780,7 @@ def process_recent_fighters(count=25):
             except Exception as e:
                 logger.error(f"Error processing recent fighter {fighter_name}: {str(e)}")
                 error_count += 1
+                failed_fighters.append(fighter_name)
                 continue
         
         # Final summary
@@ -651,12 +789,96 @@ def process_recent_fighters(count=25):
         logger.info(f"Total recent fighters processed: {len(recent_fighters)}")
         logger.info(f"Successfully updated: {success_count}")
         logger.info(f"Errors: {error_count}")
+        
+        # List all failed fighters for debugging
+        if failed_fighters:
+            logger.info("\n" + "❌ FIGHTERS THAT FAILED:")
+            for i, fighter_name in enumerate(failed_fighters, 1):
+                logger.info(f"  {i}. {fighter_name}")
+            logger.info(f"\nTotal failed fighters: {len(failed_fighters)}")
+        else:
+            logger.info("\n✅ All fighters processed successfully!")
+        
         logger.info("="*60)
         
         return success_count > 0
         
     except Exception as e:
         logger.error(f"Fatal error in recent mode: {str(e)}")
+        return False
+
+def process_maintenance_fighters(batch_size=10):
+    """Process fighters needing maintenance (missing data or broken images)."""
+    try:
+        logger.info("=== MAINTENANCE MODE ===")
+        
+        # Get fighters needing maintenance
+        maintenance_fighters = get_fighters_needing_maintenance()
+        if not maintenance_fighters:
+            logger.info("No fighters needing maintenance found")
+            return True
+        
+        # Process statistics
+        success_count = 0
+        error_count = 0
+        failed_fighters = []  # Track fighters that failed processing
+        
+        for i, fighter in enumerate(maintenance_fighters):
+            fighter_name = fighter['fighter_name']
+            
+            logger.info(f"\n--- Processing fighter {i+1}/{len(maintenance_fighters)}: {fighter_name} ---")
+            
+            try:
+                # Process fighter to fix issues
+                if process_fighter(fighter):
+                    success_count += 1
+                    logger.info(f"✓ Successfully processed {fighter_name}")
+                else:
+                    error_count += 1
+                    failed_fighters.append(fighter_name)
+                    logger.warning(f"✗ Failed to process {fighter_name}")
+                
+                # Take a break between fighters
+                if i < len(maintenance_fighters) - 1:
+                    logger.info("Brief pause before next fighter...")
+                    time.sleep(2)
+                
+                # Take a longer break after every batch
+                if (i + 1) % batch_size == 0:
+                    logger.info(f"Completed batch of {batch_size} fighters. Taking a longer break...")
+                    time.sleep(60)
+                    
+            except Exception as e:
+                logger.error(f"Error processing fighter {fighter_name}: {str(e)}")
+                error_count += 1
+                failed_fighters.append(fighter_name)
+                continue
+        
+        # Clear cache after processing
+        clear_fighter_cache()
+        
+        # Final summary
+        logger.info("\n" + "="*60)
+        logger.info("MAINTENANCE MODE COMPLETE!")
+        logger.info(f"Total fighters processed: {len(maintenance_fighters)}")
+        logger.info(f"Successfully updated: {success_count}")
+        logger.info(f"Errors: {error_count}")
+        
+        # List all failed fighters for debugging
+        if failed_fighters:
+            logger.info("\n" + "❌ FIGHTERS THAT FAILED:")
+            for i, fighter_name in enumerate(failed_fighters, 1):
+                logger.info(f"  {i}. {fighter_name}")
+            logger.info(f"\nTotal failed fighters: {len(failed_fighters)}")
+        else:
+            logger.info("\n✅ All fighters processed successfully!")
+        
+        logger.info("="*60)
+        
+        return success_count > 0
+        
+    except Exception as e:
+        logger.error(f"Fatal error in maintenance mode: {str(e)}")
         return False
 
 def main():
@@ -682,6 +904,10 @@ def main():
         if args.mode == 'recent':
             return process_recent_fighters(args.count)
         
+        # Maintenance mode - fix fighters with missing/broken data
+        if args.mode == 'maintenance':
+            return process_maintenance_fighters(args.batch_size)
+        
         # All mode - existing functionality
         logger.info("Connecting to database...")
         supabase = get_supabase_client()
@@ -706,6 +932,7 @@ def main():
         batch_size = min(args.batch_size, 10)  # Increased batch size
         success_count = 0
         error_count = 0
+        failed_fighters = []  # Track fighters that failed processing
         
         # Start from saved index
         for i in range(start_index, len(all_fighters)):
@@ -729,6 +956,7 @@ def main():
                         success_count += 1
                     else:
                         error_count += 1
+                        failed_fighters.append(fighter_name)
                 
                 # Save progress periodically - no delay needed
                 if (i + 1) % 5 == 0:
@@ -741,6 +969,7 @@ def main():
             except Exception as e:
                 logger.error(f"Error processing fighter {fighter_name}: {str(e)}")
                 error_count += 1
+                failed_fighters.append(fighter_name)
                 continue
         
         # Progress update
@@ -751,11 +980,24 @@ def main():
         # Final progress save
         save_progress(len(all_fighters) - 1, len(all_fighters), success_count, error_count)
         
+        # Clear cache after processing
+        clear_fighter_cache()
+        
         logger.info("\n" + "="*50)
         logger.info("Processing complete!")
         logger.info(f"Total fighters processed: {len(all_fighters) - start_index}")
         logger.info(f"Successfully updated: {success_count}")
         logger.info(f"Errors: {error_count}")
+        
+        # List all failed fighters for debugging
+        if failed_fighters:
+            logger.info("\n" + "❌ FIGHTERS THAT FAILED:")
+            for i, fighter_name in enumerate(failed_fighters, 1):
+                logger.info(f"  {i}. {fighter_name}")
+            logger.info(f"\nTotal failed fighters: {len(failed_fighters)}")
+        else:
+            logger.info("\n✅ All fighters processed successfully!")
+        
         logger.info("="*50)
         
     except Exception as e:
