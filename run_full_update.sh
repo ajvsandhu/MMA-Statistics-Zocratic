@@ -29,15 +29,11 @@ echo "[3/4] Running UFC rankings scraper..."
 PYTHONPATH=. python scripts/scrapers/ufc_rankings_scraper.py
 
 # Step 4: Retrain the model
-echo "[4/5] Retraining the model..."
+echo "[4/4] Retraining the model..."
 python backend/ml_new/train.py
 
 # Restart the server to load the new model
 sudo systemctl restart zocratic
-
-# Step 5: Scrape next upcoming event with fresh model
-echo "[5/5] Scraping next upcoming UFC event..."
-python scripts/scrapers/upcoming_event_scraper.py
 
 # Check if there are any changes to commit
 if [[ -n $(git status --porcelain) ]]; then
