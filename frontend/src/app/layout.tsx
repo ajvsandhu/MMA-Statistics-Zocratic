@@ -68,7 +68,7 @@ function SiteHeader() {
         <div className="rounded-full border border-[var(--nav-border)] bg-[var(--nav-bg)] backdrop-blur-md shadow-[var(--nav-shadow)]">
           <div className="flex h-14 items-center px-4">
             <MainNav />
-            <div className="flex flex-1 items-center justify-end">
+            <div className="hidden md:flex flex-1 items-center justify-end">
               <div className="relative">
                 <ThemeSwitcher />
               </div>

@@ -418,9 +418,9 @@ export function FightHistoryModal() {
 
                         {/* Actual Result */}
                         {fight.result && fight.result.winner_name ? (
-                          <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                          <Card className="bg-green-500/10 border-green-500/30 dark:bg-green-500/5 dark:border-green-500/20">
                             <CardContent className="p-2 space-y-2">
-                              <div className="flex items-center gap-1 text-green-700 dark:text-green-400">
+                              <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                                 <Trophy className="h-3 w-3" />
                                 <h6 className="font-semibold text-xs">Actual Result</h6>
                               </div>
@@ -428,26 +428,26 @@ export function FightHistoryModal() {
                               <div className="space-y-2">
                                 <div className="space-y-0.5">
                                   <p className="text-xs text-muted-foreground">Winner</p>
-                                  <p className="font-semibold text-xs text-green-700 dark:text-green-400">
+                                  <p className="font-semibold text-xs text-green-600 dark:text-green-400">
                                     {fight.result.winner_name}
                                   </p>
                                 </div>
                                 {fight.result.method && (
                                   <div className="space-y-0.5">
                                     <p className="text-xs text-muted-foreground">Method</p>
-                                    <p className="font-medium text-xs">{fight.result.method}</p>
+                                    <p className="font-medium text-xs text-foreground">{fight.result.method}</p>
                                   </div>
                                 )}
                                 {fight.result.round && (
                                   <div className="space-y-0.5">
                                     <p className="text-xs text-muted-foreground">Round</p>
-                                    <p className="font-medium text-xs">Round {fight.result.round}</p>
+                                    <p className="font-medium text-xs text-foreground">Round {fight.result.round}</p>
                                   </div>
                                 )}
                                 {fight.result.time && (
                                   <div className="space-y-0.5">
                                     <p className="text-xs text-muted-foreground">Time</p>
-                                    <p className="font-medium text-xs">{fight.result.time}</p>
+                                    <p className="font-medium text-xs text-foreground">{fight.result.time}</p>
                                   </div>
                                 )}
                               </div>

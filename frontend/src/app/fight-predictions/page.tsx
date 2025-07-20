@@ -21,43 +21,21 @@ export default function FightPredictionsPage() {
             </p>
           </AnimatedItem>
 
-          <AnimatedContainer className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto" delay={0.2}>
+          <AnimatedContainer className="max-w-2xl mx-auto" delay={0.2}>
             <AnimatedItem variant="fadeUp">
               <Card className="bg-card/50 backdrop-blur border-primary/20 transition-all duration-300 hover:bg-card/70 hover:shadow-lg">
-                <CardContent className="p-4 space-y-3">
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-semibold">Quick Prediction</h2>
-                    <p className="text-muted-foreground">
+                <CardContent className="p-6 space-y-4">
+                  <div className="space-y-3 text-center">
+                    <h2 className="text-3xl font-semibold">Quick Prediction</h2>
+                    <p className="text-muted-foreground text-lg">
                       Select two fighters and get instant predictions based on their stats and history.
                     </p>
                   </div>
                   <Button 
-                    className="w-full bg-primary/90 hover:bg-primary text-primary-foreground transition-all duration-300 hover:scale-[1.02]"
+                    className="w-full bg-primary/90 hover:bg-primary text-primary-foreground transition-all duration-300 hover:scale-[1.02] h-12 text-lg"
                     onClick={() => router.push('/fight-predictions/compare')}
                   >
-                    Start Now <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-            </AnimatedItem>
-
-            <AnimatedItem variant="fadeUp" delay={0.1}>
-              <Card className="bg-card/50 backdrop-blur border-primary/20 transition-all duration-300 hover:bg-card/70 hover:shadow-lg">
-                <CardContent className="p-4 space-y-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-semibold">Event Analysis</h2>
-                      <span className="text-xs font-medium bg-green-500/20 text-green-500 px-2 py-1 rounded-full">NEW</span>
-                    </div>
-                    <p className="text-muted-foreground">
-                      Get comprehensive predictions and analysis for upcoming UFC events.
-                    </p>
-                  </div>
-                  <Button 
-                    className="w-full bg-primary/90 hover:bg-primary text-primary-foreground transition-all duration-300 hover:scale-[1.02]"
-                    onClick={() => router.push('/fight-predictions/events')}
-                  >
-                    View Events <ArrowRight className="ml-2 h-4 w-4" />
+                    Start Now <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </CardContent>
               </Card>
