@@ -24,6 +24,16 @@ interface HistoricalEvent {
 interface Fight {
   fighter1_name?: string
   fighter2_name?: string
+  odds_data?: {
+    fighter1_odds?: {
+      odds?: number | null
+      bookmaker?: string | null
+    }
+    fighter2_odds?: {
+      odds?: number | null
+      bookmaker?: string | null
+    }
+  }
   prediction?: {
     predicted_winner_name?: string
     confidence_percent?: number
@@ -45,6 +55,16 @@ interface EventData {
     date?: string
     total_fights?: number
     completed_fights?: number
+  }
+  event_name?: string
+  event_date?: string
+  total_fights?: number
+  completed_fights?: number
+  accuracy_stats?: {
+    total_fights: number
+    completed_fights: number
+    correct_predictions: number
+    accuracy_percentage: number
   }
   fights?: Fight[]
 }
@@ -146,7 +166,9 @@ export function FightHistoryModal() {
       }
       
       setSelectedEvent(eventData)
-      setSelectedEventName(eventName)
+      // Use the proper event name from the data instead of the raw filename
+      const properEventName = eventData.event_info?.name || eventData.event_name || formatEventName(eventName)
+      setSelectedEventName(properEventName)
       setCurrentView('details')
     } catch (err) {
       setError('Failed to load event details')
@@ -275,7 +297,9 @@ export function FightHistoryModal() {
             Back to Events
           </Button>
           <div className="space-y-1 min-w-0 flex-1">
-            <h3 className="text-xl font-bold">{selectedEventName}</h3>
+            <h3 className="text-xl font-bold">
+              {selectedEvent?.event_info?.name || selectedEvent?.event_name || selectedEventName}
+            </h3>
             <p className="text-sm text-muted-foreground">Fight predictions and results analysis</p>
           </div>
         </div>
@@ -307,18 +331,56 @@ export function FightHistoryModal() {
               <div className="flex justify-between items-start gap-4">
                 <div className="space-y-2 min-w-0 flex-1">
                   <h4 className="text-xl font-bold">
-                    {selectedEvent.event_info?.name || selectedEventName}
+                    {selectedEvent.event_info?.name || selectedEvent.event_name || selectedEventName}
                   </h4>
                   <p className="text-muted-foreground">
-                    {selectedEvent.event_info?.date || 'Date Unknown'}
+                    {selectedEvent.event_info?.date || selectedEvent.event_date || 'Date Unknown'}
                   </p>
                 </div>
                 <Badge variant="default" className="text-sm px-3 py-1 flex-shrink-0">
-                  {selectedEvent.event_info?.completed_fights || 0} / {selectedEvent.event_info?.total_fights || 0} Fights
+                  {selectedEvent.event_info?.completed_fights || selectedEvent.completed_fights || selectedEvent.accuracy_stats?.completed_fights || 0} / {selectedEvent.event_info?.total_fights || selectedEvent.total_fights || selectedEvent.accuracy_stats?.total_fights || 0} Fights
                 </Badge>
               </div>
             </CardContent>
           </Card>
+
+          {/* Prediction Accuracy Summary */}
+          {selectedEvent.accuracy_stats && (
+            <Card className="bg-gradient-to-r from-green-500/5 to-blue-500/5 border-green-500/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Trophy className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <h4 className="text-lg font-semibold">Prediction Accuracy</h4>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {selectedEvent.accuracy_stats.correct_predictions}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Correct</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">
+                      {selectedEvent.accuracy_stats.completed_fights}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Total Fights</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-primary">
+                      {selectedEvent.accuracy_stats.accuracy_percentage.toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">Accuracy</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">
+                      {selectedEvent.accuracy_stats.total_fights}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Event Total</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Fights Section */}
           {selectedEvent.fights && selectedEvent.fights.length > 0 ? (
@@ -330,14 +392,36 @@ export function FightHistoryModal() {
               
               <div className="space-y-2">
                 {selectedEvent.fights.map((fight, index) => (
-                  <Card key={index} className="border-l-4 border-l-primary">
-                    <CardContent className="p-3 space-y-2">
+                  <Card key={index} className="border-l-4 border-l-primary bg-gradient-to-r from-card to-card/80 hover:from-card/90 hover:to-card/70 transition-all duration-200 shadow-sm hover:shadow-md">
+                    <CardContent className="p-4 space-y-3">
                       {/* Fight Header */}
                       <div className="flex justify-between items-start gap-3">
                         <div className="space-y-1 min-w-0 flex-1">
-                          <h5 className="font-bold text-sm">
-                            {fight.fighter1_name || 'Fighter 1'} vs {fight.fighter2_name || 'Fighter 2'}
-                          </h5>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <h5 className="font-bold text-sm flex-1 min-w-0">
+                                {fight.fighter1_name || 'Fighter 1'}
+                              </h5>
+                              {fight.odds_data?.fighter1_odds?.odds && (
+                                <span className="text-xs px-2 py-1 rounded-md font-medium bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
+                                  {fight.odds_data.fighter1_odds.odds > 0 ? '+' : ''}{fight.odds_data.fighter1_odds.odds}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-center">
+                              <span className="text-xs text-muted-foreground font-medium">vs</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <h5 className="font-bold text-sm flex-1 min-w-0">
+                                {fight.fighter2_name || 'Fighter 2'}
+                              </h5>
+                              {fight.odds_data?.fighter2_odds?.odds && (
+                                <span className="text-xs px-2 py-1 rounded-md font-medium bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
+                                  {fight.odds_data.fighter2_odds.odds > 0 ? '+' : ''}{fight.odds_data.fighter2_odds.odds}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                           <p className="text-xs text-muted-foreground">Fight {index + 1}</p>
                         </div>
                         {fight.result && fight.result.winner_name && fight.prediction_correct !== undefined && (
@@ -355,11 +439,11 @@ export function FightHistoryModal() {
                       </div>
 
                       {/* Prediction vs Result Grid */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {/* AI Prediction */}
                         {fight.prediction ? (
-                          <Card className="bg-primary/5 border-primary/20">
-                            <CardContent className="p-2 space-y-2">
+                          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/30 hover:border-primary/40 transition-colors">
+                            <CardContent className="p-3 space-y-3">
                               <div className="flex items-center gap-1 text-primary">
                                 <Target className="h-3 w-3" />
                                 <h6 className="font-semibold text-xs">AI Prediction</h6>
@@ -409,8 +493,8 @@ export function FightHistoryModal() {
                             </CardContent>
                           </Card>
                         ) : (
-                          <Card className="bg-muted/50">
-                            <CardContent className="p-2 flex items-center justify-center h-full">
+                          <Card className="bg-muted/30 border-muted/40">
+                            <CardContent className="p-3 flex items-center justify-center h-full">
                               <p className="text-muted-foreground text-center text-xs">No prediction data available</p>
                             </CardContent>
                           </Card>
@@ -418,8 +502,8 @@ export function FightHistoryModal() {
 
                         {/* Actual Result */}
                         {fight.result && fight.result.winner_name ? (
-                          <Card className="bg-green-500/10 border-green-500/30 dark:bg-green-500/5 dark:border-green-500/20">
-                            <CardContent className="p-2 space-y-2">
+                          <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/30 hover:border-green-500/40 transition-colors">
+                            <CardContent className="p-3 space-y-3">
                               <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                                 <Trophy className="h-3 w-3" />
                                 <h6 className="font-semibold text-xs">Actual Result</h6>
@@ -429,7 +513,7 @@ export function FightHistoryModal() {
                                 <div className="space-y-0.5">
                                   <p className="text-xs text-muted-foreground">Winner</p>
                                   <p className="font-semibold text-xs text-green-600 dark:text-green-400">
-                                    {fight.result.winner_name}
+                                    {fight.result.winner_name?.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')}
                                   </p>
                                 </div>
                                 {fight.result.method && (
@@ -454,8 +538,8 @@ export function FightHistoryModal() {
                             </CardContent>
                           </Card>
                         ) : (
-                          <Card className="bg-muted/50">
-                            <CardContent className="p-2 flex items-center justify-center h-full">
+                          <Card className="bg-muted/30 border-muted/40">
+                            <CardContent className="p-3 flex items-center justify-center h-full">
                               <p className="text-muted-foreground text-center text-xs">No result data available</p>
                             </CardContent>
                           </Card>
