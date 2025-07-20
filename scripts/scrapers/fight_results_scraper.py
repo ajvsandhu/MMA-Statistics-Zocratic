@@ -373,9 +373,9 @@ def calculate_accuracy_stats(fights):
     accuracy_percentage = (correct_predictions / completed_fights * 100) if completed_fights > 0 else 0
     
     # Calculate accuracy by confidence level
-    high_confidence = [f for f in fights if f.get("prediction", {}).get("confidence_percent", 0) > 75]
-    medium_confidence = [f for f in fights if 60 <= f.get("prediction", {}).get("confidence_percent", 0) <= 75]
-    low_confidence = [f for f in fights if f.get("prediction", {}).get("confidence_percent", 0) < 60]
+    high_confidence = [f for f in fights if f.get("prediction") and f.get("prediction", {}).get("confidence_percent", 0) > 75]
+    medium_confidence = [f for f in fights if f.get("prediction") and 60 <= f.get("prediction", {}).get("confidence_percent", 0) <= 75]
+    low_confidence = [f for f in fights if f.get("prediction") and f.get("prediction", {}).get("confidence_percent", 0) < 60]
     
     def calc_accuracy(fight_list):
         completed = [f for f in fight_list if f.get("status") == "completed"]
