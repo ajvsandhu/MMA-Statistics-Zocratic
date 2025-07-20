@@ -710,6 +710,10 @@ def save_to_database(event_data):
                 'event_date': event_data['event_date'],
                 'scraped_at': event_data['scraped_at'],
                 'fights': event_data['fights'],
+                'status': event_data.get('status', 'upcoming'),
+                'total_fights': event_data.get('total_fights', 0),
+                'completed_fights': event_data.get('completed_fights', 0),
+                'results_updated_at': event_data.get('results_updated_at'),
                 'is_active': True
             }).eq('id', existing_event['id']).execute()
             
@@ -733,6 +737,10 @@ def save_to_database(event_data):
             'event_url': event_data['event_url'],
             'scraped_at': event_data['scraped_at'],
             'fights': event_data['fights'],
+            'status': event_data.get('status', 'upcoming'),
+            'total_fights': event_data.get('total_fights', 0),
+            'completed_fights': event_data.get('completed_fights', 0),
+            'results_updated_at': event_data.get('results_updated_at'),
             'is_active': True
         }).execute()
         
@@ -799,8 +807,30 @@ def main():
         "event_date": event["date"],
         "event_url": event["url"],
         "scraped_at": datetime.now().isoformat(),
+        "status": "upcoming",
+        "total_fights": len(enriched_matchups),
+        "completed_fights": 0,
+        "results_updated_at": None,
         "fights": enriched_matchups
     }
+    
+    # Enhance each fight with result fields
+    for i, fight in enumerate(event_data["fights"]):
+        fight.update({
+            "fight_id": f"fight_{i+1}",
+            "fight_order": i + 1,
+            "status": "upcoming",  # upcoming, in_progress, completed
+            "result": {
+                "winner": None,
+                "winner_name": None,
+                "method": None,
+                "round": None,
+                "time": None,
+                "details": None
+            },
+            "prediction_correct": None,
+            "completed_at": None
+        })
     
     # Save to database (primary method)
     database_success = save_to_database(event_data)

@@ -283,6 +283,10 @@ app.include_router(zobot.router)
 from backend.api.routes import odds
 app.include_router(odds.router)
 
+# Import and include Fight Results router
+from backend.api.routes import fight_results
+app.include_router(fight_results.router)
+
 @app.get("/")
 def read_root():
     """Root endpoint that checks database connection."""

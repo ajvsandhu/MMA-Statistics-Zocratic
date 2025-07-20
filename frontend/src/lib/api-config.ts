@@ -78,5 +78,10 @@ export const ENDPOINTS = {
   ODDS_MMA: `${API_URL}/api/${API_VERSION}/odds/mma`,
   ODDS_EVENT: (eventId: string) => `${API_URL}/api/${API_VERSION}/odds/event/${encodeURIComponent(eventId)}`,
   ODDS_UPCOMING_WITH_ODDS: `${API_URL}/api/${API_VERSION}/odds/upcoming-with-odds`,
-  ODDS_HEALTH: `${API_URL}/api/${API_VERSION}/odds/health`
+  ODDS_HEALTH: `${API_URL}/api/${API_VERSION}/odds/health`,
+  
+  // Fight Results API
+  FIGHT_RESULTS: `${API_URL}/api/${API_VERSION}/fight-results/`,
+  FIGHT_RESULTS_EVENT: (filename: string) => `${API_URL}/api/${API_VERSION}/fight-results/event/${encodeURIComponent(filename)}`,
+  FIGHT_RESULTS_STATS: `${API_URL}/api/${API_VERSION}/fight-results/stats/overall`
 } as const; 

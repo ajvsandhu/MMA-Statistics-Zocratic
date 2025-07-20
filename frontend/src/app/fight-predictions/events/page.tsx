@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button"
 import Link from 'next/link'
 import Image from 'next/image'
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
-import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft } from 'lucide-react'
+import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft, CheckCircle, XCircle, Trophy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
 import { ENDPOINTS } from "@/lib/api-config"
 import { FighterOdds } from "@/components/ui/odds-display"
+import { FightHistoryModal } from "@/components/ui/fight-history-modal"
 
 interface Fighter {
   fighter_name: string
@@ -62,6 +63,14 @@ interface Fight {
   prediction: Prediction
   odds_data?: OddsData | null
   odds_event_id?: string | null
+  result?: {
+    winner_name?: string
+    method?: string
+    round?: number
+    time?: string
+  }
+  status?: string
+  prediction_correct?: boolean
 }
 
 interface Event {
@@ -233,6 +242,7 @@ export default function EventAnalysisPage() {
                 </Button>
                 <h2 className="text-lg sm:text-xl font-bold">Event Analysis</h2>
               </div>
+              <FightHistoryModal />
             </div>
             
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -407,6 +417,56 @@ export default function EventAnalysisPage() {
                       </div>
 
                       <div className="mt-2 sm:mt-3 md:mt-4 pt-2 sm:pt-3 md:pt-4 border-t border-border">
+                        {/* Show results if fight is completed */}
+                        {fight.status === 'completed' && fight.result ? (
+                          <div className="space-y-2 mb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Trophy className="h-4 w-4 text-yellow-500" />
+                                <span className="font-semibold text-sm">Fight Result</span>
+                                {fight.prediction_correct !== undefined && (
+                                  <Badge 
+                                    variant={fight.prediction_correct ? "default" : "destructive"}
+                                    className="flex items-center gap-1 px-2 py-0.5 text-xs"
+                                  >
+                                    {fight.prediction_correct ? (
+                                      <><CheckCircle className="h-2.5 w-2.5" /> Correct</>
+                                    ) : (
+                                      <><XCircle className="h-2.5 w-2.5" /> Incorrect</>
+                                    )}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Winner: </span>
+                                <span className="font-semibold">{fight.result.winner_name}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Method: </span>
+                                <span className="font-semibold">{fight.result.method}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Round: </span>
+                                <span className="font-semibold">{fight.result.round}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Time: </span>
+                                <span className="font-semibold">{fight.result.time}</span>
+                              </div>
+                            </div>
+                            <Separator className="my-2" />
+                          </div>
+                        ) : (
+                          <div className="mb-3">
+                            <Badge variant="outline" className="text-xs">
+                              {fight.status === 'scheduled' ? 'Scheduled' : 'Upcoming'}
+                            </Badge>
+                          </div>
+                        )}
+                        
+                        {/* Prediction details */}
                         <div className={cn(
                           "flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2",
                           "text-xs md:text-sm"
@@ -431,8 +491,6 @@ export default function EventAnalysisPage() {
                           <div className="text-[9px] sm:text-[10px] md:text-sm text-muted-foreground">
                             Predicted Winner: <span className="font-semibold break-words line-clamp-1 inline-block align-bottom">{fight.prediction?.predicted_winner_name}</span>
                           </div>
-                          
-
                         </div>
                       </div>
                     </CardContent>
