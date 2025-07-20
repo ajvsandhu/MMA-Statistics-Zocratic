@@ -686,7 +686,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         {showSuggestions && (searchTerm || searchHistory.length > 0) && (
           <motion.div
             className={cn(
-              "absolute top-full left-0 right-0 mt-2 z-[60]",
+              "absolute top-full left-0 right-0 mt-2 z-40",
               "bg-background/95 backdrop-blur-xl",
               "border border-white/20 rounded-lg shadow-xl",
               "overflow-hidden"

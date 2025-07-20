@@ -181,7 +181,7 @@ export function MainNav() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[60]"
+                  className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[200]"
                   style={{ 
                     clipPath: 'polygon(0 80px, 100% 80px, 100% 100%, 0 100%)'
                   }}
@@ -195,7 +195,7 @@ export function MainNav() {
                   animate="open"
                   exit="closed"
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="absolute top-full right-0 mt-3 w-72 rounded-3xl border border-[var(--nav-border)] bg-[hsl(var(--background))] backdrop-blur-2xl shadow-2xl z-[70]"
+                  className="absolute top-full right-0 mt-3 w-72 rounded-3xl border border-[var(--nav-border)] bg-[hsl(var(--background))] backdrop-blur-2xl shadow-2xl z-[210]"
                   data-mobile-menu
                 >
                   <div className="p-3">
@@ -270,7 +270,7 @@ export function MainNav() {
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
                             transition={{ duration: 0.15 }}
-                            className="absolute top-full left-0 right-0 mt-1 bg-[hsl(var(--background))] backdrop-blur-2xl border border-[var(--nav-border)] rounded-2xl shadow-xl z-[80] overflow-hidden"
+                            className="absolute top-full left-0 right-0 mt-1 bg-[hsl(var(--background))] backdrop-blur-2xl border border-[var(--nav-border)] rounded-2xl shadow-xl z-[220] overflow-hidden"
                           >
                             {THEMES_LIST.map((themeOption, index) => (
                               <motion.button
