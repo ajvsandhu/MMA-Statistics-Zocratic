@@ -79,6 +79,17 @@ interface Event {
   event_url: string
   scraped_at: string
   fights: Fight[]
+  // Additional fields for completed events
+  status?: string
+  total_fights?: number
+  completed_fights?: number
+  exported_at?: string
+  accuracy_stats?: {
+    total_fights: number
+    completed_fights: number
+    correct_predictions: number
+    accuracy_percentage: number
+  }
 }
 
 export default function EventAnalysisPage() {
@@ -262,26 +273,35 @@ export default function EventAnalysisPage() {
               <h1 className="text-3xl font-bold">{eventData.event_name}</h1>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>{eventData.event_date}</span>
+                <span>{eventData.event_date || 'Date Unknown'}</span>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="flex items-center gap-1">
                 <Clock className="h-3 w-3" /> 
-                <span>Last Updated: {new Date(eventData.scraped_at).toLocaleString()}</span>
+                <span>Last Updated: {new Date(eventData.scraped_at || eventData.exported_at || Date.now()).toLocaleString()}</span>
               </Badge>
-              <Link 
-                href={eventData.event_url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-              >
-                <ExternalLink className="h-3 w-3" /> 
-                UFC Stats
-              </Link>
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Trophy className="h-3 w-3" />
+                <span>{eventData.completed_fights || 0}/{eventData.total_fights || 0} Fights</span>
+              </Badge>
+              {eventData.event_url && (
+                <Link 
+                  href={eventData.event_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" /> 
+                  UFC Stats
+                </Link>
+              )}
             </div>
             <p className="text-muted-foreground pt-2">
-              AI-powered fight predictions for the upcoming UFC event, based on comprehensive fighter analysis.
+              {eventData.status === 'completed' 
+                ? 'AI-powered fight predictions and results analysis for the completed UFC event.'
+                : 'AI-powered fight predictions for the upcoming UFC event, based on comprehensive fighter analysis.'
+              }
             </p>
           </AnimatedItem>
 
