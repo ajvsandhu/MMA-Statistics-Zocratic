@@ -102,25 +102,38 @@ export default function EventAnalysisPage() {
   useEffect(() => {
     async function fetchEventData() {
       try {
-        // Fetch the event data (includes both predictions and odds)
-        const response = await fetch(ENDPOINTS.UPCOMING_EVENTS)
-        if (!response.ok) {
-          throw new Error('Failed to fetch event data')
+        // Try to fetch active upcoming event first
+        let response = await fetch(ENDPOINTS.UPCOMING_EVENTS)
+        
+        if (response.ok) {
+          // Active event exists - use it
+          const eventData = await response.json()
+          setEventData(eventData)
+          setError(null)
+        } else {
+          // No active event - fetch most recent completed event from bucket
+          response = await fetch(ENDPOINTS.FIGHT_RESULTS)
+          if (!response.ok) {
+            throw new Error('Failed to fetch event data')
+          }
+          
+          const eventsData = await response.json()
+          if (!eventsData.events || eventsData.events.length === 0) {
+            throw new Error('No event data available')
+          }
+          
+          // Get the most recent completed event
+          const mostRecentEvent = eventsData.events[0]
+          const eventResponse = await fetch(ENDPOINTS.FIGHT_RESULTS_EVENT(mostRecentEvent.filename))
+          
+          if (!eventResponse.ok) {
+            throw new Error('Failed to fetch completed event data')
+          }
+          
+          const eventResponseData = await eventResponse.json()
+          setEventData(eventResponseData.event)
+          setError(null)
         }
-        const eventData = await response.json()
-        
-        console.log('Event data loaded successfully:', eventData.event_name)
-        console.log('Total fights:', eventData.total_fights)
-        
-        // Log first fight to debug
-        if (eventData.fights && eventData.fights.length > 0) {
-          const firstFight = eventData.fights[0]
-          console.log('First fight prediction:', firstFight.prediction)
-          console.log('First fight odds:', firstFight.odds_data)
-        }
-        
-        setEventData(eventData)
-        setError(null)
       } catch (err) {
         console.error('Error fetching event data:', err)
         setError(err instanceof Error ? err.message : 'Failed to fetch event data')
