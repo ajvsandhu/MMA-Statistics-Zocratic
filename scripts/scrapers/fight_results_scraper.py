@@ -269,17 +269,21 @@ def update_event_with_results(event_data, scraped_results):
     if not scraped_results:
         logger.warning("No results to update")
         return event_data, 0
-    
+
     updated_fights = 0
     fights = event_data.get("fights", [])
-    
+
     for scraped_fight in scraped_results:
         match_index = match_fight_to_database(scraped_fight, fights)
-        
+
         if match_index is not None:
             fight = fights[match_index]
             result_data = scraped_fight
-            
+
+            # Skip if fight already has results (efficiency improvement)
+            if fight.get("status") == "completed" and fight.get("result", {}).get("winner_name"):
+                continue
+
             if result_data and result_data.get("winner_name"):
                 # Update fight with results, using extracted winner name if available
                 processed_result = result_data.copy()
@@ -288,22 +292,22 @@ def update_event_with_results(event_data, scraped_results):
                 fight["result"] = processed_result
                 fight["status"] = "completed"
                 fight["completed_at"] = datetime.now().isoformat()
-                
+
                 # Calculate prediction accuracy
                 prediction = fight.get("prediction")
                 predicted_winner = prediction.get("predicted_winner_name") if prediction else None
                 # Use the extracted actual winner (not the concatenated string)
                 actual_winner = result_data.get("actual_winner") or result_data.get("winner_name")
-                
+
                 if predicted_winner and actual_winner:
                     # Simple comparison of predicted vs actual winner (names only)
                     predicted_clean = predicted_winner.lower().strip()
                     actual_clean = actual_winner.lower().strip()
-                    
+
                     fight["prediction_correct"] = predicted_clean == actual_clean
-                
+
                 updated_fights += 1
-                logger.info(f"Updated fight: {fight['fighter1_name']} vs {fight['fighter2_name']}")
+                logger.info(f"NEW RESULT - Updated fight: {fight['fighter1_name']} vs {fight['fighter2_name']}")
     
     # Update event-level statistics
     completed_fights = sum(1 for f in fights if f.get("status") == "completed")
