@@ -173,6 +173,111 @@ class UFCTrainer:
             if os.path.exists(temp_file_path):
                 os.unlink(temp_file_path)
     
+    def load_latest_model_from_bucket_direct(self):
+        """Load the latest model directly from bucket by listing files (fallback method)."""
+        # Import here to avoid circular imports
+        from backend.api.database import get_supabase_client
+        
+        supabase = get_supabase_client()
+        if not supabase:
+            raise RuntimeError("Database connection failed")
+        
+        try:
+            # First, list all folders in the ml-models bucket
+            logger.info("🔍 Listing folders in bucket...")
+            response = supabase.storage.from_('ml-models').list()
+            
+            if not response:
+                raise RuntimeError("Failed to list files in bucket")
+            
+            # Look for the model folder
+            model_folder = None
+            for item in response:
+                if item.get('name') == 'advanced_leakproof_model':
+                    model_folder = item['name']
+                    logger.info(f"📂 Found model folder: {model_folder}")
+                    break
+            
+            if not model_folder:
+                # If no subfolder, try listing .pkl files in root
+                pkl_files = [f for f in response if f.get('name', '').endswith('.pkl')]
+                if pkl_files:
+                    logger.info(f"📁 Found {len(pkl_files)} .pkl files in root")
+                    # Sort by name in descending order (latest timestamp first)
+                    pkl_files.sort(key=lambda x: x.get('name', ''), reverse=True)
+                    latest_file = pkl_files[0]
+                    file_path = latest_file['name']
+                else:
+                    raise RuntimeError("No model folder or .pkl files found in bucket")
+            else:
+                # List files in the model folder
+                logger.info(f"🔍 Listing files in {model_folder} folder...")
+                folder_response = supabase.storage.from_('ml-models').list(model_folder)
+                
+                if not folder_response:
+                    raise RuntimeError(f"Failed to list files in {model_folder} folder")
+                
+                # Filter for .pkl files and sort by name (which contains timestamp)
+                pkl_files = [f for f in folder_response if f.get('name', '').endswith('.pkl')]
+                
+                if not pkl_files:
+                    raise RuntimeError(f"No .pkl model files found in {model_folder} folder")
+                
+                # Sort by name in descending order (latest timestamp first)
+                pkl_files.sort(key=lambda x: x.get('name', ''), reverse=True)
+                latest_file = pkl_files[0]
+                file_path = f"{model_folder}/{latest_file['name']}"
+            
+            logger.info(f"📁 Found {len(pkl_files)} model files")
+            logger.info(f"🎯 Latest model file: {latest_file['name']}")
+            
+            # Download the latest model
+            logger.info(f"⬇️ Downloading model from: {file_path}")
+            file_response = supabase.storage.from_('ml-models').download(file_path)
+            
+            if not file_response:
+                raise RuntimeError(f"Failed to download model from bucket: {file_path}")
+            
+            # Create temporary file and load model
+            with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as temp_file:
+                temp_file.write(file_response)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Load model data
+                model_data = joblib.load(temp_file_path)
+                
+                # Set trainer attributes
+                self.model = model_data['model']
+                self.scaler = model_data['scaler']
+                self.features = model_data['features']
+                
+                logger.info(f"✅ Latest model '{latest_file['name']}' loaded successfully from bucket")
+                logger.info(f"📊 Model features: {len(self.features) if self.features else 'Unknown'}")
+                
+                # Get file size from metadata
+                file_size = latest_file.get('metadata', {}).get('size', 0)
+                if file_size > 0:
+                    logger.info(f"📁 File size: {file_size / 1024 / 1024:.2f} MB")
+                
+                # Return file info for compatibility
+                return {
+                    'model_version': latest_file['name'].replace('.pkl', ''),
+                    'bucket_path': file_path,
+                    'file_size': file_size,
+                    'updated_at': latest_file.get('updated_at'),
+                    'source': 'direct_bucket_listing'
+                }
+                
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                
+        except Exception as e:
+            logger.error(f"❌ Error loading latest model from bucket: {str(e)}")
+            raise
+    
     def load_model_from_bucket(self, model_name: str, model_version: str = None):
         """Load model from Supabase storage bucket."""
         # Import here to avoid circular imports
@@ -198,8 +303,10 @@ class UFCTrainer:
             response = query.execute()
             
             if not response.data:
-                raise RuntimeError(f"No model found with name '{model_name}'" + 
-                                 (f" version '{model_version}'" if model_version else ""))
+                logger.warning(f"No model found with name '{model_name}' in ml_models table" + 
+                             (f" version '{model_version}'" if model_version else ""))
+                logger.info("🔄 Attempting to load latest model directly from bucket...")
+                return self.load_latest_model_from_bucket_direct()
             
             model_record = response.data[0]
             bucket_path = model_record['bucket_path']
@@ -236,7 +343,16 @@ class UFCTrainer:
                 
         except Exception as e:
             logger.error(f"❌ Error loading model from bucket: {str(e)}")
-            raise
+            # If database lookup fails, try direct bucket listing as fallback
+            if "No model found with name" in str(e):
+                logger.info("🔄 Attempting to load latest model directly from bucket as fallback...")
+                try:
+                    return self.load_latest_model_from_bucket_direct()
+                except Exception as fallback_error:
+                    logger.error(f"❌ Fallback method also failed: {str(fallback_error)}")
+                    raise fallback_error
+            else:
+                raise
 
     def save_model(self, model_path):
         """Save model, scaler and features to disk."""
