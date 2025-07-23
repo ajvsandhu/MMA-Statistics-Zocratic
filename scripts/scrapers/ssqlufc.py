@@ -790,7 +790,7 @@ def fetch_upcoming_events(num_events=1, max_retries=3):
     return []
 
 def update_recent_fighters(num_events=2, use_upcoming=False):
-    """Update only fighters who competed in the most recent events or upcoming events"""
+    """Update only fighters who competed in the most recent events or upcoming events, including all fighters with a UFC profile in those events (even if they have no fights yet)."""
     event_type = "upcoming" if use_upcoming else "completed"
     print(f"[INFO] Running in recent fighters mode, checking last {num_events} {event_type} events")
     
@@ -817,8 +817,8 @@ def update_recent_fighters(num_events=2, use_upcoming=False):
         fighter_urls = extract_fighters_from_event(event["url"])
         all_fighter_urls.extend(fighter_urls)
     
-    # Remove duplicates
-    all_fighter_urls = list(set(all_fighter_urls))
+    # Remove duplicates robustly (normalize URLs)
+    all_fighter_urls = list({url.strip(): None for url in all_fighter_urls if url and url.strip()}.keys())
     
     if not all_fighter_urls:
         print(f"[ERROR] Could not find any fighters in the recent {event_type} events. Exiting.")
@@ -827,7 +827,7 @@ def update_recent_fighters(num_events=2, use_upcoming=False):
     print(f"[INFO] Found {len(all_fighter_urls)} unique fighters across {len(recent_events)} {event_type} events")
     
     # Get existing fighters before starting the scrape
-    existing_fighters = get_existing_fighters()
+    existing_fighters = get_existing_fighters()  # {fighter_url: fighter_name}
     
     # Process fighter details
     all_rows = []
@@ -844,6 +844,9 @@ def update_recent_fighters(num_events=2, use_upcoming=False):
         
         for dfut in concurrent.futures.as_completed(detail_futs):
             row_data = dfut.result()
+            # If the fighter has no record ("N/A" or empty), log it if they are new
+            if row_data.get("Record", "N/A") in ("N/A", "") and row_data["fighter_url"] not in existing_fighters:
+                print(f"[INFO] New fighter with no fights yet: {row_data.get('fighter_name', 'Unknown')} ({row_data['fighter_url']})")
             all_rows.append(row_data)
             
             # Show progress

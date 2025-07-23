@@ -150,21 +150,6 @@ class OddsService:
         
         logger.info(f"Matching {len(matchups)} matchups to {len(odds_events)} odds events")
         
-        # Create a mapping of normalized names to odds events
-        odds_map = {}
-        for event in odds_events:
-            # Use event name as key
-            event_name = event.get('sport_title', '').lower()
-            odds_map[event_name] = event
-            
-            # Also use home/away team names
-            home_team = event.get('home_team', '').lower()
-            away_team = event.get('away_team', '').lower()
-            if home_team:
-                odds_map[home_team] = event
-            if away_team:
-                odds_map[away_team] = event
-        
         matched_count = 0
         
         for matchup in matchups:
@@ -174,28 +159,40 @@ class OddsService:
             
             # Try to find matching odds event
             matching_event = None
+            best_match_score = 0
             
-            # Try direct name matches first
-            for key, event in odds_map.items():
-                if (fighter1_name in key or fighter2_name in key) and len(key) > 5:
+            # Check each odds event for the best match
+            for event in odds_events:
+                home_team = event.get('home_team', '').lower()
+                away_team = event.get('away_team', '').lower()
+                
+                # Calculate match score for this event
+                match_score = 0
+                
+                # Check if both fighters can be found in this event
+                fighter1_in_home = self._names_similar(fighter1_name, home_team)
+                fighter1_in_away = self._names_similar(fighter1_name, away_team)
+                fighter2_in_home = self._names_similar(fighter2_name, home_team)
+                fighter2_in_away = self._names_similar(fighter2_name, away_team)
+                
+                # Both fighters must be found in the event (one as home, one as away)
+                if (fighter1_in_home and fighter2_in_away) or (fighter1_in_away and fighter2_in_home):
+                    # Perfect match - both fighters found in correct positions
+                    match_score = 10
+                elif (fighter1_in_home or fighter1_in_away) and (fighter2_in_home or fighter2_in_away):
+                    # Both fighters found but may be in same position (shouldn't happen)
+                    match_score = 5
+                elif fighter1_in_home or fighter1_in_away or fighter2_in_home or fighter2_in_away:
+                    # Only one fighter found - partial match (not good enough)
+                    match_score = 1
+                
+                # Select the best matching event
+                if match_score > best_match_score:
+                    best_match_score = match_score
                     matching_event = event
-                    break
             
-            # If no direct match, try more flexible matching
-            if not matching_event:
-                for event in odds_events:
-                    home_team = event.get('home_team', '').lower()
-                    away_team = event.get('away_team', '').lower()
-                    
-                    # Check if fighter names are similar to team names
-                    if (self._names_similar(fighter1_name, home_team) or 
-                        self._names_similar(fighter1_name, away_team) or
-                        self._names_similar(fighter2_name, home_team) or
-                        self._names_similar(fighter2_name, away_team)):
-                        matching_event = event
-                        break
-            
-            if matching_event:
+            # Only accept matches where both fighters are found (score >= 5)
+            if matching_event and best_match_score >= 5:
                 # Process the odds for this matchup
                 odds_data = self._process_odds_data(matching_event)
                 
@@ -206,16 +203,16 @@ class OddsService:
                 matchup['odds_event_id'] = matching_event.get('id')
                 matched_count += 1
                 
-                logger.info(f"Matched {fighter1_name} vs {fighter2_name} with odds event")
+                logger.info(f"Matched {fighter1_name} vs {fighter2_name} with odds event (score: {best_match_score})")
             else:
                 matchup['odds_data'] = None
                 matchup['odds_event_id'] = None
-                logger.warning(f"No odds found for {fighter1_name} vs {fighter2_name}")
+                logger.warning(f"No odds found for {fighter1_name} vs {fighter2_name} (best score: {best_match_score})")
         
         logger.info(f"Successfully matched {matched_count}/{len(matchups)} matchups with odds")
         return matchups
     
-    def _names_similar(self, name1: str, name2: str) -> bool:
+    def _names_similar(self, name1: str, name2: str, threshold: float = 0.8) -> bool:
         """Check if two names are similar enough to be considered a match"""
         if not name1 or not name2:
             return False
@@ -240,7 +237,42 @@ class OddsService:
             if name1_parts[-1] == name2_parts[-1]:  # Same last name
                 return True
         
-        return False
+        # Use edit distance for spelling variations (like almabayev vs almabaev)
+        similarity = self._calculate_name_similarity(name1, name2)
+        return similarity >= threshold
+    
+    def _calculate_name_similarity(self, name1: str, name2: str) -> float:
+        """Calculate similarity between two names using edit distance"""
+        if not name1 or not name2:
+            return 0.0
+        
+        # Simple edit distance calculation
+        def edit_distance(s1, s2):
+            if len(s1) < len(s2):
+                return edit_distance(s2, s1)
+            
+            if len(s2) == 0:
+                return len(s1)
+            
+            previous_row = range(len(s2) + 1)
+            for i, c1 in enumerate(s1):
+                current_row = [i + 1]
+                for j, c2 in enumerate(s2):
+                    insertions = previous_row[j + 1] + 1
+                    deletions = current_row[j] + 1
+                    substitutions = previous_row[j] + (c1 != c2)
+                    current_row.append(min(insertions, deletions, substitutions))
+                previous_row = current_row
+            
+            return previous_row[-1]
+        
+        max_len = max(len(name1), len(name2))
+        if max_len == 0:
+            return 1.0
+        
+        distance = edit_distance(name1, name2)
+        similarity = 1.0 - (distance / max_len)
+        return similarity
     
     def _process_odds_data(self, event: Dict) -> Dict:
         """Process raw odds data from API into structured format"""
