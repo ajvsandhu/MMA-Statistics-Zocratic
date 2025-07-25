@@ -25,9 +25,11 @@ async def get_upcoming_events() -> Dict[str, Any]:
         
         # Format the response
         return {
+            "id": event_data['id'],
             "event_name": event_data['event_name'],
             "event_date": event_data['event_date'],
             "event_url": event_data['event_url'],
+            "event_start_time": event_data.get('event_start_time'),
             "scraped_at": event_data['scraped_at'],
             "fights": event_data['fights'],
             "total_fights": len(event_data['fights']) if event_data['fights'] else 0

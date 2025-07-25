@@ -121,9 +121,31 @@ export function FightHistoryModal() {
       const historyResponse = await fetch(ENDPOINTS.FIGHT_RESULTS)
       if (historyResponse.ok) {
         const historyData = await historyResponse.json()
-        if (historyData.events) {
-          allEvents.push(...historyData.events.map((event: any) => ({ ...event, is_current: false })))
+        console.log('Historical events response:', historyData)
+        
+        if (historyData.success && historyData.events) {
+          // Map the events and add proper metadata
+          const mappedEvents = historyData.events.map((event: any) => {
+            let eventName = 'Unknown Event'
+            if (event.filename && typeof event.filename === 'string') {
+              const filename = event.filename
+              eventName = filename
+                .replace(/\.json$/, '')
+                .replace(/_complete$/, '')
+                .replace(/_/g, ' ')
+            }
+            
+            return {
+              ...event,
+              is_current: false,
+              event_name: eventName,
+              created_at: event.created_at
+            }
+          })
+          allEvents.push(...mappedEvents)
         }
+      } else {
+        console.error('Failed to fetch historical events:', historyResponse.status, historyResponse.statusText)
       }
       
       setEvents(allEvents)
@@ -159,7 +181,7 @@ export function FightHistoryModal() {
         }
       } else {
         // Load historical event from storage
-        const response = await fetch(ENDPOINTS.FIGHT_RESULTS_EVENT(filename))
+        const response = await fetch(`${ENDPOINTS.FIGHT_RESULTS_EVENT}/${filename}`)
         if (!response.ok) throw new Error('Failed to load event details')
         const data = await response.json()
         eventData = data.event

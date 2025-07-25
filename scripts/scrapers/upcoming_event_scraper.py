@@ -105,9 +105,10 @@ try:
                 # 4. Load Model Trainer
                 logger.info("Initializing UFCTrainer...")
                 trainer = UFCTrainer()
-                model_path = os.path.join(DATA_DIR, 'advanced_leakproof_model.pkl')
-                logger.info(f"Loading model from {model_path}...")
-                trainer.load_model(model_path)
+                logger.info("Loading latest model from bucket...")
+                # Use the bucket method to get the most recent model
+                model_info = trainer.load_latest_model_from_bucket_direct()
+                logger.info(f"Successfully loaded model: {model_info.get('model_version', 'unknown')} from bucket")
                 
                 if trainer.model and trainer.features is not None:
                     ml_initialized = True
@@ -966,7 +967,7 @@ def add_odds_to_matchups(matchups):
     """Add betting odds to each matchup"""
     if not odds_service_available:
         logger.warning("Odds service is not available. Skipping odds step.")
-        return matchups
+        return matchups, None
 
     logger.info("Fetching betting odds for all matchups...")
     
@@ -974,7 +975,7 @@ def add_odds_to_matchups(matchups):
     odds_service = get_odds_service()
     if not odds_service:
         logger.warning("Failed to initialize odds service. Skipping odds.")
-        return matchups
+        return matchups, None
 
     try:
         # Get all MMA odds from the API
@@ -987,9 +988,18 @@ def add_odds_to_matchups(matchups):
             for matchup in matchups:
                 matchup['odds_data'] = None
                 matchup['odds_event_id'] = None
-            return matchups
+            return matchups, None
         
         logger.info(f"Found {len(odds_events)} MMA events with odds")
+        
+        # EXTRACT EVENT START TIME from odds data
+        event_start_time = None
+        for event in odds_events:
+            commence_time = event.get('commence_time')
+            if commence_time:
+                event_start_time = commence_time
+                logger.info(f"Found event start time from odds API: {event_start_time}")
+                break
         
         # DETECT FIGHTER CHANGES BEFORE MATCHING ODDS
         logger.info("Checking for potential fighter changes...")
@@ -1043,7 +1053,7 @@ def add_odds_to_matchups(matchups):
         matched_count = sum(1 for m in enriched_matchups if m.get('odds_data') is not None)
         logger.info(f"Successfully matched {matched_count}/{len(enriched_matchups)} matchups with odds")
         
-        return enriched_matchups
+        return enriched_matchups, event_start_time
         
     except Exception as e:
         logger.error(f"Error adding odds to matchups: {str(e)}")
@@ -1051,7 +1061,7 @@ def add_odds_to_matchups(matchups):
         for matchup in matchups:
             matchup['odds_data'] = None
             matchup['odds_event_id'] = None
-        return matchups
+        return matchups, None
 
 def save_to_database(event_data):
     """Save event data to the database using upsert to prevent duplicates"""
@@ -1076,6 +1086,7 @@ def save_to_database(event_data):
             response = supabase.table('upcoming_events').update({
                 'event_name': event_data['event_name'],
                 'event_date': event_data['event_date'],
+                'event_start_time': event_data.get('event_start_time'),
                 'scraped_at': event_data['scraped_at'],
                 'fights': event_data['fights'],
                 'status': event_data.get('status', 'upcoming'),
@@ -1103,6 +1114,7 @@ def save_to_database(event_data):
             'event_name': event_data['event_name'],
             'event_date': event_data['event_date'],
             'event_url': event_data['event_url'],
+            'event_start_time': event_data.get('event_start_time'),
             'scraped_at': event_data['scraped_at'],
             'fights': event_data['fights'],
             'status': event_data.get('status', 'upcoming'),
@@ -1165,15 +1177,17 @@ def main():
     if not args.no_predictions:
         enriched_matchups = add_predictions_to_matchups(enriched_matchups)
     
-    # Add odds if requested
+    # Add odds if requested and extract event start time
+    event_start_time = None
     if not args.no_odds:
-        enriched_matchups = add_odds_to_matchups(enriched_matchups)
+        enriched_matchups, event_start_time = add_odds_to_matchups(enriched_matchups)
     
     # Create the final event data structure
     event_data = {
         "event_name": event["name"],
         "event_date": event["date"],
         "event_url": event["url"],
+        "event_start_time": event_start_time,
         "scraped_at": datetime.now().isoformat(),
         "status": "upcoming",
         "total_fights": len(enriched_matchups),

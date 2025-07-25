@@ -75,35 +75,90 @@ if USE_SIMPLE_AUTH:
 
 def check_prediction_window(event_id: int) -> bool:
     """Check if predictions are still open (closes 10 min before event)"""
-    # Temporarily disabled for testing - return True to always allow predictions
-    return True
-    
-    # Original implementation (commented out for testing):
-    # try:
-    #     supabase = get_db_connection()
-    #     if not supabase:
-    #         return False
-    #         
-    #     response = supabase.table('upcoming_events')\
-    #         .select('event_date, is_active')\
-    #         .eq('id', event_id)\
-    #         .execute()
-    #         
-    #     if not response.data or len(response.data) == 0:
-    #         return False
-    #         
-    #     event = response.data[0]
-    #     if not event.get('is_active', False):
-    #         return False
-    #         
-    #     event_date = datetime.fromisoformat(event['event_date'].replace('Z', '+00:00'))
-    #     cutoff_time = event_date - timedelta(minutes=10)
-    #     
-    #     return datetime.now(timezone.utc) < cutoff_time
-    #     
-    # except Exception as e:
-    #     logger.error(f"Error checking prediction window: {str(e)}")
-    #     return False
+    try:
+        logger.info(f"Checking prediction window for event_id: {event_id}")
+        supabase = get_db_connection()
+        if not supabase:
+            logger.warning("Database connection unavailable for prediction window check")
+            return False
+            
+        # If no event_id provided, check the active event
+        if event_id is None:
+            logger.info("No event_id provided, looking for active event")
+            response = supabase.table('upcoming_events')\
+                .select('event_start_time, event_date, is_active')\
+                .eq('is_active', True)\
+                .order('scraped_at', desc=True)\
+                .limit(1)\
+                .execute()
+        else:
+            logger.info(f"Looking for specific event_id: {event_id}")
+            response = supabase.table('upcoming_events')\
+                .select('event_start_time, event_date, is_active')\
+                .eq('id', event_id)\
+                .execute()
+            
+        if not response.data or len(response.data) == 0:
+            logger.warning(f"No event found for event_id: {event_id}")
+            return False
+            
+        event = response.data[0]
+        logger.info(f"Found event: is_active={event.get('is_active', False)}")
+        if not event.get('is_active', False):
+            logger.info(f"Event {event_id} is not active, predictions closed")
+            return False
+        
+        # Use event_start_time if available, otherwise fall back to event_date
+        event_time_str = event.get('event_start_time') or event.get('event_date')
+        logger.info(f"Raw event time string: {event_time_str}")
+        
+        if not event_time_str:
+            logger.warning(f"No event time found for event {event_id}")
+            return False
+            
+        # Parse the event time
+        from datetime import timezone
+        try:
+            # Handle ISO format with or without timezone
+            if event_time_str.endswith('Z'):
+                event_time_str = event_time_str.replace('Z', '+00:00')
+            event_time = datetime.fromisoformat(event_time_str)
+            
+            # Ensure timezone aware
+            if event_time.tzinfo is None:
+                event_time = event_time.replace(tzinfo=timezone.utc)
+        except ValueError as e:
+            logger.error(f"Failed to parse event time '{event_time_str}': {str(e)}")
+            return False
+        
+        # Calculate cutoff time (10 minutes before event)
+        cutoff_time = event_time - timedelta(minutes=10)
+        current_time = datetime.now(timezone.utc)
+        
+        is_open = current_time < cutoff_time
+        
+        # Enhanced logging for debugging
+        logger.info(f"=== PREDICTION WINDOW CHECK DETAILS ===")
+        logger.info(f"Event ID: {event_id}")
+        logger.info(f"Current UTC time: {current_time}")
+        logger.info(f"Event time (UTC): {event_time}")
+        logger.info(f"Cutoff time (UTC): {cutoff_time}")
+        logger.info(f"Time until cutoff: {cutoff_time - current_time}")
+        logger.info(f"Prediction window open: {is_open}")
+        logger.info(f"==========================================")
+        
+        if not is_open:
+            logger.info(f"Predictions window closed for event {event_id}. Current: {current_time}, Cutoff: {cutoff_time}")
+        else:
+            logger.debug(f"Predictions window open for event {event_id}. Closes at: {cutoff_time}")
+            
+        return is_open
+        
+    except Exception as e:
+        logger.error(f"Error checking prediction window for event {event_id}: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return False
 
 # API Endpoints
 
@@ -340,10 +395,11 @@ async def get_event_pick_stats(
             .execute()
             
         # Get total pick counts per fight (optional - for community stats)
-        total_picks_response = supabase.table('bets')\
-            .select('fight_id, fighter_id, count(*)')\
-            .eq('event_id', event_id)\
-            .execute()
+        # Note: We'll skip this complex aggregation for now and just get user picks
+        # total_picks_response = supabase.table('bets')\
+        #     .select('fight_id, fighter_id')\
+        #     .eq('event_id', event_id)\
+        #     .execute()
             
         user_picks = {pick['fight_id']: pick for pick in user_picks_response.data}
         
