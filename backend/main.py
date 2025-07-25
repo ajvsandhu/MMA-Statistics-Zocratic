@@ -41,7 +41,7 @@ from backend.constants import (
 )
 from backend.utils import sanitize_json
 from backend.api.database import get_db_connection, test_connection
-from backend.api.routes import fighters, predictions, upcoming_events
+from backend.api.routes import fighters, predictions, upcoming_events, predictions_game
 
 # Configure logging
 logging.basicConfig(
@@ -286,6 +286,9 @@ app.include_router(odds.router)
 # Import and include Fight Results router
 from backend.api.routes import fight_results
 app.include_router(fight_results.router)
+
+# Include Predictions Game router
+app.include_router(predictions_game.router)
 
 @app.get("/")
 def read_root():

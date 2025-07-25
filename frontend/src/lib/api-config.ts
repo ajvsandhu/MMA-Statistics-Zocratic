@@ -1,87 +1,27 @@
-// API Configuration
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-export const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1'
+// API Configuration - force localhost for development
+const isLocalhost = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname === '::1'
+);
 
-// API request timeout and retry configuration
-export const API_TIMEOUT_MS = 15000 // 15 seconds
-export const MAX_RETRIES = 3
-export const RETRY_DELAY_MS = 1000 // Start with 1 second, will increase exponentially
+const isDevelopment = process.env.NODE_ENV !== 'production' || isLocalhost;
 
-// Retry fetch with exponential backoff
-export async function fetchWithRetries(url: string, options = {}) {
-  let retries = 0;
-  let lastError: Error | null = null;
-  
-  while (retries < MAX_RETRIES) {
-    try {
-      // Add timeout to the fetch
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-      
-      const fetchOptions = {
-        ...options,
-        signal: controller.signal,
-      };
-      
-      const response = await fetch(url, fetchOptions);
-      clearTimeout(timeoutId);
-      
-      // Return the successful response
-      return response;
-    } catch (error) {
-      lastError = error as Error;
-      retries++;
-      
-      if (retries >= MAX_RETRIES) {
-        break;
-      }
-      
-      // Calculate delay with exponential backoff (1s, 2s, 4s...)
-      const delay = RETRY_DELAY_MS * Math.pow(2, retries - 1);
-      console.warn(`API request failed, retrying (${retries}/${MAX_RETRIES}) in ${delay}ms...`, error);
-      
-      // Wait before next retry
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  
-  // All retries failed, throw the last error
-  throw lastError || new Error('Failed to fetch after retries');
-}
+// Force localhost for development, only use production URL in production builds
+export const API_URL = isDevelopment 
+  ? 'http://localhost:8000' 
+  : (process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000');
 
-// API Endpoints
+export const API_PREFIX = '/api/v1';
+
 export const ENDPOINTS = {
-  FIGHTERS_SEARCH: (query: string) => `${API_URL}/api/${API_VERSION}/fighters?query=${encodeURIComponent(query)}`,
-  FIGHTER: (id: string) => `${API_URL}/api/${API_VERSION}/fighter/${encodeURIComponent(id)}`,
-  FIGHTER_STATS: (id: string) => `${API_URL}/api/${API_VERSION}/fighter-stats/${encodeURIComponent(id)}`,
-  FIGHTER_DETAILS: (id: string) => `${API_URL}/api/${API_VERSION}/fighter-details/${encodeURIComponent(id)}`,
-  FIGHTERS_COUNT: `${API_URL}/api/${API_VERSION}/fighters-count`,
-  PREDICTION: (fighter1: string, fighter2: string) => ({
-    url: `${API_URL}/api/${API_VERSION}/prediction/predict`,
-    options: {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fighter1_id: fighter1,
-        fighter2_id: fighter2
-      }),
-    },
-  }),
-  TRAIN_MODEL: `${API_URL}/api/${API_VERSION}/prediction/train`,
-  MODEL_STATUS: `${API_URL}/api/${API_VERSION}/prediction/status`,
-  UPDATE_RANKINGS: `${API_URL}/api/${API_VERSION}/prediction/update-rankings`,
-  ZOBOT_CHAT: `${API_URL}/api/${API_VERSION}/zobot/chat`,
-  ZOBOT_STATUS: `${API_URL}/api/${API_VERSION}/zobot/status`,
-  UPCOMING_EVENTS: `${API_URL}/api/${API_VERSION}/upcoming-events`,
-  ODDS_MMA: `${API_URL}/api/${API_VERSION}/odds/mma`,
-  ODDS_EVENT: (eventId: string) => `${API_URL}/api/${API_VERSION}/odds/event/${encodeURIComponent(eventId)}`,
-  ODDS_UPCOMING_WITH_ODDS: `${API_URL}/api/${API_VERSION}/odds/upcoming-with-odds`,
-  ODDS_HEALTH: `${API_URL}/api/${API_VERSION}/odds/health`,
-  
-  // Fight Results API
-  FIGHT_RESULTS: `${API_URL}/api/${API_VERSION}/fight-results/`,
-  FIGHT_RESULTS_EVENT: (filename: string) => `${API_URL}/api/${API_VERSION}/fight-results/event/${encodeURIComponent(filename)}`,
-  FIGHT_RESULTS_STATS: `${API_URL}/api/${API_VERSION}/fight-results/stats/overall`
-} as const; 
+  GET_BALANCE: `${API_URL}${API_PREFIX}/predictions-game/balance`,
+  PLACE_PICK: `${API_URL}${API_PREFIX}/predictions-game/place-pick`,
+  MY_PICKS: `${API_URL}${API_PREFIX}/predictions-game/my-picks`,
+  TRANSACTION_HISTORY: `${API_URL}${API_PREFIX}/predictions-game/transaction-history`,
+  MY_RANK: `${API_URL}${API_PREFIX}/predictions-game/my-rank`,
+  LEADERBOARD: `${API_URL}${API_PREFIX}/predictions-game/leaderboard`,
+  UPCOMING_EVENTS: `${API_URL}${API_PREFIX}/upcoming-events`,
+  FIGHT_RESULTS: `${API_URL}${API_PREFIX}/fight-results`,
+  FIGHT_RESULTS_EVENT: `${API_URL}${API_PREFIX}/fight-results/event`,
+}; 

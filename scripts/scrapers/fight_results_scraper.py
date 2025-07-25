@@ -51,6 +51,32 @@ except Exception as e:
     supabase = None
     db_available = False
 
+def settle_event_predictions(event_id):
+    """Settle predictions for completed fights in an event"""
+    if not db_available or not supabase:
+        logger.warning("Database not available for predictions settlement")
+        return False
+    
+    try:
+        # Call the settlement function via RPC
+        response = supabase.rpc('settle_event_bets', {'p_event_id': event_id}).execute()
+        
+        if response.error:
+            logger.error(f"Error settling predictions: {response.error.message}")
+            return False
+            
+        settled_count = response.data or 0
+        if settled_count > 0:
+            logger.info(f"✅ Settled {settled_count} predictions for event {event_id}")
+        else:
+            logger.info(f"No predictions to settle for event {event_id}")
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"Exception during predictions settlement: {str(e)}")
+        return False
+
 def get_active_event():
     """Get the currently active event from database"""
     if not db_available or not supabase:
@@ -506,6 +532,13 @@ def monitor_event():
         success = save_updated_event(updated_event)
         if success:
             logger.info(f"Successfully updated {updated_count} fights with results")
+            
+            # Settle predictions for newly completed fights
+            try:
+                settle_event_predictions(updated_event['id'])
+            except Exception as e:
+                logger.warning(f"Failed to settle predictions for event {updated_event['id']}: {str(e)}")
+                # Don't fail the entire process if prediction settlement fails
         else:
             logger.error("Failed to save updates to database")
             return False

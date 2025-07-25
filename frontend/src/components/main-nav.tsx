@@ -5,11 +5,12 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X } from "lucide-react"
+import { Menu, X, User, LogOut, Settings as SettingsIcon, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useTheme, THEMES_LIST, type Theme } from "@/lib/theme-provider"
 import { Check, Palette } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 export function MainNav() {
   const pathname = usePathname()
@@ -17,6 +18,7 @@ export function MainNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = React.useState(false)
   const { theme, setTheme } = useTheme()
+  const { isAuthenticated, isLoading, userProfile, signOut } = useAuth()
   
   React.useEffect(() => {
     const checkMobile = () => {
@@ -81,36 +83,25 @@ export function MainNav() {
       document.body.style.overflow = ''
     }
   }, [mobileMenuOpen, themeMenuOpen])
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      setMobileMenuOpen(false)
+    } catch (error) {
+      console.error('Sign out error:', error)
+    }
+  }
   
   const links = [
-    {
-      href: "/",
-      label: "Home",
-    },
-    {
-      href: "/fighters",
-      label: "Fighters",
-    },
-    {
-      href: "/fight-predictions",
-      label: "Fight Predictions",
-    },
-    {
-      href: "/fight-predictions/events",
-      label: "Event Analysis",
-    },
-    {
-      href: "/zobot",
-      label: "Zobot AI",
-    },
-    {
-      href: "/about",
-      label: "About",
-    },
-    {
-      href: "/contact",
-      label: "Contact Us",
-    },
+    { href: "/", label: "Home" },
+    { href: "/fighters", label: "Fighters" },
+    { href: "/fight-predictions", label: "Fight Predictions" },
+    { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/fight-predictions/events", label: "Event Analysis" },
+    { href: "/zobot", label: "Zobot AI" },
+    { href: "/about", label: "About" },
+    { href: "/contact", label: "Contact Us" }
   ]
 
   // Mobile menu animation variants
@@ -199,6 +190,80 @@ export function MainNav() {
                   data-mobile-menu
                 >
                   <div className="p-3">
+                    {/* Authentication Section */}
+                    {!isLoading && (
+                      <motion.div
+                        variants={itemVariants}
+                        initial="closed"
+                        animate="open"
+                        transition={{ delay: 0, duration: 0.2 }}
+                        className="mb-3"
+                      >
+                        {isAuthenticated ? (
+                          <div className="space-y-2">
+                            <div className="px-4 py-3 rounded-2xl bg-[var(--nav-bg-active)]/50">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                                  <User className="h-4 w-4 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-[var(--nav-text)] truncate">
+                                    {userProfile.preferred_username || userProfile.email || 'User'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Signed in
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            {isAuthenticated && (
+                              <Link
+                                href="/settings"
+                                className="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
+                                onClick={() => setMobileMenuOpen(false)}
+                              >
+                                <span>Settings</span>
+                                <span className="ml-1">⚙️</span>
+                              </Link>
+                            )}
+                            <button
+                              onClick={handleSignOut}
+                              className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 hover:bg-red-500/10 text-red-500 hover:text-red-400"
+                            >
+                              <LogOut className="h-4 w-4" />
+                              Sign Out
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Link
+                              href="/auth"
+                              onClick={() => setMobileMenuOpen(false)}
+                              className="flex-1 px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white text-center"
+                            >
+                              Sign In
+                            </Link>
+                            <Link
+                              href="/auth"
+                              onClick={() => setMobileMenuOpen(false)}
+                              className="flex-1 px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 border border-[var(--nav-border)] hover:bg-[var(--nav-bg-active)] text-muted-foreground hover:text-[var(--nav-text)] text-center"
+                            >
+                              Sign Up
+                            </Link>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+
+                    {/* Separator */}
+                    <motion.div
+                      variants={itemVariants}
+                      initial="closed"
+                      animate="open"
+                      transition={{ delay: 0.05, duration: 0.2 }}
+                      className="my-2 h-px bg-border"
+                    />
+                    
                     {/* Navigation Links */}
                     {links.map(({ href, label }, index) => {
                       const isActive = pathname === href
@@ -208,7 +273,7 @@ export function MainNav() {
                           variants={itemVariants}
                           initial="closed"
                           animate="open"
-                          transition={{ delay: index * 0.05, duration: 0.2 }}
+                          transition={{ delay: (index + 1) * 0.05, duration: 0.2 }}
                         >
                           <Link
                             href={href}
@@ -233,7 +298,7 @@ export function MainNav() {
                       variants={itemVariants}
                       initial="closed"
                       animate="open"
-                      transition={{ delay: links.length * 0.05, duration: 0.2 }}
+                      transition={{ delay: (links.length + 1) * 0.05, duration: 0.2 }}
                       className="my-2 h-px bg-border"
                     />
                     
@@ -242,7 +307,7 @@ export function MainNav() {
                       variants={itemVariants}
                       initial="closed"
                       animate="open"
-                      transition={{ delay: (links.length + 1) * 0.05, duration: 0.2 }}
+                      transition={{ delay: (links.length + 2) * 0.05, duration: 0.2 }}
                       className="relative"
                     >
                       <button
@@ -356,6 +421,96 @@ export function MainNav() {
           )
         })}
       </div>
+
+      {/* Desktop Auth Section */}
+      <div className="flex-1" />
+      <div className="flex items-center gap-3">
+        {!isLoading && (
+          <UserMenu isAuthenticated={isAuthenticated} userProfile={userProfile} onSignOut={handleSignOut} />
+        )}
+      </div>
     </>
   )
+} 
+
+// UserMenu component for desktop nav
+import { useState, useRef, useEffect } from 'react';
+
+function UserMenu({ isAuthenticated, userProfile, onSignOut }: { isAuthenticated: boolean, userProfile: any, onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        className="flex items-center justify-center w-9 h-9 rounded-full bg-[var(--nav-bg-active)]/50 hover:bg-[var(--nav-bg-active)] transition focus:outline-none"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="User menu"
+      >
+        <User className="h-5 w-5 text-[var(--nav-text)]" />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-48 bg-[hsl(var(--background))] border border-[var(--nav-border)] rounded-xl shadow-lg z-50 py-2">
+          {isAuthenticated ? (
+            <>
+              <div className="px-4 py-2 text-xs text-muted-foreground truncate">
+                {userProfile.preferred_username || userProfile.email || 'User'}
+              </div>
+              <a
+                href="/dashboard"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition rounded w-full text-left font-medium"
+                onClick={() => setOpen(false)}
+              >
+                <BarChart3 className="h-4 w-4 transition-colors" /> Dashboard
+              </a>
+              <a
+                href="/settings"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition rounded w-full text-left font-medium"
+                onClick={() => setOpen(false)}
+              >
+                <SettingsIcon className="h-4 w-4 transition-colors" /> Settings
+              </a>
+              <button
+                onClick={() => { onSignOut(); setOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 hover:text-red-400 transition rounded w-full text-left"
+              >
+                <LogOut className="h-4 w-4" /> Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <a
+                href="/auth"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-[var(--nav-bg-active)] transition rounded"
+                onClick={() => setOpen(false)}
+              >
+                <User className="h-4 w-4" /> Sign In
+              </a>
+              <a
+                href="/auth"
+                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-[var(--nav-bg-active)] transition rounded"
+                onClick={() => setOpen(false)}
+              >
+                <User className="h-4 w-4" /> Sign Up
+              </a>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 } 

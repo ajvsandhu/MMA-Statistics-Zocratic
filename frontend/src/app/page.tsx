@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import { useState, useEffect } from "react"
-import { API_URL, API_VERSION, ENDPOINTS } from "@/lib/api-config"
+import { API_URL, ENDPOINTS } from "@/lib/api-config"
 import { Badge } from "@/components/ui/badge"
 import { useIsMobile, createFighterSlug } from "@/lib/utils"
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
@@ -26,14 +26,14 @@ export default function HomePage() {
     const fetchData = async () => {
       try {
         // Fetch fighters count
-        const countResponse = await fetch(`${API_URL}/api/${API_VERSION}/fighters-count`);
+        const countResponse = await fetch(`${API_URL}/api/v1/fighters-count`);
         const countData = await countResponse.json();
         setFightersCount(countData.count);
 
         // Fetch updated data for featured fighters
         const updatedFighters = await Promise.all(
           FEATURED_FIGHTERS.map(async (fighter) => {
-            const response = await fetch(ENDPOINTS.FIGHTER(fighter.id));
+            const response = await fetch(`${API_URL}/api/v1/fighter/${fighter.id}`);
             if (!response.ok) return fighter;
             const data = await response.json();
             return {

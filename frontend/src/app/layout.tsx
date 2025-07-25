@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-provider";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import { MainNav } from "@/components/main-nav";
 import { Toaster } from "@/components/ui/toaster";
 import { PageBackground } from "@/components/page-background";
 import { PageTransitionsProvider } from "@/components/page-transitions-provider";
 import { FooterVisibility } from "@/components/footer-visibility";
-import { usePathname } from "next/navigation";
+import { Providers } from "./providers";
+import AntiGamblingModal from "@/components/anti-gambling-modal";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -68,11 +68,6 @@ function SiteHeader() {
         <div className="rounded-full border border-[var(--nav-border)] bg-[var(--nav-bg)] backdrop-blur-md shadow-[var(--nav-shadow)]">
           <div className="flex h-14 items-center px-4">
             <MainNav />
-            <div className="hidden md:flex flex-1 items-center justify-end">
-              <div className="relative">
-                <ThemeSwitcher />
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -85,11 +80,6 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Only show the footer if we're NOT on a fighter details page
-  // This keeps the footer from overlapping the radar chart and stats
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
-  const isFighterPage = pathname.startsWith('/fighters/') && pathname.split('/').length === 3;
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -108,18 +98,16 @@ export default function RootLayout({
         }} />
         <style>{`
           html {
-            /* Ensure html takes full height for body min-height to work reliably */
             height: 100%; 
           }
           body {
-            /* Removed height: 100% from combined rule */
             margin: 0;
             padding: 0;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
           }
-          #main-content { /* This style seems unused based on current main tag */
+          #main-content {
             isolation: isolate;
             min-height: 100vh;
             position: relative;
@@ -128,23 +116,25 @@ export default function RootLayout({
         `}</style>
       </head>
       <body className={`${inter.className} min-h-screen flex flex-col overflow-y-auto overflow-x-hidden`}>
-        {/* This layout ensures the footer always stays at the bottom, even if content is short. */}
-        <ThemeProvider
-          defaultTheme="dark"
-          storageKey="zocratic-ui-theme"
-        >
-          <PageBackground />
-          <SiteHeader />
-          <main className="relative pt-28 flex-1">
-            <div className="mx-auto max-w-[90rem] px-4">
-              <PageTransitionsProvider>
-                {children}
-              </PageTransitionsProvider>
-            </div>
-          </main>
-          <FooterVisibility />
-          <Toaster />
-        </ThemeProvider>
+        <AntiGamblingModal />
+        <Providers>
+          <ThemeProvider
+            defaultTheme="dark"
+            storageKey="zocratic-ui-theme"
+          >
+            <PageBackground />
+            <SiteHeader />
+            <main className="relative pt-28 flex-1">
+              <div className="mx-auto max-w-[90rem] px-4">
+                <PageTransitionsProvider>
+                  {children}
+                </PageTransitionsProvider>
+              </div>
+            </main>
+            <FooterVisibility />
+            <Toaster />
+          </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );

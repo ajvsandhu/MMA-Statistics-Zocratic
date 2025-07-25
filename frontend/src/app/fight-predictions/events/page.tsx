@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button"
 import Link from 'next/link'
 import Image from 'next/image'
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
-import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft, CheckCircle, XCircle, Trophy } from 'lucide-react'
+import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft, CheckCircle, XCircle, Trophy, Coins } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
 import { ENDPOINTS } from "@/lib/api-config"
 import { FighterOdds } from "@/components/ui/odds-display"
 import { FightHistoryModal } from "@/components/ui/fight-history-modal"
+import { PlacePickModal } from "@/components/ui/place-pick-modal"
+import { useAuth } from '@/hooks/use-auth'
 
 interface Fighter {
   fighter_name: string
@@ -71,6 +73,7 @@ interface Fight {
   }
   status?: string
   prediction_correct?: boolean
+  fight_id: string
 }
 
 interface Event {
@@ -90,6 +93,7 @@ interface Event {
     correct_predictions: number
     accuracy_percentage: number
   }
+  id: number
 }
 
 export default function EventAnalysisPage() {
@@ -99,6 +103,18 @@ export default function EventAnalysisPage() {
   const [isContentReady, setIsContentReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const { user, isAuthenticated, getToken } = useAuth()
+  const [coinBalance, setCoinBalance] = useState<number | null>(null)
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    eventId: 0,
+    fightId: '',
+    fighterId: 0,
+    fighterName: '',
+    oddsAmerican: 0,
+  })
+
+  const [userBets, setUserBets] = useState<any[]>([])
 
   useEffect(() => {
     const checkMobile = () => {
@@ -109,6 +125,102 @@ export default function EventAnalysisPage() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Fetch coin balance when user is authenticated - ONLY ONCE
+  useEffect(() => {
+    let isMounted = true; // Prevent state updates if component unmounts
+
+    async function fetchInitialData() {
+      if (!isAuthenticated) {
+        setCoinBalance(null)
+        setUserBets([])
+        return
+      }
+
+      try {
+        const token = await getToken()
+        if (!token || !isMounted) return
+
+        // Fetch both balance and bets in parallel - ONLY ONCE ON AUTH CHANGE
+        const [balanceResponse, betsResponse] = await Promise.all([
+          fetch(ENDPOINTS.GET_BALANCE, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }),
+          fetch(`${ENDPOINTS.MY_PICKS}?event_id=5`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+        ])
+
+        if (!isMounted) return; // Component unmounted
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json()
+          setCoinBalance(balanceData.balance)
+          console.log('Initial balance loaded:', balanceData.balance)
+        }
+
+        if (betsResponse.ok) {
+          const betsData = await betsResponse.json()
+          setUserBets(betsData)
+          console.log('Initial bets loaded:', betsData.length, 'bets')
+        }
+      } catch (error) {
+        console.error('Error fetching initial data:', error)
+      }
+    }
+
+    fetchInitialData()
+    
+    return () => {
+      isMounted = false; // Cleanup to prevent state updates after unmount
+    }
+  }, [isAuthenticated]) // ONLY run when authentication status changes
+
+  // Function to refresh balance after successful bet - CALL MANUALLY ONLY
+  const refreshBalance = async () => {
+    console.log('Manually refreshing balance and bets...')
+    
+    try {
+      const token = await getToken()
+      if (!token) return
+
+      // Fetch both balance and bets in parallel
+      const [balanceResponse, userBetsResponse] = await Promise.all([
+        fetch(ENDPOINTS.GET_BALANCE, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch(`${ENDPOINTS.MY_PICKS}?event_id=5`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      ])
+
+      if (balanceResponse.ok) {
+        const balanceData = await balanceResponse.json()
+        setCoinBalance(balanceData.balance)
+        console.log('Balance manually refreshed:', balanceData.balance)
+      }
+
+      if (userBetsResponse.ok) {
+        const betsData = await userBetsResponse.json()
+        setUserBets(betsData)
+        console.log('Bets manually refreshed:', betsData.length, 'bets')
+      }
+    } catch (error) {
+      console.error('Error manually refreshing data:', error)
+    }
+  }
 
   useEffect(() => {
     async function fetchEventData() {
@@ -135,7 +247,7 @@ export default function EventAnalysisPage() {
           
           // Get the most recent completed event
           const mostRecentEvent = eventsData.events[0]
-          const eventResponse = await fetch(ENDPOINTS.FIGHT_RESULTS_EVENT(mostRecentEvent.filename))
+          const eventResponse = await fetch(`${ENDPOINTS.FIGHT_RESULTS_EVENT}/${mostRecentEvent.filename}`)
           
           if (!eventResponse.ok) {
             throw new Error('Failed to fetch completed event data')
@@ -266,7 +378,28 @@ export default function EventAnalysisPage() {
                 </Button>
                 <h2 className="text-lg sm:text-xl font-bold">Event Analysis</h2>
               </div>
-              <FightHistoryModal />
+              <div className="flex items-center gap-4">
+                {isAuthenticated ? (
+                  coinBalance !== null ? (
+                    <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-lg">
+                      <Coins className="h-4 w-4 text-primary" />
+                      <span className="font-semibold text-sm">{coinBalance} coins</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-lg">
+                      <Coins className="h-4 w-4 text-muted-foreground animate-pulse" />
+                      <span className="text-sm text-muted-foreground">Loading...</span>
+                    </div>
+                  )
+                ) : (
+                  <Link href="/auth">
+                    <Button variant="outline" size="sm" className="gap-2">
+                      Sign In to Place Picks
+                    </Button>
+                  </Link>
+                )}
+                <FightHistoryModal />
+              </div>
             </div>
             
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -377,6 +510,27 @@ export default function EventAnalysisPage() {
                               {fight.prediction?.fighter1_win_probability_percent.toFixed(1)}%
                             </div>
                           </div>
+                          {isAuthenticated && fight.odds_data && fight.odds_data.fighter1_odds?.odds && (
+                            <Button 
+                              className="mt-2 bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg shadow-sm transition-colors"
+                              size="sm"
+                              onClick={() => {
+                                if (fight.odds_data?.fighter1_odds?.odds) {
+                                  setModalState({
+                                    isOpen: true,
+                                    eventId: 5, // Active event ID from database
+                                    fightId: fight.fight_id,
+                                    fighterId: fight.fighter1_id,
+                                    fighterName: fight.fighter1_name,
+                                    oddsAmerican: fight.odds_data.fighter1_odds.odds,
+                                  })
+                                }
+                              }}
+                            >
+                              <Coins className="h-3 w-3 mr-1" />
+                              Place Pick
+                            </Button>
+                          )}
                         </div>
 
                         <div className="flex flex-col items-center justify-center p-1 md:p-3 w-[20%]">
@@ -446,6 +600,27 @@ export default function EventAnalysisPage() {
                               {fight.prediction?.fighter2_win_probability_percent.toFixed(1)}%
                             </div>
                           </div>
+                          {isAuthenticated && fight.odds_data && fight.odds_data.fighter2_odds?.odds && (
+                            <Button 
+                              className="mt-2 bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg shadow-sm transition-colors"
+                              size="sm"
+                              onClick={() => {
+                                if (fight.odds_data?.fighter2_odds?.odds) {
+                                  setModalState({
+                                    isOpen: true,
+                                    eventId: 5, // Active event ID from database
+                                    fightId: fight.fight_id,
+                                    fighterId: fight.fighter2_id,
+                                    fighterName: fight.fighter2_name,
+                                    oddsAmerican: fight.odds_data.fighter2_odds.odds,
+                                  })
+                                }
+                              }}
+                            >
+                              <Coins className="h-3 w-3 mr-1" />
+                              Place Pick
+                            </Button>
+                          )}
                         </div>
                       </div>
 
@@ -539,7 +714,63 @@ export default function EventAnalysisPage() {
               These are AI estimations and should not be used for betting purposes.
             </p>
           </AnimatedItem>
+
+          {/* User Bets Section */}
+          {isAuthenticated && userBets.length > 0 && (
+            <AnimatedItem variant="fadeUp" delay={0.4} className="mt-8">
+              <Card className="border-green-200 dark:border-green-800">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <span className="text-green-600">🎯</span>
+                    Your Picks for This Event
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-[500px] overflow-y-auto">
+                    <div className="space-y-3">
+                      {userBets.map((bet, index) => (
+                        <div key={bet.id} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <div className="font-semibold">{bet.fighter_name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {bet.odds_american > 0 ? `+${bet.odds_american}` : bet.odds_american} odds
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-green-600">{bet.stake} coins</div>
+                            <div className="text-sm text-muted-foreground">
+                              Potential: {bet.potential_payout} coins
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
+                        <div className="flex justify-between text-sm">
+                          <span>Total Wagered:</span>
+                          <span className="font-semibold">{userBets.reduce((sum, bet) => sum + bet.stake, 0)} coins</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Potential Total Payout:</span>
+                          <span className="font-semibold">{userBets.reduce((sum, bet) => sum + bet.potential_payout, 0)} coins</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </AnimatedItem>
+          )}
         </AnimatedContainer>
+        <PlacePickModal 
+          {...modalState}
+          onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+          onSuccess={refreshBalance}
+        />
       </div>
     </PageTransition>
   )
