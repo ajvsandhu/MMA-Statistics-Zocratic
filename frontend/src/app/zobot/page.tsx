@@ -248,7 +248,7 @@ function ZobotChatContent() {
                 </div>
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Zobot AI</h1>
+                <h1 className="text-3xl font-thin">Zobot AI</h1>
                 <div className="flex items-center justify-center gap-1 mt-0.5">
                   <Sparkles className="h-3 w-3 text-primary" />
                   <span className="text-xs text-muted-foreground font-medium">Powered by Advanced ML</span>

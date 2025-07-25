@@ -55,7 +55,7 @@ function FightersContent() {
       <div className="container relative mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
           <AnimatedItem variant="fadeDown" className="text-center space-y-4 mb-16">
-            <h1 className="text-4xl font-bold">UFC Fighters</h1>
+            <h1 className="text-4xl font-thin">UFC Fighters</h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Explore detailed fighter statistics, rankings, and performance metrics
             </p>

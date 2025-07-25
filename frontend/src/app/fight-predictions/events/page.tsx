@@ -376,7 +376,7 @@ export default function EventAnalysisPage() {
                   <ArrowLeft className="h-4 w-4" />
                   <span className="sr-only sm:not-sr-only">Back</span>
                 </Button>
-                <h2 className="text-lg sm:text-xl font-bold">Event Analysis</h2>
+                <h2 className="text-lg sm:text-xl font-light">Event Analysis</h2>
               </div>
               <div className="flex items-center gap-4">
                 {isAuthenticated ? (
@@ -403,7 +403,7 @@ export default function EventAnalysisPage() {
             </div>
             
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h1 className="text-3xl font-bold">{eventData.event_name}</h1>
+              <h1 className="text-3xl font-thin">{eventData.event_name}</h1>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
                 <span>{eventData.event_date || 'Date Unknown'}</span>

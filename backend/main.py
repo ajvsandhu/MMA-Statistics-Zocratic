@@ -290,6 +290,10 @@ app.include_router(fight_results.router)
 # Include Predictions Game router
 app.include_router(predictions_game.router)
 
+# Import and include Auth router
+from backend.api.routes import auth
+app.include_router(auth.router, prefix="/api/v1/auth")
+
 @app.get("/")
 def read_root():
     """Root endpoint that checks database connection."""

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X, User, LogOut, Settings as SettingsIcon, BarChart3 } from "lucide-react"
+import { Menu, X, User, LogOut, Settings as SettingsIcon, BarChart3, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useTheme, THEMES_LIST, type Theme } from "@/lib/theme-provider"
@@ -96,12 +96,12 @@ export function MainNav() {
   const links = [
     { href: "/", label: "Home" },
     { href: "/fighters", label: "Fighters" },
-    { href: "/fight-predictions", label: "Fight Predictions" },
+    { href: "/fight-predictions", label: "Picks Hub" },
     { href: "/leaderboard", label: "Leaderboard" },
-    { href: "/fight-predictions/events", label: "Event Analysis" },
-    { href: "/zobot", label: "Zobot AI" },
+    { href: "/fight-predictions/events", label: "Live Events" },
+    { href: "/zobot", label: "AI Analysis" },
     { href: "/about", label: "About" },
-    { href: "/contact", label: "Contact Us" }
+    { href: "/contact", label: "Contact" }
   ]
 
   // Mobile menu animation variants
@@ -126,7 +126,7 @@ export function MainNav() {
   if (isMobile) {
     return (
       <>
-        <Link href="/" className="font-bold text-lg">
+        <Link href="/" className="font-light text-xl text-foreground">
           ZOCRATIC
         </Link>
         <div className="flex-1" />
@@ -135,7 +135,7 @@ export function MainNav() {
             variant="ghost"
             size="icon"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="relative z-50 hover:bg-white/10"
+            className="relative z-50 hover:bg-white/10 rounded-xl"
             aria-label="Toggle navigation menu"
           >
             <AnimatePresence mode="wait">
@@ -186,10 +186,10 @@ export function MainNav() {
                   animate="open"
                   exit="closed"
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="absolute top-full right-0 mt-3 w-72 rounded-3xl border border-[var(--nav-border)] bg-[hsl(var(--background))] backdrop-blur-2xl shadow-2xl z-[210]"
+                  className="absolute top-full right-0 mt-3 w-72 rounded-2xl border border-[var(--nav-border)] bg-[hsl(var(--background))]/95 backdrop-blur-xl shadow-2xl z-[210]"
                   data-mobile-menu
                 >
-                  <div className="p-3">
+                  <div className="p-4">
                     {/* Authentication Section */}
                     {!isLoading && (
                       <motion.div
@@ -197,21 +197,21 @@ export function MainNav() {
                         initial="closed"
                         animate="open"
                         transition={{ delay: 0, duration: 0.2 }}
-                        className="mb-3"
+                        className="mb-4"
                       >
                         {isAuthenticated ? (
-                          <div className="space-y-2">
-                            <div className="px-4 py-3 rounded-2xl bg-[var(--nav-bg-active)]/50">
+                          <div className="space-y-3">
+                            <div className="px-4 py-3 rounded-xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
-                                  <User className="h-4 w-4 text-white" />
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
+                                  <User className="h-5 w-5 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-[var(--nav-text)] truncate">
+                                  <p className="text-sm font-semibold text-[var(--nav-text)] truncate">
                                     {userProfile.preferred_username || userProfile.email || 'User'}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    Signed in
+                                    Premium Member
                                   </p>
                                 </div>
                               </div>
@@ -219,16 +219,16 @@ export function MainNav() {
                             {isAuthenticated && (
                               <Link
                                 href="/settings"
-                                className="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
+                                className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
                                 onClick={() => setMobileMenuOpen(false)}
                               >
+                                <SettingsIcon className="h-4 w-4" />
                                 <span>Settings</span>
-                                <span className="ml-1">⚙️</span>
                               </Link>
                             )}
                             <button
                               onClick={handleSignOut}
-                              className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 hover:bg-red-500/10 text-red-500 hover:text-red-400"
+                              className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-red-500/10 text-red-500 hover:text-red-400"
                             >
                               <LogOut className="h-4 w-4" />
                               Sign Out
@@ -239,14 +239,14 @@ export function MainNav() {
                             <Link
                               href="/auth"
                               onClick={() => setMobileMenuOpen(false)}
-                              className="flex-1 px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white text-center"
+                              className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white text-center"
                             >
                               Sign In
                             </Link>
                             <Link
                               href="/auth"
                               onClick={() => setMobileMenuOpen(false)}
-                              className="flex-1 px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200 border border-[var(--nav-border)] hover:bg-[var(--nav-bg-active)] text-muted-foreground hover:text-[var(--nav-text)] text-center"
+                              className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 border border-[var(--nav-border)] hover:bg-[var(--nav-bg-active)] text-muted-foreground hover:text-[var(--nav-text)] text-center"
                             >
                               Sign Up
                             </Link>
@@ -261,7 +261,7 @@ export function MainNav() {
                       initial="closed"
                       animate="open"
                       transition={{ delay: 0.05, duration: 0.2 }}
-                      className="my-2 h-px bg-border"
+                      className="my-3 h-px bg-gradient-to-r from-transparent via-border to-transparent"
                     />
                     
                     {/* Navigation Links */}
@@ -278,9 +278,9 @@ export function MainNav() {
                           <Link
                             href={href}
                             className={cn(
-                              "flex items-center w-full px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200",
+                              "flex items-center w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
                               "hover:bg-[var(--nav-bg-active)] hover:text-[var(--nav-text-hover)]",
-                              isActive ? "bg-[var(--nav-bg-active)] text-[var(--nav-text)] font-semibold" : "text-muted-foreground"
+                              isActive ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold border border-primary/30" : "text-muted-foreground"
                             )}
                             onClick={() => {
                               setMobileMenuOpen(false)
@@ -288,6 +288,7 @@ export function MainNav() {
                             }}
                           >
                             {label}
+                            {isActive && <Sparkles className="ml-auto h-4 w-4" />}
                           </Link>
                         </motion.div>
                       )
@@ -299,7 +300,7 @@ export function MainNav() {
                       initial="closed"
                       animate="open"
                       transition={{ delay: (links.length + 1) * 0.05, duration: 0.2 }}
-                      className="my-2 h-px bg-border"
+                      className="my-3 h-px bg-gradient-to-r from-transparent via-border to-transparent"
                     />
                     
                     {/* Theme Switcher */}
@@ -313,14 +314,14 @@ export function MainNav() {
                       <button
                         onClick={() => setThemeMenuOpen(!themeMenuOpen)}
                         className={cn(
-                          "flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-2xl transition-all duration-200",
+                          "flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
                           "hover:bg-[var(--nav-bg-active)] hover:text-[var(--nav-text-hover)]",
                           themeMenuOpen ? "bg-[var(--nav-bg-active)] text-[var(--nav-text)]" : "text-muted-foreground"
                         )}
                       >
                         <span>Theme</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs opacity-60">
+                          <span className="text-xs opacity-70">
                             {THEMES_LIST.find(t => t.value === theme)?.label || "Dark"}
                           </span>
                           <Palette className="h-4 w-4" />
@@ -335,7 +336,7 @@ export function MainNav() {
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
                             transition={{ duration: 0.15 }}
-                            className="absolute top-full left-0 right-0 mt-1 bg-[hsl(var(--background))] backdrop-blur-2xl border border-[var(--nav-border)] rounded-2xl shadow-xl z-[220] overflow-hidden"
+                            className="absolute top-full left-0 right-0 mt-1 bg-[hsl(var(--background))]/95 backdrop-blur-xl border border-[var(--nav-border)] rounded-xl shadow-xl z-[220] overflow-hidden"
                           >
                             {THEMES_LIST.map((themeOption, index) => (
                               <motion.button
@@ -387,10 +388,10 @@ export function MainNav() {
   // Desktop Navigation
   return (
     <>
-      <Link href="/" className="font-bold text-lg mr-6">
+      <Link href="/" className="font-light text-xl text-foreground mr-8">
         ZOCRATIC
       </Link>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-1">
         {links.map(({ href, label }) => {
           const isActive = pathname === href
           return (
@@ -398,17 +399,16 @@ export function MainNav() {
               key={href}
               href={href}
               className={cn(
-                "relative px-3 py-1.5 text-sm font-medium transition-colors",
-                "hover:text-[var(--nav-text-hover)]",
-                "rounded-full",
-                isActive ? "text-[var(--nav-text)]" : "text-muted-foreground"
+                "relative px-4 py-2 text-sm font-medium transition-all duration-200 cursor-pointer",
+                "hover:text-[var(--nav-text-hover)] rounded-lg",
+                isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
               {label}
               {isActive && (
                 <motion.div
                   layoutId="nav-active"
-                  className="absolute inset-0 bg-[var(--nav-bg-active)] rounded-full"
+                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-lg border border-primary/30"
                   initial={false}
                   transition={{
                     type: "spring",
@@ -424,7 +424,7 @@ export function MainNav() {
 
       {/* Desktop Auth Section */}
       <div className="flex-1" />
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         {!isLoading && (
           <UserMenu isAuthenticated={isAuthenticated} userProfile={userProfile} onSignOut={handleSignOut} />
         )}
@@ -457,36 +457,44 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut }: { isAuthenticated
   return (
     <div className="relative" ref={menuRef}>
       <button
-        className="flex items-center justify-center w-9 h-9 rounded-full bg-[var(--nav-bg-active)]/50 hover:bg-[var(--nav-bg-active)] transition focus:outline-none"
+        className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 hover:from-primary/30 hover:to-secondary/30 border border-primary/30 transition-all duration-200"
         onClick={() => setOpen((v) => !v)}
         aria-label="User menu"
       >
-        <User className="h-5 w-5 text-[var(--nav-text)]" />
+        <User className="h-5 w-5 text-primary" />
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-48 bg-[hsl(var(--background))] border border-[var(--nav-border)] rounded-xl shadow-lg z-50 py-2">
+        <motion.div
+          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="absolute right-0 mt-2 w-56 bg-[hsl(var(--background))]/95 backdrop-blur-xl border border-[var(--nav-border)] rounded-xl shadow-xl z-50 py-2"
+        >
           {isAuthenticated ? (
             <>
-              <div className="px-4 py-2 text-xs text-muted-foreground truncate">
-                {userProfile.preferred_username || userProfile.email || 'User'}
+              <div className="px-4 py-3 border-b border-border/50">
+                <div className="text-sm font-medium text-[var(--nav-text)] truncate">
+                  {userProfile.preferred_username || userProfile.email || 'User'}
+                </div>
+                <div className="text-xs text-muted-foreground">Premium Member</div>
               </div>
               <a
                 href="/dashboard"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition rounded w-full text-left font-medium"
+                className="flex items-center gap-3 px-4 py-3 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition-all duration-200 w-full text-left font-medium"
                 onClick={() => setOpen(false)}
               >
-                <BarChart3 className="h-4 w-4 transition-colors" /> Dashboard
+                <BarChart3 className="h-4 w-4" /> Dashboard
               </a>
               <a
                 href="/settings"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition rounded w-full text-left font-medium"
+                className="flex items-center gap-3 px-4 py-3 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition-all duration-200 w-full text-left font-medium"
                 onClick={() => setOpen(false)}
               >
-                <SettingsIcon className="h-4 w-4 transition-colors" /> Settings
+                <SettingsIcon className="h-4 w-4" /> Settings
               </a>
+              <div className="my-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
               <button
                 onClick={() => { onSignOut(); setOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 hover:text-red-400 transition rounded w-full text-left"
+                className="flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 w-full text-left"
               >
                 <LogOut className="h-4 w-4" /> Sign Out
               </button>
@@ -495,21 +503,21 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut }: { isAuthenticated
             <>
               <a
                 href="/auth"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-[var(--nav-bg-active)] transition rounded"
+                className="flex items-center gap-3 px-4 py-3 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition-all duration-200"
                 onClick={() => setOpen(false)}
               >
                 <User className="h-4 w-4" /> Sign In
               </a>
               <a
                 href="/auth"
-                className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--nav-text)] hover:bg-[var(--nav-bg-active)] transition rounded"
+                className="flex items-center gap-3 px-4 py-3 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition-all duration-200"
                 onClick={() => setOpen(false)}
               >
                 <User className="h-4 w-4" /> Sign Up
               </a>
             </>
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );

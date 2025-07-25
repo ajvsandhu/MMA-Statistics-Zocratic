@@ -83,7 +83,7 @@ export default function ComparePage() {
         return null;
       }
       
-      const response = await fetch(ENDPOINTS.FIGHTER(fighterId));
+              const response = await fetch(`${ENDPOINTS.FIGHTER_DETAILS}/${fighterId}`);
       if (!response.ok) throw new Error('Fighter not found');
       
       const data = await response.json();
@@ -171,10 +171,16 @@ export default function ComparePage() {
     
     setIsPredicting(true);
     try {
-      const predictionEndpoint = ENDPOINTS.PREDICTION(fighter1.id, fighter2.id);
-      console.log('Making prediction request with data:', predictionEndpoint);
-      
-      const response = await fetch(predictionEndpoint.url, predictionEndpoint.options);
+      const response = await fetch(ENDPOINTS.PREDICTION, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fighter1_id: fighter1.id,
+          fighter2_id: fighter2.id
+        })
+      });
       const data = await response.json();
       console.log('Prediction response:', data);
 

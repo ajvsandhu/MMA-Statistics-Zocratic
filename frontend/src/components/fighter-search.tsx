@@ -487,7 +487,8 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
       setError(null);
 
       try {
-        const url = new URL(ENDPOINTS.FIGHTERS_SEARCH(searchTerm.trim()));
+        const url = new URL(ENDPOINTS.FIGHTERS_SEARCH);
+        url.searchParams.append('query', searchTerm.trim());
         
         // Add weight class filter if selected - using exact database format
         if (filters.weightClass) {
@@ -568,11 +569,9 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         "cursor-pointer md:transition-colors"
       )}
       onMouseEnter={() => setSelectedIndex(index)}
-      onPointerDown={(e) => {
-        e.preventDefault();
+      onSelect={() => {
         handleFighterSelect(item);
-      }}
-      onSelect={() => handleFighterSelect(item)} 
+      }} 
     >
       {getFighterDisplayElement(item, isHistory)}
     </CommandItem>

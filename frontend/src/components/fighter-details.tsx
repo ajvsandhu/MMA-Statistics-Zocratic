@@ -986,7 +986,7 @@ export function FighterDetails({ fighterId }: FighterDetailsProps) {
 
       try {
         // Use fetchWithRetries for robust API calls with the fighter ID
-        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(fighterId));
+        const response = await fetchWithRetries(`${ENDPOINTS.FIGHTER_DETAILS}/${fighterId}`);
         
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'Fighter not found' : `Server error: ${response.status}`);
@@ -1087,7 +1087,7 @@ export function FighterDetails({ fighterId }: FighterDetailsProps) {
     const refetch = async () => {
       try {
         // Use fetchWithRetries for robust API calls with the fighter ID
-        const response = await fetchWithRetries(ENDPOINTS.FIGHTER(fighterId));
+        const response = await fetchWithRetries(`${ENDPOINTS.FIGHTER_DETAILS}/${fighterId}`);
         
         if (!response.ok) {
           throw new Error(response.status === 404 ? 'Fighter not found' : `Server error: ${response.status}`);

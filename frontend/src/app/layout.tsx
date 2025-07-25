@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { MainNav } from "@/components/main-nav";
@@ -10,7 +10,11 @@ import { FooterVisibility } from "@/components/footer-visibility";
 import { Providers } from "./providers";
 import AntiGamblingModal from "@/components/anti-gambling-modal";
 
-const inter = Inter({ subsets: ["latin"] });
+const poppins = Poppins({ 
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  display: "swap"
+});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -96,6 +100,12 @@ export default function RootLayout({
             })();
           `
         }} />
+        {/* Google AdSense */}
+        <script 
+          async 
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6692102356476793"
+          crossOrigin="anonymous"
+        />
         <style>{`
           html {
             height: 100%; 
@@ -115,7 +125,7 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className={`${inter.className} min-h-screen flex flex-col overflow-y-auto overflow-x-hidden`}>
+      <body className={`${poppins.className} min-h-screen flex flex-col overflow-y-auto overflow-x-hidden`}>
         <AntiGamblingModal />
         <Providers>
           <ThemeProvider
@@ -124,7 +134,7 @@ export default function RootLayout({
           >
             <PageBackground />
             <SiteHeader />
-            <main className="relative pt-28 flex-1">
+            <main className="relative pt-28 pb-24 md:pb-16 flex-1">
               <div className="mx-auto max-w-[90rem] px-4">
                 <PageTransitionsProvider>
                   {children}

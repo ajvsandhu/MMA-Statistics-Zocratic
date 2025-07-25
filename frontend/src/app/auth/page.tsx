@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PageBackground } from '@/components/page-background';
 import { cn } from '@/lib/utils';
+import { UsernameInput } from '@/components/username-input';
 
 type AuthMode = 'login' | 'signup';
 
@@ -48,6 +49,7 @@ export default function AuthPage() {
   const [confirmationEmail, setConfirmationEmail] = useState('');
   const [confirmationCode, setConfirmationCode] = useState('');
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [isUsernameValid, setIsUsernameValid] = useState(false);
   const [confirmSuccess, setConfirmSuccess] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -74,15 +76,9 @@ export default function AuthPage() {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    // Username validation (only for signup)
-    if (mode === 'signup') {
-      if (!formData.username) {
-        newErrors.username = 'Username is required';
-      } else if (formData.username.length < 3) {
-        newErrors.username = 'Username must be at least 3 characters';
-      } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-        newErrors.username = 'Username can only contain letters, numbers, and underscores';
-      }
+    // Username validation (only for signup) - now handled by UsernameInput component
+    if (mode === 'signup' && !isUsernameValid) {
+      newErrors.username = 'Please enter a valid and available username';
     }
 
     // Password validation
@@ -291,21 +287,21 @@ export default function AuthPage() {
             "ring-1 ring-inset ring-[var(--primary)/20]",
             "transition-all duration-300",
             "hover:ring-2 hover:ring-[var(--primary)/40]",
-            "p-3 sm:p-5"
+            "p-2 sm:p-4"
           )}
           style={{ boxShadow: '0 8px 32px 0 rgba(0,0,0,0.25), 0 1.5px 8px 0 hsl(var(--primary) / 0.10)' }}
         >
           {/* Back to home */}
           <Link 
             href="/"
-            className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mb-4 mt-2 ml-1 sm:mb-6 sm:mt-4 sm:ml-3"
+            className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mb-2 mt-1 ml-1 sm:mb-3 sm:mt-2 sm:ml-2"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Zocratic MMA
           </Link>
           {/* Main Auth Card Content */}
           <div className="pt-0">
-            <div className="text-center mb-4 sm:mb-6">
+            <div className="text-center mb-3 sm:mb-4">
               <motion.h1
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -336,7 +332,7 @@ export default function AuthPage() {
               exit="exit"
               transition={{ duration: 0.4 }}
               onSubmit={handleSubmit}
-              className="pt-0 flex flex-col gap-3 sm:gap-4"
+              className="pt-0 flex flex-col gap-1.5 sm:gap-2"
             >
               <AnimatePresence>
                 {errors.general && (
@@ -355,7 +351,7 @@ export default function AuthPage() {
               {/* Email */}
               <div className="space-y-1">
                 <Label htmlFor="email" className="text-xs font-medium text-foreground">
-                  Email Address
+                  Email Address <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -364,7 +360,7 @@ export default function AuthPage() {
                     type="email"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
-                    className={`pl-10 h-10 sm:h-11 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                    className={`pl-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
                       errors.email ? 'border-destructive' : ''
                     }`}
                     placeholder="john@example.com"
@@ -380,32 +376,22 @@ export default function AuthPage() {
               {mode === 'signup' && (
                 <div className="space-y-1">
                   <Label htmlFor="username" className="text-xs font-medium text-foreground">
-                    Username
+                    Username <span className="text-red-500">*</span>
                   </Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="username"
-                      type="text"
-                      value={formData.username}
-                      onChange={(e) => handleInputChange('username', e.target.value)}
-                      className={`pl-10 h-10 sm:h-11 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
-                        errors.username ? 'border-destructive' : ''
-                      }`}
-                      placeholder="your_username"
-                      disabled={isLoading}
-                    />
-                    {errors.username && (
-                      <p className="text-xs text-destructive mt-1">{errors.username}</p>
-                    )}
-                  </div>
+                  <UsernameInput
+                    value={formData.username}
+                    onChange={(value) => handleInputChange('username', value)}
+                    onValidationChange={setIsUsernameValid}
+                    disabled={isLoading}
+                    className="space-y-0.5"
+                  />
                 </div>
               )}
 
               {/* Password */}
               <div className="space-y-1">
                 <Label htmlFor="password" className="text-xs font-medium text-foreground">
-                  Password
+                  Password <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -414,7 +400,7 @@ export default function AuthPage() {
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
-                    className={`pl-10 pr-10 h-10 sm:h-11 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                    className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
                       errors.password ? 'border-destructive' : ''
                     }`}
                     placeholder={mode === 'signup' ? 'Min 8 chars, 1 upper, 1 lower, 1 number' : '••••••••'}
@@ -446,7 +432,7 @@ export default function AuthPage() {
               {mode === 'signup' && (
                 <div className="space-y-1">
                   <Label htmlFor="confirmPassword" className="text-xs font-medium text-foreground">
-                    Confirm Password
+                    Confirm Password <span className="text-red-500">*</span>
                   </Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -455,7 +441,7 @@ export default function AuthPage() {
                       type={showConfirmPassword ? "text" : "password"}
                       value={formData.confirmPassword}
                       onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                      className={`pl-10 pr-10 h-10 sm:h-11 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                      className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
                         errors.confirmPassword ? 'border-destructive' : ''
                       }`}
                       placeholder="••••••••"
@@ -485,11 +471,11 @@ export default function AuthPage() {
               )}
 
               {/* Submit Button */}
-              <div>
+              <div className="pt-1">
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-10 sm:h-11 text-sm font-medium shadow-xl hover:shadow-2xl transition-all duration-200 active:scale-95"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-9 sm:h-10 text-sm font-medium shadow-xl hover:shadow-2xl transition-all duration-200 active:scale-95"
                 >
                   {isLoading ? (
                     <div className="flex items-center gap-2">
@@ -507,7 +493,7 @@ export default function AuthPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.32, duration: 0.4 }}
-                className="text-center pt-2"
+                className="text-center pt-1"
               >
                 <p className="text-xs text-muted-foreground">
                   {mode === 'login' 
