@@ -51,6 +51,51 @@ except Exception as e:
     supabase = None
     db_available = False
 
+def should_monitor_event(event_data):
+    """Check if we should monitor this event based on timing"""
+    try:
+        # Get event start time
+        event_start_str = event_data.get('event_start_time') or event_data.get('event_date')
+        if not event_start_str:
+            logger.warning("No event start time found - monitoring anyway")
+            return True
+            
+        # Parse event start time
+        if event_start_str.endswith('Z'):
+            event_start_str = event_start_str.replace('Z', '+00:00')
+        
+        from datetime import timezone
+        event_start = datetime.fromisoformat(event_start_str)
+        if event_start.tzinfo is None:
+            event_start = event_start.replace(tzinfo=timezone.utc)
+            
+        current_time = datetime.now(timezone.utc)
+        
+        # Start monitoring 1 hour before event (for early prelims)
+        monitor_start = event_start - timedelta(hours=1)
+        # Stop monitoring 8 hours after event start (events typically last 4-6 hours)
+        monitor_end = event_start + timedelta(hours=8)
+        
+        should_monitor = monitor_start <= current_time <= monitor_end
+        
+        if not should_monitor:
+            hours_until_start = (monitor_start - current_time).total_seconds() / 3600
+            hours_since_start = (current_time - event_start).total_seconds() / 3600
+            
+            if hours_until_start > 0:
+                logger.info(f"⏰ Event starts in {hours_until_start:.1f} hours - too early to monitor")
+            else:
+                logger.info(f"⏰ Event ended {abs(hours_since_start):.1f} hours ago - too late to monitor")
+            
+            return False
+            
+        logger.info(f"✅ Event timing is appropriate for monitoring")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error checking event timing: {str(e)}")
+        return True  # Default to monitoring if we can't determine timing
+
 def settle_event_predictions(event_id):
     """Settle predictions for completed fights in an event"""
     if not db_available or not supabase:
@@ -515,6 +560,11 @@ def monitor_event():
         logger.error("No active event found to monitor")
         return False
     
+    # Check if event timing is appropriate for monitoring
+    if not should_monitor_event(event_data):
+        logger.info("Event timing not appropriate for monitoring, skipping.")
+        return True
+
     logger.info(f"Monitoring event: {event_data['event_name']}")
     
     # Extract current results from UFC Stats
