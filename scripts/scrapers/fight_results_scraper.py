@@ -103,11 +103,12 @@ def settle_event_predictions(event_id):
         return False
     
     try:
-        # Get all pending bets for this event
+        # Get all pending bets for this event that haven't been settled yet
         bets_response = supabase.table('bets')\
             .select('*')\
             .eq('event_id', event_id)\
             .eq('status', 'pending')\
+            .is_('settled_at', 'null')\
             .execute()
         
         if not bets_response.data:
@@ -140,6 +141,11 @@ def settle_event_predictions(event_id):
             user_id = bet['user_id']
             bet_id = bet['id']
             
+            # Extra safety check - skip if bet already has a payout or is settled
+            if bet.get('payout') is not None or bet.get('settled_at') is not None:
+                logger.warning(f"Skipping bet {bet_id} - already settled (payout: {bet.get('payout')}, settled_at: {bet.get('settled_at')})")
+                continue
+            
             # Find the corresponding fight
             fight = None
             for f in fights:
@@ -152,18 +158,37 @@ def settle_event_predictions(event_id):
                 continue
                 
             # Check if fight has a result
-            if not fight.get('result'):
+            fight_result = fight.get('result')
+            if not fight_result or not fight_result.get('winner_name'):
                 continue  # Fight not completed yet
                 
-            # Determine if bet won or lost
+            # Determine if bet won or lost by matching winner_name to fighter
             won = False
-            if fight['result'] == 'win' and fight.get('winner_id') == fighter_id:
-                won = True
-            elif fight['result'] == 'loss' and fight.get('loser_id') == fighter_id:
-                won = False
-            else:
-                # Result unclear, skip for now
+            winner_name = fight_result.get('winner_name', '').lower().strip()
+            
+            # Get fighter names for comparison
+            fighter1_name = fight.get('fighter1_name', '').lower().strip()
+            fighter2_name = fight.get('fighter2_name', '').lower().strip()
+            fighter1_id = fight.get('fighter1_id')
+            fighter2_id = fight.get('fighter2_id')
+            
+            # Determine which fighter won
+            winner_fighter_id = None
+            if winner_name and fighter1_name and winner_name in fighter1_name:
+                winner_fighter_id = fighter1_id
+            elif winner_name and fighter2_name and winner_name in fighter2_name:
+                winner_fighter_id = fighter2_id
+            elif winner_name and fighter1_name and fighter1_name in winner_name:
+                winner_fighter_id = fighter1_id
+            elif winner_name and fighter2_name and fighter2_name in winner_name:
+                winner_fighter_id = fighter2_id
+            
+            if not winner_fighter_id:
+                logger.warning(f"Could not determine winner for fight {fight_id}: {winner_name} vs {fighter1_name}/{fighter2_name}")
                 continue
+                
+            # Check if this bet is on the winning fighter
+            won = (winner_fighter_id == fighter_id)
                 
             # Calculate payout
             if won:
@@ -173,12 +198,13 @@ def settle_event_predictions(event_id):
                 payout_amount = 0
                 new_status = 'lost'
                 
-            # Update bet status and payout
+            # Update bet status and payout with timestamp
+            current_timestamp = datetime.now().isoformat()
             bet_update_response = supabase.table('bets')\
                 .update({
                     'status': new_status,
                     'payout': payout_amount,
-                    'settled_at': 'now()'
+                    'settled_at': current_timestamp
                 })\
                 .eq('id', bet_id)\
                 .execute()
@@ -215,7 +241,7 @@ def settle_event_predictions(event_id):
                         transaction_data = {
                             'user_id': user_id,
                             'amount': payout_amount,
-                            'type': 'bet_win',
+                            'type': 'bet_won',
                             'reason': f'Won bet on {bet["fighter_name"]} vs Fight {fight_id}',
                             'ref_table': 'bets',
                             'ref_id': bet_id,
@@ -225,11 +251,11 @@ def settle_event_predictions(event_id):
                         
                         supabase.table('coin_transactions').insert(transaction_data).execute()
                         
-                        logger.info(f"✅ Settled winning bet: {bet['fighter_name']} - Payout: {payout_amount}")
+                        logger.info(f"✅ Settled winning bet: {bet['fighter_name']} - Payout: {payout_amount} - Settled at: {current_timestamp}")
                     else:
                         logger.error(f"Failed to update balance for user {user_id}")
             else:
-                logger.info(f"❌ Settled losing bet: {bet['fighter_name']}")
+                logger.info(f"❌ Settled losing bet: {bet['fighter_name']} - Settled at: {current_timestamp}")
                 
             settled_count += 1
             
