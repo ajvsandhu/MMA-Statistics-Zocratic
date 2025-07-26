@@ -438,15 +438,123 @@ async def settle_event_predictions(event_id: int):
         if not supabase:
             raise HTTPException(status_code=503, detail="Database unavailable")
             
-        # Call the settlement function
-        response = supabase.rpc('settle_event_bets', {
-            'p_event_id': event_id
-        }).execute()
+        # Get all pending bets for this event
+        bets_response = supabase.table('bets')\
+            .select('*')\
+            .eq('event_id', event_id)\
+            .eq('status', 'pending')\
+            .execute()
         
-        if response.error:
-            raise HTTPException(status_code=500, detail=response.error.message)
+        if not bets_response.data:
+            return JSONResponse(content={
+                "success": True,
+                "settled_count": 0,
+                "message": "No pending bets to settle"
+            })
             
-        settled_count = response.data
+        pending_bets = bets_response.data
+        
+        # Get event data with fight results
+        event_response = supabase.table('upcoming_events')\
+            .select('*')\
+            .eq('id', event_id)\
+            .execute()
+            
+        if not event_response.data:
+            raise HTTPException(status_code=404, detail="Event not found")
+            
+        event_data = event_response.data[0]
+        fights = event_data.get('fights', [])
+        
+        settled_count = 0
+        
+        for bet in pending_bets:
+            fight_id = bet['fight_id']
+            fighter_id = bet['fighter_id']
+            stake = bet['stake']
+            potential_payout = bet['potential_payout']
+            user_id = bet['user_id']
+            bet_id = bet['id']
+            
+            # Find the corresponding fight
+            fight = None
+            for f in fights:
+                if f.get('fight_id') == fight_id:
+                    fight = f
+                    break
+                    
+            if not fight or not fight.get('result'):
+                continue  # Fight not completed yet
+                
+            # Determine if bet won or lost
+            won = False
+            if fight['result'] == 'win' and fight.get('winner_id') == fighter_id:
+                won = True
+            elif fight['result'] == 'loss' and fight.get('loser_id') == fighter_id:
+                won = False
+            else:
+                continue  # Result unclear
+                
+            # Calculate payout
+            if won:
+                payout_amount = potential_payout
+                new_status = 'won'
+            else:
+                payout_amount = 0
+                new_status = 'lost'
+                
+            # Update bet status and payout
+            bet_update_response = supabase.table('bets')\
+                .update({
+                    'status': new_status,
+                    'payout': payout_amount,
+                    'settled_at': 'now()'
+                })\
+                .eq('id', bet_id)\
+                .execute()
+                
+            if not bet_update_response.data:
+                continue
+                
+            # Update user balance if they won
+            if won and payout_amount > 0:
+                # Get current balance
+                balance_response = supabase.table('coin_accounts')\
+                    .select('balance, total_won')\
+                    .eq('user_id', user_id)\
+                    .execute()
+                    
+                if balance_response.data:
+                    current_balance = balance_response.data[0]['balance']
+                    current_total_won = balance_response.data[0]['total_won'] or 0
+                    
+                    new_balance = current_balance + payout_amount
+                    new_total_won = current_total_won + payout_amount
+                    
+                    balance_update_response = supabase.table('coin_accounts')\
+                        .update({
+                            'balance': new_balance,
+                            'total_won': new_total_won
+                        })\
+                        .eq('user_id', user_id)\
+                        .execute()
+                        
+                    if balance_update_response.data:
+                        # Create transaction record
+                        transaction_data = {
+                            'user_id': user_id,
+                            'amount': payout_amount,
+                            'type': 'bet_win',
+                            'reason': f'Won bet on {bet["fighter_name"]}',
+                            'ref_table': 'bets',
+                            'ref_id': bet_id,
+                            'balance_before': current_balance,
+                            'balance_after': new_balance
+                        }
+                        
+                        supabase.table('coin_transactions').insert(transaction_data).execute()
+                
+            settled_count += 1
         
         return JSONResponse(content={
             "success": True,

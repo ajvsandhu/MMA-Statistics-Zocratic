@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowRight, Coins, TrendingUp, Target, BarChart3, Trophy, Users, Activity, Zap, Star, Brain, Flame } from "lucide-react"
+import { ArrowRight, Coins, TrendingUp, Target, BarChart3, Trophy, Users, Activity, Zap, Star, Brain, Flame, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useState, useEffect } from "react"
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
 import { ENDPOINTS } from "@/lib/api-config"
+import { OnboardingModal } from "@/components/onboarding-modal"
 
 interface GlobalStats {
   totalPicks: number
@@ -27,6 +28,7 @@ export default function FightPredictionsPage() {
     activeUsers: 0
   })
   const [loading, setLoading] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
     fetchGlobalStats()
@@ -77,7 +79,7 @@ export default function FightPredictionsPage() {
             <AnimatedItem variant="fadeDown" className="text-center space-y-6 max-w-4xl mx-auto">
               <div className="space-y-4">
                 <h1 className="text-6xl md:text-7xl font-thin text-foreground leading-tight tracking-tight">
-                  Picks Hub
+                  Predictions
                 </h1>
                 <div className="w-24 h-1 bg-gradient-to-r from-primary to-secondary rounded-full mx-auto"></div>
               </div>
@@ -85,6 +87,17 @@ export default function FightPredictionsPage() {
                 Master your prediction skills with AI-powered analysis, place virtual picks, 
                 and compete with fellow MMA enthusiasts on the global leaderboard
             </p>
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowOnboarding(true)}
+                className="gap-2"
+              >
+                <HelpCircle className="h-4 w-4" />
+                How It Works
+              </Button>
+            </div>
           </AnimatedItem>
 
             {/* Global Community Stats */}
@@ -301,80 +314,7 @@ export default function FightPredictionsPage() {
 
           </AnimatedContainer>
 
-            {/* How It Works Section */}
-            <AnimatedContainer className="max-w-6xl mx-auto space-y-8" delay={0.6}>
-              <AnimatedItem variant="fadeUp" className="text-center space-y-4">
-                              <h2 className="text-4xl font-thin text-foreground">
-                How the System Works
-              </h2>
-                <p className="text-xl text-foreground/70 max-w-3xl mx-auto">
-                  Our platform combines cutting-edge AI analysis with an engaging prediction game
-                </p>
-                <div className="w-16 h-1 bg-gradient-to-r from-primary to-secondary rounded-full mx-auto"></div>
-              </AnimatedItem>
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                <AnimatedItem variant="fadeUp" delay={0.1}>
-                  <Card className="p-8 bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/10 hover:border-primary/30 transition-all duration-300">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-gradient-to-r from-primary to-secondary text-primary-foreground rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shadow-lg">1</div>
-                        <h3 className="text-2xl font-bold">AI-Powered Analysis</h3>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        Our machine learning models analyze thousands of fight statistics, fighter profiles, 
-                        and historical matchups to generate accurate win probabilities and predictions.
-                      </p>
-                    </div>
-                  </Card>
-                </AnimatedItem>
 
-                <AnimatedItem variant="fadeUp" delay={0.2}>
-                  <Card className="p-8 bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/10 hover:border-primary/30 transition-all duration-300">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-gradient-to-r from-primary to-secondary text-primary-foreground rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shadow-lg">2</div>
-                        <h3 className="text-2xl font-bold">Real Odds Integration</h3>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        We integrate live odds from DraftKings to provide realistic payouts and market insights, 
-                        making your virtual picks feel authentic and rewarding.
-                      </p>
-                    </div>
-                  </Card>
-                </AnimatedItem>
-
-                <AnimatedItem variant="fadeUp" delay={0.3}>
-                  <Card className="p-8 bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/10 hover:border-primary/30 transition-all duration-300">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-gradient-to-r from-primary to-secondary text-primary-foreground rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shadow-lg">3</div>
-                        <h3 className="text-2xl font-bold">Virtual Currency System</h3>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        Start with 1,000 virtual coins and grow your bankroll through smart picks. 
-                        Your performance determines your ranking and bragging rights on the leaderboard.
-                      </p>
-                    </div>
-                  </Card>
-            </AnimatedItem>
-            
-                <AnimatedItem variant="fadeUp" delay={0.4}>
-                  <Card className="p-8 bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/10 hover:border-primary/30 transition-all duration-300">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-gradient-to-r from-primary to-secondary text-primary-foreground rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shadow-lg">4</div>
-                        <h3 className="text-2xl font-bold">Performance Tracking</h3>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        Monitor your progress with detailed analytics including win rate, ROI, 
-                        favorite fighters, and prediction accuracy across different fighting styles.
-                      </p>
-                    </div>
-                  </Card>
-                </AnimatedItem>
-            </div>
-          </AnimatedContainer>
 
             {/* Call to Action */}
             {!isAuthenticated && (
@@ -401,6 +341,12 @@ export default function FightPredictionsPage() {
             )}
         </div>
       </div>
+      
+      {/* Onboarding Modal */}
+      <OnboardingModal 
+        isOpen={showOnboarding} 
+        onClose={() => setShowOnboarding(false)} 
+      />
     </PageTransition>
   );
 } 

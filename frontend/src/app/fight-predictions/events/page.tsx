@@ -407,38 +407,39 @@ export default function EventAnalysisPage() {
 
   return (
     <PageTransition variant="fade">
-      <div className="container mx-auto px-4 py-8">
-        <AnimatedContainer className="space-y-6 max-w-5xl mx-auto">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <AnimatedContainer className="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
           <AnimatedItem variant="fadeIn" className="space-y-2">
-            <div className="flex items-center justify-between h-12 mb-4">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between min-h-[3rem] mb-4">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Button
                   variant="ghost"
                   onClick={() => router.push('/fight-predictions')}
-                  className="gap-1 px-2"
+                  className="gap-1 px-1 sm:px-2 h-8 sm:h-auto"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  <span className="sr-only sm:not-sr-only">Back</span>
+                  <span className="sr-only sm:not-sr-only text-sm">Back</span>
                 </Button>
-                <h2 className="text-lg sm:text-xl font-light">Event Analysis</h2>
+                <h2 className="text-sm sm:text-lg md:text-xl font-light">Event Analysis</h2>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 {isAuthenticated ? (
                   coinBalance !== null ? (
-                    <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-lg">
-                      <Coins className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-sm">{coinBalance} coins</span>
+                    <div className="flex items-center gap-1 sm:gap-2 bg-primary/10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg">
+                      <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                      <span className="font-semibold text-xs sm:text-sm">{coinBalance} coins</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-lg">
-                      <Coins className="h-4 w-4 text-muted-foreground animate-pulse" />
-                      <span className="text-sm text-muted-foreground">Loading...</span>
+                    <div className="flex items-center gap-1 sm:gap-2 bg-muted px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg">
+                      <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground animate-pulse" />
+                      <span className="text-xs sm:text-sm text-muted-foreground">Loading...</span>
                     </div>
                   )
                 ) : (
                   <Link href="/auth">
-                    <Button variant="outline" size="sm" className="gap-2">
-                      Sign In to Place Picks
+                    <Button variant="outline" size="sm" className="gap-1 text-xs sm:text-sm px-2 sm:px-3">
+                      <span className="hidden sm:inline">Sign In to Place Picks</span>
+                      <span className="sm:hidden">Sign In</span>
                     </Button>
                   </Link>
                 )}
@@ -446,37 +447,37 @@ export default function EventAnalysisPage() {
               </div>
             </div>
             
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h1 className="text-3xl font-thin">{eventData.event_name}</h1>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-thin leading-tight">{eventData.event_name}</h1>
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>{eventData.event_date || 'Date Unknown'}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" /> 
-                <span>Last Updated: {new Date(eventData.scraped_at || eventData.exported_at || Date.now()).toLocaleString()}</span>
+            <div className="flex flex-wrap gap-1 sm:gap-2">
+              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                <Clock className="h-2 w-2 sm:h-3 sm:w-3" /> 
+                <span className="text-xs">Last Updated: {new Date(eventData.scraped_at || eventData.exported_at || Date.now()).toLocaleString()}</span>
               </Badge>
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Trophy className="h-3 w-3" />
-                <span>{eventData.completed_fights || 0}/{eventData.total_fights || 0} Fights</span>
+              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                <Trophy className="h-2 w-2 sm:h-3 sm:w-3" />
+                <span className="text-xs">{eventData.completed_fights || 0}/{eventData.total_fights || 0} Fights</span>
               </Badge>
               {eventData.event_url && (
                 <Link 
                   href={eventData.event_url} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground hover:text-primary transition-colors"
                 >
-                  <ExternalLink className="h-3 w-3" /> 
+                  <ExternalLink className="h-2 w-2 sm:h-3 sm:w-3" /> 
                   UFC Stats
                 </Link>
               )}
               {/* Compact countdown next to UFC Stats for upcoming events */}
               {eventData.status !== 'completed' && eventData.event_start_time && isAuthenticated && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Picks Lock In:</span>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Picks Lock In:</span>
                   <EventCountdown 
                     eventStartTime={eventData.event_start_time} 
                     eventName={eventData.event_name}
@@ -485,7 +486,7 @@ export default function EventAnalysisPage() {
                 </div>
               )}
             </div>
-            <p className="text-muted-foreground pt-2">
+            <p className="text-muted-foreground text-sm sm:text-base pt-2 leading-relaxed">
               {eventData.status === 'completed' 
                 ? 'AI-powered fight predictions and results analysis for the completed UFC event.'
                 : 'AI-powered fight predictions for the upcoming UFC event, based on comprehensive fighter analysis.'
@@ -493,9 +494,9 @@ export default function EventAnalysisPage() {
             </p>
           </AnimatedItem>
 
-          <Separator className="my-6" />
+          <Separator className="my-4 sm:my-6" />
 
-          <AnimatedContainer className="space-y-8" delay={0.05}>
+          <AnimatedContainer className="space-y-4 sm:space-y-6 md:space-y-8" delay={0.05}>
             {eventData.fights.map((fight, index) => {
               const fighter1Win = fight.prediction?.fighter1_win_probability_percent >= 50
               const fighter2Win = !fighter1Win
@@ -503,7 +504,7 @@ export default function EventAnalysisPage() {
               return (
                 <AnimatedItem key={index} variant="fadeUp" delay={0.1 + (index * 0.05)} className="relative">
                   <Card className="bg-card/50 backdrop-blur border-primary/20 hover:shadow-lg transition-all duration-300">
-                    <CardContent className="p-3 sm:p-4 md:p-6 space-y-2 sm:space-y-4">
+                    <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 space-y-2 sm:space-y-3 md:space-y-4">
                       <div className="flex flex-row gap-1 sm:gap-2 md:gap-8 items-center">
                         <div className="flex flex-col items-center text-center flex-1 w-[40%] min-w-0">
                           <div className="relative w-16 md:w-32 h-16 md:h-32 mb-2 md:mb-4 overflow-hidden rounded-full">
@@ -776,7 +777,7 @@ export default function EventAnalysisPage() {
             })}
           </AnimatedContainer>
 
-          <AnimatedItem variant="fadeUp" delay={0.3} className="mt-8 text-center text-xs md:text-sm text-muted-foreground">
+          <AnimatedItem variant="fadeUp" delay={0.3} className="mt-6 sm:mt-8 text-center text-xs md:text-sm text-muted-foreground">
             <p>
               Predictions are based on historical performance, fighter statistics, and matchup analysis. 
               These are AI estimations and should not be used for betting purposes.
@@ -785,11 +786,11 @@ export default function EventAnalysisPage() {
 
           {/* User Bets Section */}
           {isAuthenticated && userBets.length > 0 && (
-            <AnimatedItem variant="fadeUp" delay={0.4} className="mt-8">
-              <Card className="border-green-200 dark:border-green-800">
+            <AnimatedItem variant="fadeUp" delay={0.4} className="mt-6 sm:mt-8">
+              <Card className="border-primary/20 bg-card/50 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <span className="text-green-600">🎯</span>
+                    <span className="text-primary">🎯</span>
                     Your Picks for This Event
                   </CardTitle>
                 </CardHeader>
@@ -797,9 +798,9 @@ export default function EventAnalysisPage() {
                   <div className="max-h-[500px] overflow-y-auto">
                     <div className="space-y-3">
                       {userBets.map((bet, index) => (
-                        <div key={bet.id} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <div key={bet.id} className="flex items-center justify-between p-3 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg transition-colors">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
                               {index + 1}
                             </div>
                             <div>
@@ -810,19 +811,19 @@ export default function EventAnalysisPage() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-green-600">{bet.stake} coins</div>
+                            <div className="font-semibold text-primary">{bet.stake} coins</div>
                             <div className="text-sm text-muted-foreground">
                               Potential: {bet.potential_payout} coins
                             </div>
                           </div>
                         </div>
                       ))}
-                      <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800">
+                      <div className="mt-3 pt-3 border-t border-primary/20">
                         <div className="flex justify-between text-sm">
                           <span>Total Wagered:</span>
                           <span className="font-semibold">{userBets.reduce((sum, bet) => sum + bet.stake, 0)} coins</span>
                         </div>
-                        <div className="flex justify-between text-sm text-green-600">
+                        <div className="flex justify-between text-sm text-primary">
                           <span>Potential Total Payout:</span>
                           <span className="font-semibold">{userBets.reduce((sum, bet) => sum + bet.potential_payout, 0)} coins</span>
                         </div>
@@ -833,13 +834,13 @@ export default function EventAnalysisPage() {
               </Card>
             </AnimatedItem>
           )}
-        </AnimatedContainer>
-        <PlacePickModal 
-          {...modalState}
-          onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
-          onSuccess={refreshBalance}
-        />
-      </div>
-    </PageTransition>
-  )
+                                   </AnimatedContainer>
+          <PlacePickModal 
+           {...modalState}
+           onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+           onSuccess={refreshBalance}
+         />
+       </div>
+     </PageTransition>
+   )
 } 

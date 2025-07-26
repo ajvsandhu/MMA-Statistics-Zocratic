@@ -86,8 +86,8 @@ export default function AuthPage() {
       newErrors.password = 'Password is required';
     } else if (mode === 'signup' && formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
-    } else if (mode === 'signup' && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain uppercase, lowercase, and number';
+         } else if (mode === 'signup' && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password)) {
+       newErrors.password = 'Password must contain uppercase, lowercase, number, and special character';
     }
 
     // Confirm password validation (only for signup)
@@ -272,7 +272,7 @@ export default function AuthPage() {
 
   // Main Auth Card
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-0">
+    <div className="min-h-screen flex items-center justify-center px-4 relative z-0 -mt-32">
       <PageBackground />
       <LayoutGroup>
         <motion.div
@@ -281,14 +281,14 @@ export default function AuthPage() {
           initial="hidden"
           animate="visible"
           transition={{ layout: { type: 'spring', stiffness: 100, damping: 18 } }}
-          className={cn(
-            "w-full max-w-sm relative z-10",
-            "bg-card/60 backdrop-blur-xl rounded-2xl border border-border/60 overflow-hidden shadow-2xl",
-            "ring-1 ring-inset ring-[var(--primary)/20]",
-            "transition-all duration-300",
-            "hover:ring-2 hover:ring-[var(--primary)/40]",
-            "p-2 sm:p-4"
-          )}
+                     className={cn(
+             "w-full max-w-md sm:max-w-lg md:max-w-xl relative z-10",
+             "bg-card/60 backdrop-blur-xl rounded-2xl border border-border/60 overflow-hidden shadow-2xl",
+             "ring-1 ring-inset ring-[var(--primary)/20]",
+             "transition-all duration-300",
+             "hover:ring-2 hover:ring-[var(--primary)/40]",
+             "p-3 sm:p-5 md:p-6"
+           )}
           style={{ boxShadow: '0 8px 32px 0 rgba(0,0,0,0.25), 0 1.5px 8px 0 hsl(var(--primary) / 0.10)' }}
         >
           {/* Back to home */}
@@ -354,18 +354,18 @@ export default function AuthPage() {
                   Email Address <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className={`pl-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
-                      errors.email ? 'border-destructive' : ''
-                    }`}
-                    placeholder="john@example.com"
-                    disabled={isLoading}
-                  />
+                                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                   <Input
+                     id="email"
+                     type="email"
+                     value={formData.email}
+                     onChange={(e) => handleInputChange('email', e.target.value)}
+                     className={`pl-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                       errors.email ? 'border-destructive' : ''
+                     }`}
+                     placeholder="john@example.com"
+                     disabled={isLoading}
+                   />
                   {errors.email && (
                     <p className="text-xs text-destructive mt-1">{errors.email}</p>
                   )}
@@ -393,26 +393,26 @@ export default function AuthPage() {
                 <Label htmlFor="password" className="text-xs font-medium text-foreground">
                   Password <span className="text-red-500">*</span>
                 </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
-                      errors.password ? 'border-destructive' : ''
-                    }`}
-                    placeholder={mode === 'signup' ? 'Min 8 chars, 1 upper, 1 lower, 1 number' : '••••••••'}
-                    disabled={isLoading}
-                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors active:scale-90"
-                    aria-label="Toggle password visibility"
-                  >
+                                 <div className="relative">
+                   <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground z-10" />
+                   <Input
+                     id="password"
+                     type={showPassword ? "text" : "password"}
+                     value={formData.password}
+                     onChange={(e) => handleInputChange('password', e.target.value)}
+                     className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                       errors.password ? 'border-destructive' : ''
+                     }`}
+                                          placeholder={mode === 'signup' ? '••••••••' : '••••••••'}
+                     disabled={isLoading}
+                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                   />
+                   <button
+                     type="button"
+                     onClick={() => setShowPassword(!showPassword)}
+                     className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90 z-10"
+                     aria-label="Toggle password visibility"
+                   >
                     <motion.span
                       initial={{ rotate: 0 }}
                       animate={{ rotate: showPassword ? 180 : 0 }}
@@ -422,9 +422,14 @@ export default function AuthPage() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </motion.span>
                   </button>
-                  {errors.password && (
-                    <p className="text-xs text-destructive mt-1">{errors.password}</p>
-                  )}
+                                                          {mode === 'signup' && (
+                       <p className="text-xs text-muted-foreground mt-1">
+                         Must be at least 8 characters with uppercase, lowercase, number, and special character
+                       </p>
+                     )}
+                   {errors.password && (
+                     <p className="text-xs text-destructive mt-1">{errors.password}</p>
+                   )}
                 </div>
               </div>
 
@@ -434,26 +439,26 @@ export default function AuthPage() {
                   <Label htmlFor="confirmPassword" className="text-xs font-medium text-foreground">
                     Confirm Password <span className="text-red-500">*</span>
                   </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={formData.confirmPassword}
-                      onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                      className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
-                        errors.confirmPassword ? 'border-destructive' : ''
-                      }`}
-                      placeholder="••••••••"
-                      disabled={isLoading}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors active:scale-90"
-                      aria-label="Toggle confirm password visibility"
-                    >
+                                     <div className="relative">
+                     <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground z-10" />
+                     <Input
+                       id="confirmPassword"
+                       type={showConfirmPassword ? "text" : "password"}
+                       value={formData.confirmPassword}
+                       onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                       className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                         errors.confirmPassword ? 'border-destructive' : ''
+                       }`}
+                       placeholder="••••••••"
+                       disabled={isLoading}
+                       autoComplete="new-password"
+                     />
+                     <button
+                       type="button"
+                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                       className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90 z-10"
+                       aria-label="Toggle confirm password visibility"
+                     >
                       <motion.span
                         initial={{ rotate: 0 }}
                         animate={{ rotate: showConfirmPassword ? 180 : 0 }}

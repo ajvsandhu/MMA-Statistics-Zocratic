@@ -95,11 +95,11 @@ export function MainNav() {
   
   const links = [
     { href: "/", label: "Home" },
+    { href: "/fight-predictions", label: "Predictions" },
     { href: "/fighters", label: "Fighters" },
-    { href: "/fight-predictions", label: "Picks Hub" },
-    { href: "/leaderboard", label: "Leaderboard" },
     { href: "/fight-predictions/events", label: "Live Events" },
-    { href: "/zobot", label: "AI Analysis" },
+    { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/zobot", label: "Zobot" },
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" }
   ]
@@ -126,7 +126,7 @@ export function MainNav() {
   if (isMobile) {
     return (
       <>
-        <Link href="/" className="font-light text-xl text-foreground">
+        <Link href="/" className="font-light text-lg sm:text-xl text-foreground">
           ZOCRATIC
         </Link>
         <div className="flex-1" />
@@ -135,7 +135,7 @@ export function MainNav() {
             variant="ghost"
             size="icon"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="relative z-50 hover:bg-white/10 rounded-xl"
+            className="relative z-50 hover:bg-white/10 rounded-xl h-10 w-10"
             aria-label="Toggle navigation menu"
           >
             <AnimatePresence mode="wait">
@@ -186,7 +186,7 @@ export function MainNav() {
                   animate="open"
                   exit="closed"
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="absolute top-full right-0 mt-3 w-72 rounded-2xl border border-[var(--nav-border)] bg-[hsl(var(--background))]/95 backdrop-blur-xl shadow-2xl z-[210]"
+                  className="absolute top-full right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-[var(--nav-border)] bg-[hsl(var(--background))]/95 backdrop-blur-xl shadow-2xl z-[210]"
                   data-mobile-menu
                 >
                   <div className="p-4">
@@ -217,14 +217,24 @@ export function MainNav() {
                               </div>
                             </div>
                             {isAuthenticated && (
-                              <Link
-                                href="/settings"
-                                className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
-                                onClick={() => setMobileMenuOpen(false)}
-                              >
-                                <SettingsIcon className="h-4 w-4" />
-                                <span>Settings</span>
-                              </Link>
+                              <>
+                                <Link
+                                  href="/settings"
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
+                                  onClick={() => setMobileMenuOpen(false)}
+                                >
+                                  <SettingsIcon className="h-4 w-4" />
+                                  <span>Settings</span>
+                                </Link>
+                                <Link
+                                  href="/dashboard"
+                                  className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
+                                  onClick={() => setMobileMenuOpen(false)}
+                                >
+                                  <BarChart3 className="h-4 w-4" />
+                                  <span>Dashboard</span>
+                                </Link>
+                              </>
                             )}
                             <button
                               onClick={handleSignOut}
@@ -242,13 +252,6 @@ export function MainNav() {
                               className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white text-center"
                             >
                               Sign In
-                            </Link>
-                            <Link
-                              href="/auth"
-                              onClick={() => setMobileMenuOpen(false)}
-                              className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 border border-[var(--nav-border)] hover:bg-[var(--nav-bg-active)] text-muted-foreground hover:text-[var(--nav-text)] text-center"
-                            >
-                              Sign Up
                             </Link>
                           </div>
                         )}
@@ -388,7 +391,7 @@ export function MainNav() {
   // Desktop Navigation
   return (
     <>
-      <Link href="/" className="font-light text-xl text-foreground mr-8">
+      <Link href="/" className="font-light text-lg sm:text-xl text-foreground mr-6 sm:mr-8">
         ZOCRATIC
       </Link>
       <div className="flex items-center space-x-1">
@@ -507,13 +510,6 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut }: { isAuthenticated
                 onClick={() => setOpen(false)}
               >
                 <User className="h-4 w-4" /> Sign In
-              </a>
-              <a
-                href="/auth"
-                className="flex items-center gap-3 px-4 py-3 text-sm text-[var(--nav-text)] hover:bg-primary/10 hover:text-primary transition-all duration-200"
-                onClick={() => setOpen(false)}
-              >
-                <User className="h-4 w-4" /> Sign Up
               </a>
             </>
           )}

@@ -157,26 +157,22 @@ export default function LeaderboardPage() {
 
       {/* Top 3 Podium */}
       {getTopThree().length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 mb-8 sm:mb-10 md:mb-12">
           {getTopThree().map((user, index) => {
             const actualRank = user.rank;
             const podiumOrder = [1, 0, 2];
             const podiumIndex = podiumOrder.indexOf(index);
-            const height = podiumIndex === 1 ? 'h-80' : podiumIndex === 0 ? 'h-72' : 'h-64';
+            const height = podiumIndex === 1 ? 'h-72 sm:h-80 md:h-96' : podiumIndex === 0 ? 'h-64 sm:h-72 md:h-80' : 'h-56 sm:h-64 md:h-72';
             
             return (
-              <Card key={user.user_id} className={`${height} relative overflow-hidden group transition-all duration-500 hover:shadow-2xl ${
-                actualRank === 1 ? 'border-yellow-400 shadow-yellow-400/30 shadow-xl bg-gradient-to-br from-yellow-50/50 to-orange-50/50 dark:from-yellow-950/20 dark:to-orange-950/20' : 
-                actualRank === 2 ? 'border-gray-400 shadow-gray-400/20 shadow-lg bg-gradient-to-br from-gray-50/50 to-slate-50/50 dark:from-gray-950/20 dark:to-slate-950/20' : 
-                'border-amber-400 shadow-amber-400/20 shadow-lg bg-gradient-to-br from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20'
+              <Card key={user.user_id} className={`${height} relative overflow-hidden group transition-all duration-500 hover:shadow-2xl bg-card/50 backdrop-blur-sm border-primary/20 ${
+                actualRank === 1 ? 'border-primary shadow-primary/20' : 
+                actualRank === 2 ? 'border-muted-foreground/40 shadow-muted-foreground/10' : 
+                'border-secondary shadow-secondary/20'
               }`}>
-                <div className={`absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-500 ${
-                  actualRank === 1 ? 'bg-gradient-to-br from-yellow-400/50 via-transparent to-orange-400/50' :
-                  actualRank === 2 ? 'bg-gradient-to-br from-gray-400/50 via-transparent to-slate-400/50' :
-                  'bg-gradient-to-br from-amber-400/50 via-transparent to-orange-400/50'
-                }`}></div>
+                <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity duration-500 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20"></div>
 
-                <CardContent className="p-6 h-full flex flex-col items-center justify-center text-center space-y-4 relative z-10">
+                <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 h-full flex flex-col items-center justify-center text-center space-y-1 sm:space-y-2 md:space-y-3 lg:space-y-4 relative z-10">
                   <div className="relative">
                     {getRankIcon(actualRank)}
                     {actualRank === 1 && (
@@ -191,36 +187,36 @@ export default function LeaderboardPage() {
                     )}
                   </div>
 
-                  <div className={`w-16 h-16 rounded-2xl ${getRankBadgeColor(actualRank)} flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform duration-300`}>
+                  <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl ${getRankBadgeColor(actualRank)} flex items-center justify-center text-sm sm:text-base md:text-lg font-bold group-hover:scale-110 transition-transform duration-300`}>
                     {getUserInitials(user.email, user.display_name, user.username)}
                   </div>
 
-                                     <div className="space-y-2 w-full">
-                     <h3 className="font-bold text-lg leading-tight truncate px-2">
+                                     <div className="space-y-0.5 sm:space-y-1 w-full">
+                     <h3 className="font-bold text-xs sm:text-sm md:text-base lg:text-lg leading-tight truncate px-1 sm:px-2">
                        {getDisplayName(user)}
                      </h3>
-                     <Badge className={`${getRankBadgeColor(actualRank)} font-bold px-2 py-1 text-xs`}>
+                     <Badge className={`${getRankBadgeColor(actualRank)} font-bold px-1 sm:px-2 py-0.5 text-[9px] sm:text-[10px] md:text-xs`}>
                        #{actualRank} Champion
                      </Badge>
                    </div>
 
-                   <div className="space-y-1">
-                     <div className="text-xl font-bold text-green-600 leading-tight">
+                   <div className="space-y-0.5 sm:space-y-1">
+                     <div className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-primary leading-tight">
                        {formatCurrency(user.portfolio_value)}
                      </div>
-                     <div className="text-xs text-muted-foreground font-medium">
+                     <div className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground font-medium">
                        Portfolio Value
                      </div>
                    </div>
 
-                                     <div className="grid grid-cols-2 gap-3 text-sm w-full px-2">
-                     <div className="text-center p-2 rounded-lg bg-background/50 backdrop-blur-sm">
-                       <div className="font-semibold text-sm leading-tight">{formatPercentage(user.win_rate)}</div>
-                       <div className="text-muted-foreground text-xs">Win Rate</div>
+                                     <div className="grid grid-cols-2 gap-1 sm:gap-2 md:gap-3 text-sm w-full px-1 sm:px-2">
+                     <div className="text-center p-0.5 sm:p-1 md:p-2 rounded-lg bg-background/50 backdrop-blur-sm">
+                       <div className="font-semibold text-[10px] sm:text-xs md:text-sm leading-tight">{formatPercentage(user.win_rate)}</div>
+                       <div className="text-muted-foreground text-[8px] sm:text-[9px] md:text-[10px]">Win Rate</div>
                      </div>
-                     <div className="text-center p-2 rounded-lg bg-background/50 backdrop-blur-sm">
-                       <div className="font-semibold text-sm leading-tight">{user.total_picks}</div>
-                       <div className="text-muted-foreground text-xs">Total Picks</div>
+                     <div className="text-center p-0.5 sm:p-1 md:p-2 rounded-lg bg-background/50 backdrop-blur-sm">
+                       <div className="font-semibold text-[10px] sm:text-xs md:text-sm leading-tight">{user.total_picks}</div>
+                       <div className="text-muted-foreground text-[8px] sm:text-[9px] md:text-[10px]">Total Picks</div>
                      </div>
                    </div>
                 </CardContent>
@@ -231,7 +227,7 @@ export default function LeaderboardPage() {
       )}
 
       {/* Rest of Leaderboard */}
-      <Card className="bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/20 shadow-xl">
+      <Card className="bg-card/50 backdrop-blur-sm border border-primary/20 shadow-xl">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-3 text-2xl">
             <Target className="w-6 h-6 text-primary" />
@@ -240,55 +236,52 @@ export default function LeaderboardPage() {
           <CardDescription className="text-base">Elite traders from around the world competing for supremacy</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="max-h-[700px] overflow-y-auto">
+          <div className="max-h-[700px] overflow-y-auto overflow-x-hidden">
             {getRestOfLeaderboard().length > 0 ? (
               <div className="space-y-0">
                 {getRestOfLeaderboard().map((user, index) => (
                   <div 
                     key={user.user_id} 
-                    className="flex items-center justify-between p-6 border-b last:border-b-0 hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 group"
+                    className="flex items-center justify-between p-3 sm:p-4 md:p-6 border-b last:border-b-0 hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 group"
                   >
-                    <div className="flex items-center gap-6 flex-1">
-                      <div className="w-10 text-center">
-                        <span className="font-bold text-xl text-muted-foreground group-hover:text-primary transition-colors">#{user.rank}</span>
+                    <div className="flex items-center gap-2 sm:gap-3 md:gap-6 flex-1 min-w-0">
+                      <div className="w-6 sm:w-8 md:w-10 text-center shrink-0">
+                        <span className="font-bold text-sm sm:text-base md:text-xl text-muted-foreground group-hover:text-primary transition-colors">#{user.rank}</span>
                       </div>
                       
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center text-sm font-bold group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center text-xs sm:text-sm font-bold group-hover:scale-110 transition-transform duration-300 shrink-0">
                         {getUserInitials(user.email, user.display_name, user.username)}
                       </div>
                       
-                      <div className="space-y-1">
-                        <div className="font-semibold text-lg truncate max-w-48 group-hover:text-primary transition-colors">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="font-semibold text-sm sm:text-base md:text-lg truncate group-hover:text-primary transition-colors">
                           {getDisplayName(user)}
-                        </div>
-                        <div className="text-sm text-muted-foreground truncate max-w-64">
-                          Member since {new Date(user.member_since).toLocaleDateString()}
                         </div>
                       </div>
                     </div>
 
-                    <div className="hidden lg:flex items-center gap-8 text-sm">
-                      <div className="text-center">
-                        <div className="font-bold text-lg text-green-600">{formatCurrency(user.portfolio_value)}</div>
+                    <div className="hidden lg:flex items-center gap-4 xl:gap-6 text-sm shrink-0">
+                      <div className="text-center min-w-0">
+                        <div className="font-bold text-sm xl:text-base text-primary">{formatCurrency(user.portfolio_value)}</div>
                         <div className="text-xs text-muted-foreground font-medium">Portfolio</div>
                       </div>
-                      <div className="text-center">
-                        <div className="font-semibold text-base">{formatPercentage(user.win_rate)}</div>
+                      <div className="text-center min-w-0">
+                        <div className="font-semibold text-sm xl:text-base">{formatPercentage(user.win_rate)}</div>
                         <div className="text-xs text-muted-foreground">Win Rate</div>
                       </div>
-                      <div className="text-center">
-                        <div className="font-semibold text-base">{formatCurrency(user.total_invested)}</div>
+                      <div className="text-center min-w-0">
+                        <div className="font-semibold text-sm xl:text-base">{formatCurrency(user.total_invested)}</div>
                         <div className="text-xs text-muted-foreground">Invested</div>
                       </div>
-                      <div className="text-center">
-                        <div className="font-semibold text-base">{user.total_picks}</div>
+                      <div className="text-center min-w-0">
+                        <div className="font-semibold text-sm xl:text-base">{user.total_picks}</div>
                         <div className="text-xs text-muted-foreground">Picks</div>
                       </div>
                     </div>
 
-                    <div className="lg:hidden text-right space-y-1">
-                      <div className="font-bold text-lg text-green-600">{formatCurrency(user.portfolio_value)}</div>
-                      <div className="text-sm text-muted-foreground">
+                    <div className="lg:hidden text-right space-y-1 shrink-0 min-w-0">
+                      <div className="font-bold text-sm sm:text-base text-primary">{formatCurrency(user.portfolio_value)}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">
                         {user.total_picks} picks • {formatPercentage(user.win_rate)} win rate
                       </div>
                     </div>

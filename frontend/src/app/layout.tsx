@@ -67,10 +67,10 @@ export const metadata: Metadata = {
 
 function SiteHeader() {
   return (
-    <header className="fixed top-6 left-0 right-0 z-50">
-      <div className="mx-auto max-w-[90rem] px-4">
+    <header className="fixed top-3 sm:top-6 left-0 right-0 z-50">
+      <div className="mx-auto max-w-[90rem] px-2 sm:px-4">
         <div className="rounded-full border border-[var(--nav-border)] bg-[var(--nav-bg)] backdrop-blur-md shadow-[var(--nav-shadow)]">
-          <div className="flex h-14 items-center px-4">
+          <div className="flex h-12 sm:h-14 items-center px-3 sm:px-4">
             <MainNav />
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function RootLayout({
           >
             <PageBackground />
             <SiteHeader />
-            <main className="relative pt-28 pb-24 md:pb-16 flex-1">
+            <main className="relative pt-20 sm:pt-28 pb-40 sm:pb-48 md:pb-32 flex-1">
               <div className="mx-auto max-w-[90rem] px-4">
                 <PageTransitionsProvider>
                   {children}
