@@ -76,15 +76,12 @@ if USE_SIMPLE_AUTH:
 def check_prediction_window(event_id: int) -> bool:
     """Check if predictions are still open (closes 10 min before event)"""
     try:
-        logger.info(f"Checking prediction window for event_id: {event_id}")
         supabase = get_db_connection()
         if not supabase:
-            logger.warning("Database connection unavailable for prediction window check")
             return False
             
         # If no event_id provided, check the active event
         if event_id is None:
-            logger.info("No event_id provided, looking for active event")
             response = supabase.table('upcoming_events')\
                 .select('event_start_time, event_date, is_active')\
                 .eq('is_active', True)\
@@ -92,28 +89,22 @@ def check_prediction_window(event_id: int) -> bool:
                 .limit(1)\
                 .execute()
         else:
-            logger.info(f"Looking for specific event_id: {event_id}")
             response = supabase.table('upcoming_events')\
                 .select('event_start_time, event_date, is_active')\
                 .eq('id', event_id)\
                 .execute()
             
         if not response.data or len(response.data) == 0:
-            logger.warning(f"No event found for event_id: {event_id}")
             return False
             
         event = response.data[0]
-        logger.info(f"Found event: is_active={event.get('is_active', False)}")
         if not event.get('is_active', False):
-            logger.info(f"Event {event_id} is not active, predictions closed")
             return False
         
         # Use event_start_time if available, otherwise fall back to event_date
         event_time_str = event.get('event_start_time') or event.get('event_date')
-        logger.info(f"Raw event time string: {event_time_str}")
         
         if not event_time_str:
-            logger.warning(f"No event time found for event {event_id}")
             return False
             
         # Parse the event time
@@ -136,28 +127,10 @@ def check_prediction_window(event_id: int) -> bool:
         current_time = datetime.now(timezone.utc)
         
         is_open = current_time < cutoff_time
-        
-        # Enhanced logging for debugging
-        logger.info(f"=== PREDICTION WINDOW CHECK DETAILS ===")
-        logger.info(f"Event ID: {event_id}")
-        logger.info(f"Current UTC time: {current_time}")
-        logger.info(f"Event time (UTC): {event_time}")
-        logger.info(f"Cutoff time (UTC): {cutoff_time}")
-        logger.info(f"Time until cutoff: {cutoff_time - current_time}")
-        logger.info(f"Prediction window open: {is_open}")
-        logger.info(f"==========================================")
-        
-        if not is_open:
-            logger.info(f"Predictions window closed for event {event_id}. Current: {current_time}, Cutoff: {cutoff_time}")
-        else:
-            logger.debug(f"Predictions window open for event {event_id}. Closes at: {cutoff_time}")
-            
         return is_open
         
     except Exception as e:
         logger.error(f"Error checking prediction window for event {event_id}: {str(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 # API Endpoints
@@ -170,8 +143,7 @@ async def get_coin_balance(
 ):
     """Get user's current coin balance and stats"""
     try:
-        user_id = authorization  # get_user_id_from_token returns the user_id
-        logger.info(f"Getting balance for user_id: {user_id}")
+        user_id = authorization
         
         supabase = get_db_connection()
         if not supabase:
@@ -184,7 +156,6 @@ async def get_coin_balance(
             
         if not response.data or len(response.data) == 0:
             # Create account if it doesn't exist - need to create user_settings first
-            logger.info(f"Creating new account for user_id: {user_id}")
             
             # First create user_settings entry (required for foreign key)
             try:
@@ -194,9 +165,6 @@ async def get_coin_balance(
                         'user_id': user_id,
                         'settings': {'notifications': False}
                     }).execute()
-                    logger.info("User settings created")
-                else:
-                    logger.info("User settings already exist")
             except Exception as e:
                 logger.warning(f"User settings creation issue: {e}")
             
@@ -209,7 +177,6 @@ async def get_coin_balance(
                     'total_won': 0,
                     'total_lost': 0
                 }).execute()
-                logger.info("Coin account created with 1000 coins")
             except Exception as e:
                 logger.warning(f"Coin account might already exist: {e}")
             
@@ -243,7 +210,6 @@ async def place_prediction_pick(
     """Place a prediction pick on a fight"""
     try:
         user_id = authorization
-        logger.info(f"Placing pick for user_id: {user_id}, fighter: {pick_request.fighter_name}, stake: {pick_request.stake}")
         
         # Check if predictions are still open
         if not check_prediction_window(pick_request.event_id):
@@ -256,29 +222,78 @@ async def place_prediction_pick(
         if not supabase:
             raise HTTPException(status_code=503, detail="Database unavailable")
             
-        # Call the place_bet function (using your DB function)
-        response = supabase.rpc('place_bet', {
-            'p_user_id': user_id,
-            'p_event_id': pick_request.event_id,
-            'p_fight_id': pick_request.fight_id,
-            'p_fighter_id': pick_request.fighter_id,
-            'p_fighter_name': pick_request.fighter_name,
-            'p_stake': pick_request.stake,
-            'p_odds_american': pick_request.odds_american
-        }).execute()
-        
-        # Check if there was an error (response.data will be None if error occurred)
-        if response.data is None:
-            logger.error(f"Database function returned no data - possible error")
-            raise HTTPException(status_code=400, detail="Failed to place bet")
+        # First, get user's current balance
+        balance_response = supabase.table('coin_accounts')\
+            .select('balance')\
+            .eq('user_id', user_id)\
+            .execute()
             
-        pick_id = response.data
-        logger.info(f"Bet placed successfully with ID: {pick_id}")
+        if not balance_response.data:
+            raise HTTPException(status_code=400, detail="User account not found")
+            
+        current_balance = balance_response.data[0]['balance']
+        
+        # Check if user has enough balance
+        if current_balance < pick_request.stake:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient balance. You have {current_balance} coins but need {pick_request.stake} coins"
+            )
+        
+        # Calculate odds and potential payout
+        odds_decimal = (pick_request.odds_american / 100) + 1 if pick_request.odds_american > 0 else (100 / abs(pick_request.odds_american)) + 1
+        potential_payout = int(pick_request.stake * odds_decimal)
+        
+        # Insert bet record
+        bet_data = {
+            'user_id': user_id,
+            'event_id': pick_request.event_id,
+            'fight_id': pick_request.fight_id,
+            'fighter_id': pick_request.fighter_id,
+            'fighter_name': pick_request.fighter_name,
+            'stake': pick_request.stake,
+            'odds_american': pick_request.odds_american,
+            'odds_decimal': odds_decimal,
+            'potential_payout': potential_payout,
+            'status': 'pending'
+        }
+        
+        bet_response = supabase.table('bets').insert(bet_data).execute()
+        
+        if not bet_response.data:
+            logger.error("Failed to insert bet record")
+            raise HTTPException(status_code=500, detail="Failed to place bet")
+            
+        # Update user's balance (deduct stake and update total_wagered)
+        new_balance = current_balance - pick_request.stake
+        
+        # Get current total_wagered
+        account_response = supabase.table('coin_accounts')\
+            .select('total_wagered')\
+            .eq('user_id', user_id)\
+            .execute()
+            
+        current_total_wagered = account_response.data[0]['total_wagered'] if account_response.data else 0
+        new_total_wagered = current_total_wagered + pick_request.stake
+        
+        balance_update_response = supabase.table('coin_accounts')\
+            .update({
+                'balance': new_balance,
+                'total_wagered': new_total_wagered
+            })\
+            .eq('user_id', user_id)\
+            .execute()
+            
+        if not balance_update_response.data:
+            logger.error("Failed to update user balance after placing bet")
+            
+        pick_id = bet_response.data[0]['id']
         
         return JSONResponse(content={
             "success": True,
             "pick_id": pick_id,
-            "message": f"Prediction placed on {pick_request.fighter_name} for {pick_request.stake} coins"
+            "message": f"Prediction placed on {pick_request.fighter_name} for {pick_request.stake} coins",
+            "new_balance": new_balance
         })
         
     except HTTPException:
@@ -433,8 +448,6 @@ async def settle_event_predictions(event_id: int):
             
         settled_count = response.data
         
-        logger.info(f"Settled {settled_count} predictions for event {event_id}")
-        
         return JSONResponse(content={
             "success": True,
             "settled_count": settled_count,
@@ -498,8 +511,6 @@ async def get_leaderboard():
             .select('user_id, balance, total_wagered, total_won, total_lost, created_at')\
             .execute()
         
-        logger.info(f"Found {len(accounts_response.data or [])} coin accounts")
-        
         if not accounts_response.data:
             return JSONResponse(content={
                 "success": True,
@@ -512,7 +523,6 @@ async def get_leaderboard():
             .select('user_id, settings')\
             .execute()
         
-        logger.info(f"Found {len(settings_response.data or [])} user settings")
         settings_map = {s['user_id']: s.get('settings', {}) for s in settings_response.data or []}
         
         # Get all active picks in one query
@@ -584,8 +594,6 @@ async def get_leaderboard():
                 email.split('@')[0]
             )
             
-            logger.info(f"User {user_id}: username={username}, settings={user_settings}")
-            
             leaderboard_data.append({
                 "user_id": user_id,
                 "email": email,
@@ -609,8 +617,6 @@ async def get_leaderboard():
         # Assign ranks
         for i, user in enumerate(leaderboard_data):
             user['rank'] = i + 1
-        
-        logger.info(f"Returning leaderboard with {len(leaderboard_data)} users")
         
         return JSONResponse(content={
             "success": True,
