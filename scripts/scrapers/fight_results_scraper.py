@@ -727,6 +727,18 @@ def monitor_event():
         if success:
             logger.info(f"Successfully updated {updated_count} fights with results")
             
+            # INDUSTRY BEST PRACTICE: Check for any fight changes that require refunds
+            try:
+                logger.info("Checking for fight changes that may require refunds...")
+                from scripts.scrapers.upcoming_event_scraper import check_and_process_refunds
+                refund_result = check_and_process_refunds(updated_event['id'])
+                if refund_result and refund_result.get('total_bets_refunded', 0) > 0:
+                    logger.warning(f"REFUNDS PROCESSED during results update: {refund_result['total_bets_refunded']} bets "
+                                 f"refunded for {refund_result['total_amount_refunded']} coins due to fight changes")
+            except Exception as e:
+                logger.error(f"Error processing refunds during results update: {str(e)}")
+                # Don't fail the entire process if refund processing fails
+            
             # Settle predictions for newly completed fights
             try:
                 settle_event_predictions(updated_event['id'])

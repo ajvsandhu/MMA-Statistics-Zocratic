@@ -5,12 +5,34 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X, User, LogOut, Settings as SettingsIcon, BarChart3, Sparkles } from "lucide-react"
+import { Menu, X, User, LogOut, Settings as SettingsIcon, BarChart3, Sparkles, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useTheme, THEMES_LIST, type Theme } from "@/lib/theme-provider"
 import { Check, Palette } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
+
+// Utility function to check if user is admin
+const isUserAdmin = (idToken: string | undefined): boolean => {
+  if (!idToken) {
+    console.log('No idToken provided for admin check');
+    return false;
+  }
+  
+  try {
+    // Decode JWT token (simple base64 decode of payload)
+    const payload = JSON.parse(atob(idToken.split('.')[1]));
+    const groups = payload['cognito:groups'] || payload['groups'] || [];
+    console.log('JWT payload groups:', groups);
+    console.log('Full JWT payload:', payload);
+    const isAdmin = Array.isArray(groups) && groups.includes('admin');
+    console.log('User is admin:', isAdmin);
+    return isAdmin;
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
+};
 
 export function MainNav() {
   const pathname = usePathname()
@@ -18,7 +40,7 @@ export function MainNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = React.useState(false)
   const { theme, setTheme } = useTheme()
-  const { isAuthenticated, isLoading, userProfile, signOut } = useAuth()
+  const { isAuthenticated, isLoading, userProfile, signOut, getIdToken } = useAuth()
   
   React.useEffect(() => {
     const checkMobile = () => {
@@ -211,7 +233,7 @@ export function MainNav() {
                                     {userProfile.preferred_username || userProfile.email || 'User'}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    Premium Member
+                                    Member
                                   </p>
                                 </div>
                               </div>
@@ -234,6 +256,16 @@ export function MainNav() {
                                   <BarChart3 className="h-4 w-4" />
                                   <span>Dashboard</span>
                                 </Link>
+                                {isUserAdmin(getIdToken()) && (
+                                  <Link
+                                    href="/admin"
+                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)] bg-blue-500/10 border border-blue-500/30"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                  >
+                                    <Shield className="h-4 w-4 text-blue-400" />
+                                    <span className="text-blue-400 font-semibold">Admin</span>
+                                  </Link>
+                                )}
                               </>
                             )}
                             <button
@@ -429,7 +461,7 @@ export function MainNav() {
       <div className="flex-1" />
       <div className="flex items-center gap-4">
         {!isLoading && (
-          <UserMenu isAuthenticated={isAuthenticated} userProfile={userProfile} onSignOut={handleSignOut} />
+          <UserMenu isAuthenticated={isAuthenticated} userProfile={userProfile} onSignOut={handleSignOut} isAdmin={isUserAdmin(getIdToken())} />
         )}
       </div>
     </>
@@ -439,7 +471,7 @@ export function MainNav() {
 // UserMenu component for desktop nav
 import { useState, useRef, useEffect } from 'react';
 
-function UserMenu({ isAuthenticated, userProfile, onSignOut }: { isAuthenticated: boolean, userProfile: any, onSignOut: () => void }) {
+function UserMenu({ isAuthenticated, userProfile, onSignOut, isAdmin }: { isAuthenticated: boolean, userProfile: any, onSignOut: () => void, isAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -478,7 +510,7 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut }: { isAuthenticated
                 <div className="text-sm font-medium text-[var(--nav-text)] truncate">
                   {userProfile.preferred_username || userProfile.email || 'User'}
                 </div>
-                <div className="text-xs text-muted-foreground">Premium Member</div>
+                <div className="text-xs text-muted-foreground">Member</div>
               </div>
               <a
                 href="/dashboard"
@@ -494,6 +526,15 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut }: { isAuthenticated
               >
                 <SettingsIcon className="h-4 w-4" /> Settings
               </a>
+              {isAdmin && (
+                <a
+                  href="/admin"
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-all duration-200 w-full text-left font-semibold bg-blue-500/5 border-l-2 border-blue-500"
+                  onClick={() => setOpen(false)}
+                >
+                  <Shield className="h-4 w-4" /> Admin
+                </a>
+              )}
               <div className="my-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
               <button
                 onClick={() => { onSignOut(); setOpen(false); }}

@@ -61,8 +61,31 @@ class TransactionRecord(BaseModel):
     balance_after: int
     created_at: str
 
+class FightCancellationRequest(BaseModel):
+    fight_id: str
+    reason: str = Field(description="Reason for cancellation/change")
+    refund_type: str = Field(description="full_refund or partial_refund")
+
+class RefundResult(BaseModel):
+    total_bets_refunded: int
+    total_amount_refunded: int
+    affected_users: int
+    refund_details: List[Dict[str, Any]]
+
+class BonusDistributionRequest(BaseModel):
+    amount: int = Field(gt=0, description="Amount of coins to give each user")
+    reason: str = Field(description="Reason for the bonus distribution")
+    target_users: Optional[List[str]] = Field(None, description="Optional list of specific user IDs. If empty, distributes to all users")
+
+class BonusDistributionResult(BaseModel):
+    total_users_affected: int
+    total_amount_distributed: int
+    successful_distributions: int
+    failed_distributions: int
+    distribution_details: List[Dict[str, Any]]
+
 # Import auth helper
-from backend.api.utils.auth_helper import get_user_id_from_auth_header, get_user_id_simple
+from backend.api.utils.auth_helper import get_user_id_from_auth_header, get_user_id_simple, get_admin_user_from_auth_header, get_admin_user_simple
 import os
 
 # SECURITY: Simple auth disabled by default - only for development/testing
@@ -71,6 +94,213 @@ USE_SIMPLE_AUTH = os.getenv("USE_SIMPLE_AUTH", "false").lower() == "true"
 # Warning if simple auth is enabled
 if USE_SIMPLE_AUTH:
     logger.warning("⚠️  SECURITY WARNING: Simple auth is enabled! This should NEVER be used in production!")
+
+
+def detect_fight_changes(old_fights: List[Dict], new_fights: List[Dict]) -> List[Dict]:
+    """
+    Detect significant changes in fights that warrant refunds.
+    Industry best practice: Be conservative - refund when in doubt.
+    """
+    changes = []
+    
+    # Create lookup for old fights
+    old_fights_map = {fight.get('fight_id'): fight for fight in old_fights}
+    
+    for new_fight in new_fights:
+        fight_id = new_fight.get('fight_id')
+        old_fight = old_fights_map.get(fight_id)
+        
+        if not old_fight:
+            # New fight added - no refund needed
+            continue
+            
+        change_reasons = []
+        
+        # Check for fighter changes (most critical)
+        if (old_fight.get('fighter1_name') != new_fight.get('fighter1_name') or
+            old_fight.get('fighter2_name') != new_fight.get('fighter2_name') or
+            old_fight.get('fighter1_id') != new_fight.get('fighter1_id') or
+            old_fight.get('fighter2_id') != new_fight.get('fighter2_id')):
+            change_reasons.append("Fighter substitution detected")
+            
+        # Check for fight cancellation
+        if new_fight.get('status') == 'cancelled' or new_fight.get('cancelled', False):
+            change_reasons.append("Fight cancelled")
+            
+        # Check for significant weight class changes
+        if (old_fight.get('weight_class') and new_fight.get('weight_class') and
+            old_fight.get('weight_class') != new_fight.get('weight_class')):
+            change_reasons.append("Weight class changed")
+            
+        # Check for fight type changes (title vs non-title)
+        if (old_fight.get('is_title_fight') != new_fight.get('is_title_fight')):
+            change_reasons.append("Title fight status changed")
+        
+        if change_reasons:
+            changes.append({
+                'fight_id': fight_id,
+                'old_fight': old_fight,
+                'new_fight': new_fight,
+                'change_reasons': change_reasons,
+                'refund_type': 'full_refund'  # Default to full refund for safety
+            })
+    
+    # Check for removed fights
+    new_fight_ids = {fight.get('fight_id') for fight in new_fights}
+    for old_fight in old_fights:
+        fight_id = old_fight.get('fight_id')
+        if fight_id not in new_fight_ids:
+            changes.append({
+                'fight_id': fight_id,
+                'old_fight': old_fight,
+                'new_fight': None,
+                'change_reasons': ['Fight removed from card'],
+                'refund_type': 'full_refund'
+            })
+    
+    return changes
+
+
+async def process_refunds_for_changes(changes: List[Dict], event_id: int) -> RefundResult:
+    """
+    Process refunds for detected fight changes.
+    Industry best practice: Atomic transactions, comprehensive logging, user notifications.
+    """
+    supabase = get_db_connection()
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    
+    total_refunded = 0
+    total_amount = 0
+    affected_users = set()
+    refund_details = []
+    
+    try:
+        for change in changes:
+            fight_id = change['fight_id']
+            change_reasons = change['change_reasons']
+            refund_type = change['refund_type']
+            
+            logger.info(f"Processing refunds for fight {fight_id}: {', '.join(change_reasons)}")
+            
+            # Get all pending bets for this fight
+            bets_response = supabase.table('bets')\
+                .select('*')\
+                .eq('event_id', event_id)\
+                .eq('fight_id', fight_id)\
+                .eq('status', 'pending')\
+                .execute()
+            
+            if not bets_response.data:
+                logger.info(f"No pending bets found for fight {fight_id}")
+                continue
+            
+            fight_refunds = []
+            
+            for bet in bets_response.data:
+                user_id = bet['user_id']
+                bet_id = bet['id']
+                stake = bet['stake']
+                
+                # Calculate refund amount
+                refund_amount = stake if refund_type == 'full_refund' else int(stake * 0.5)
+                
+                # Get current user balance
+                balance_response = supabase.table('coin_accounts')\
+                    .select('balance, total_wagered')\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                if not balance_response.data:
+                    logger.error(f"User account not found for user {user_id}")
+                    continue
+                
+                current_balance = balance_response.data[0]['balance']
+                current_total_wagered = balance_response.data[0]['total_wagered'] or 0
+                
+                # Calculate new balances
+                new_balance = current_balance + refund_amount
+                new_total_wagered = max(0, current_total_wagered - stake)  # Reduce total wagered
+                
+                # Update bet status to refunded
+                current_timestamp = datetime.now().isoformat()
+                bet_update_response = supabase.table('bets')\
+                    .update({
+                        'status': 'refunded',
+                        'payout': refund_amount,
+                        'settled_at': current_timestamp,
+                        'refund_reason': '; '.join(change_reasons)
+                    })\
+                    .eq('id', bet_id)\
+                    .execute()
+                
+                if not bet_update_response.data:
+                    logger.error(f"Failed to update bet {bet_id} to refunded status")
+                    continue
+                
+                # Update user balance
+                balance_update_response = supabase.table('coin_accounts')\
+                    .update({
+                        'balance': new_balance,
+                        'total_wagered': new_total_wagered
+                    })\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                if not balance_update_response.data:
+                    logger.error(f"Failed to update balance for user {user_id}")
+                    continue
+                
+                # Create transaction record
+                transaction_data = {
+                    'user_id': user_id,
+                    'amount': refund_amount,
+                    'type': 'bet_refunded',
+                    'reason': f'Refund for {bet["fighter_name"]} - {"; ".join(change_reasons)}',
+                    'ref_table': 'bets',
+                    'ref_id': bet_id,
+                    'balance_before': current_balance,
+                    'balance_after': new_balance
+                }
+                
+                transaction_response = supabase.table('coin_transactions')\
+                    .insert(transaction_data)\
+                    .execute()
+                
+                if transaction_response.data:
+                    fight_refunds.append({
+                        'user_id': user_id,
+                        'bet_id': bet_id,
+                        'fighter_name': bet['fighter_name'],
+                        'refund_amount': refund_amount,
+                        'original_stake': stake
+                    })
+                    
+                    total_refunded += 1
+                    total_amount += refund_amount
+                    affected_users.add(user_id)
+                    
+                    logger.info(f"Refunded {refund_amount} coins to user {user_id} for bet on {bet['fighter_name']}")
+                else:
+                    logger.error(f"Failed to create transaction record for refund {bet_id}")
+            
+            if fight_refunds:
+                refund_details.append({
+                    'fight_id': fight_id,
+                    'change_reasons': change_reasons,
+                    'refunds': fight_refunds
+                })
+        
+        return RefundResult(
+            total_bets_refunded=total_refunded,
+            total_amount_refunded=total_amount,
+            affected_users=len(affected_users),
+            refund_details=refund_details
+        )
+        
+    except Exception as e:
+        logger.error(f"Error processing refunds: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Refund processing failed: {str(e)}")
 
 
 def check_prediction_window(event_id: int) -> bool:
@@ -409,6 +639,406 @@ async def get_transaction_history(
         logger.error(f"Error getting transaction history: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get transactions")
 
+
+@router.post("/admin/refund-fight", response_model=RefundResult)
+@limiter.limit("3/minute")  # Stricter rate limit for refund operations
+async def refund_fight_manually(
+    request: FightCancellationRequest,
+    req: Request,
+    authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
+):
+    """
+    Manually refund all bets for a specific fight.
+    For admin use when fights are cancelled or significantly changed.
+    """
+    try:
+        logger.info(f"Admin refund requested by user {authorization[:8]}... for fight {request.fight_id}: {request.reason}")
+        
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+        
+        # Get all pending bets for this fight
+        bets_response = supabase.table('bets')\
+            .select('*')\
+            .eq('fight_id', request.fight_id)\
+            .eq('status', 'pending')\
+            .execute()
+        
+        if not bets_response.data:
+            return RefundResult(
+                total_bets_refunded=0,
+                total_amount_refunded=0,
+                affected_users=0,
+                refund_details=[]
+            )
+        
+        # Create a change object for processing
+        change = {
+            'fight_id': request.fight_id,
+            'change_reasons': [request.reason],
+            'refund_type': request.refund_type
+        }
+        
+        # Get event_id from the first bet
+        event_id = bets_response.data[0]['event_id']
+        
+        # Process refunds
+        result = await process_refunds_for_changes([change], event_id)
+        
+        logger.info(f"Manual refund completed: {result.total_bets_refunded} bets, {result.total_amount_refunded} coins")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error processing manual refund: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Manual refund failed: {str(e)}")
+
+
+@router.post("/admin/check-and-refund-changes/{event_id}", response_model=RefundResult)
+@limiter.limit("10/minute")  # Rate limit for auto-refund checks
+async def check_and_refund_fight_changes(
+    event_id: int,
+    req: Request,
+    authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
+):
+    """
+    Check for fight changes in an event and automatically process refunds.
+    This should be called whenever an event is updated from scrapers.
+    """
+    try:
+        logger.info(f"Checking for fight changes in event {event_id}")
+        
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+        
+        # Get current event data
+        current_response = supabase.table('upcoming_events')\
+            .select('*')\
+            .eq('id', event_id)\
+            .execute()
+        
+        if not current_response.data:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        current_event = current_response.data[0]
+        current_fights = current_event.get('fights', [])
+        
+        # Get previous version of this event from the database
+        # Look for the previous scraped version by checking scraped_at timestamps
+        previous_response = supabase.table('upcoming_events')\
+            .select('*')\
+            .eq('event_url', current_event['event_url'])\
+            .neq('id', event_id)\
+            .order('scraped_at', desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if not previous_response.data:
+            logger.info("No previous version found - treating as new event, no refunds needed")
+            return RefundResult(
+                total_bets_refunded=0,
+                total_amount_refunded=0,
+                affected_users=0,
+                refund_details=[]
+            )
+        
+        previous_event = previous_response.data[0]
+        previous_fights = previous_event.get('fights', [])
+        
+        # Detect changes
+        changes = detect_fight_changes(previous_fights, current_fights)
+        
+        if not changes:
+            logger.info("No significant fight changes detected")
+            return RefundResult(
+                total_bets_refunded=0,
+                total_amount_refunded=0,
+                affected_users=0,
+                refund_details=[]
+            )
+        
+        logger.info(f"Detected {len(changes)} fight changes requiring refunds")
+        
+        # Process refunds for all changes
+        result = await process_refunds_for_changes(changes, event_id)
+        
+        # Log the changes for audit trail
+        for change in changes:
+            logger.warning(f"REFUND PROCESSED - Fight {change['fight_id']}: {', '.join(change['change_reasons'])}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error checking/processing fight changes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Fight change processing failed: {str(e)}")
+
+
+@router.get("/admin/refund-status/{event_id}")
+async def get_refund_status(
+    event_id: int,
+    authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
+):
+    """Get refund statistics for an event"""
+    try:
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+        
+        # Get refunded bets for this event
+        refunded_response = supabase.table('bets')\
+            .select('*')\
+            .eq('event_id', event_id)\
+            .eq('status', 'refunded')\
+            .execute()
+        
+        refunded_bets = refunded_response.data or []
+        
+        # Calculate statistics
+        total_refunded_amount = sum(bet.get('payout', 0) for bet in refunded_bets)
+        unique_users = len(set(bet['user_id'] for bet in refunded_bets))
+        
+        # Group by fight_id
+        fights_with_refunds = {}
+        for bet in refunded_bets:
+            fight_id = bet['fight_id']
+            if fight_id not in fights_with_refunds:
+                fights_with_refunds[fight_id] = {
+                    'fight_id': fight_id,
+                    'refund_count': 0,
+                    'refund_amount': 0,
+                    'refund_reasons': set()
+                }
+            
+            fights_with_refunds[fight_id]['refund_count'] += 1
+            fights_with_refunds[fight_id]['refund_amount'] += bet.get('payout', 0)
+            if bet.get('refund_reason'):
+                fights_with_refunds[fight_id]['refund_reasons'].add(bet['refund_reason'])
+        
+        # Convert to list
+        fights_summary = []
+        for fight_data in fights_with_refunds.values():
+            fight_data['refund_reasons'] = list(fight_data['refund_reasons'])
+            fights_summary.append(fight_data)
+        
+        return {
+            'event_id': event_id,
+            'total_refunded_bets': len(refunded_bets),
+            'total_refunded_amount': total_refunded_amount,
+            'affected_users': unique_users,
+            'fights_with_refunds': fights_summary
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting refund status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get refund status")
+
+@router.post("/admin/distribute-bonus", response_model=BonusDistributionResult)
+@limiter.limit("5/minute")  # Admin endpoints should be rate limited
+async def distribute_bonus_coins(
+    request: BonusDistributionRequest,
+    req: Request,
+    authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
+):
+    """
+    Distribute bonus coins to users.
+    Admin endpoint to give bonus coins to all users or specific users.
+    """
+    try:
+        logger.info(f"Admin bonus distribution requested by user {authorization[:8]}... - Amount: {request.amount}, Reason: {request.reason}")
+        
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+        
+        # Get target accounts
+        if request.target_users:
+            # Distribute to specific users
+            accounts_response = supabase.table('coin_accounts')\
+                .select('user_id, balance')\
+                .in_('user_id', request.target_users)\
+                .execute()
+        else:
+            # Distribute to all users
+            accounts_response = supabase.table('coin_accounts')\
+                .select('user_id, balance')\
+                .execute()
+        
+        if not accounts_response.data:
+            raise HTTPException(status_code=404, detail="No accounts found")
+        
+        accounts = accounts_response.data
+        successful = 0
+        failed = 0
+        distribution_details = []
+        
+        for account in accounts:
+            try:
+                user_id = account['user_id']
+                current_balance = account['balance']
+                new_balance = current_balance + request.amount
+                
+                # Update balance
+                update_response = supabase.table('coin_accounts')\
+                    .update({'balance': new_balance})\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                if update_response.data:
+                    # Create transaction record
+                    transaction_data = {
+                        'user_id': user_id,
+                        'amount': request.amount,
+                        'type': 'admin_bonus',
+                        'reason': request.reason,
+                        'balance_before': current_balance,
+                        'balance_after': new_balance
+                    }
+                    
+                    supabase.table('coin_transactions').insert(transaction_data).execute()
+                    
+                    successful += 1
+                    distribution_details.append({
+                        'user_id': user_id[:8] + "...",
+                        'amount': request.amount,
+                        'old_balance': current_balance,
+                        'new_balance': new_balance,
+                        'status': 'success'
+                    })
+                    
+                    logger.info(f"✅ Distributed {request.amount} coins to user {user_id[:8]}... (balance: {current_balance} → {new_balance})")
+                else:
+                    failed += 1
+                    distribution_details.append({
+                        'user_id': user_id[:8] + "...",
+                        'amount': 0,
+                        'status': 'failed',
+                        'error': 'Database update failed'
+                    })
+                    logger.error(f"❌ Failed to update balance for user {user_id[:8]}...")
+                    
+            except Exception as e:
+                failed += 1
+                distribution_details.append({
+                    'user_id': user_id[:8] + "..." if 'user_id' in locals() else 'unknown',
+                    'amount': 0,
+                    'status': 'failed',
+                    'error': str(e)
+                })
+                logger.error(f"❌ Error processing user {user_id[:8] if 'user_id' in locals() else 'unknown'}...: {e}")
+        
+        total_distributed = successful * request.amount
+        
+        logger.info(f"✅ Bonus distribution completed: {successful} successful, {failed} failed, {total_distributed} total coins distributed")
+        
+        return BonusDistributionResult(
+            total_users_affected=len(accounts),
+            total_amount_distributed=total_distributed,
+            successful_distributions=successful,
+            failed_distributions=failed,
+            distribution_details=distribution_details
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error distributing bonus coins: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to distribute bonus coins")
+
+@router.get("/user/recent-refunds")
+async def get_user_recent_refunds(
+    limit: int = 10,
+    authorization: str = Depends(get_user_id_simple if USE_SIMPLE_AUTH else get_user_id_from_auth_header)
+):
+    """
+    Get user's recent refunds with detailed information.
+    Industry best practice: Transparent communication about refunds.
+    """
+    try:
+        user_id = authorization
+        
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+        
+        # Get recent refunded bets for this user
+        refunds_response = supabase.table('bets')\
+            .select('*, upcoming_events(event_name, event_date)')\
+            .eq('user_id', user_id)\
+            .eq('status', 'refunded')\
+            .order('settled_at', desc=True)\
+            .limit(limit)\
+            .execute()
+        
+        refunds = []
+        for bet in refunds_response.data or []:
+            refunds.append({
+                'bet_id': bet['id'],
+                'fight_id': bet['fight_id'],
+                'fighter_name': bet['fighter_name'],
+                'original_stake': bet['stake'],
+                'refund_amount': bet.get('payout', 0),
+                'refund_reason': bet.get('refund_reason', 'Fight cancelled or changed'),
+                'refunded_at': bet.get('settled_at'),
+                'event_name': bet.get('upcoming_events', {}).get('event_name', 'Unknown Event') if bet.get('upcoming_events') else 'Unknown Event',
+                'event_date': bet.get('upcoming_events', {}).get('event_date') if bet.get('upcoming_events') else None
+            })
+        
+        return {
+            'user_id': user_id,
+            'recent_refunds': refunds,
+            'total_refunds_shown': len(refunds)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user refunds: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get refunds")
+
+
+@router.get("/user/refund-summary")
+async def get_user_refund_summary(
+    authorization: str = Depends(get_user_id_simple if USE_SIMPLE_AUTH else get_user_id_from_auth_header)
+):
+    """Get summary of all user refunds"""
+    try:
+        user_id = authorization
+        
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+        
+        # Get all refunded bets for this user
+        refunds_response = supabase.table('bets')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .eq('status', 'refunded')\
+            .execute()
+        
+        refunded_bets = refunds_response.data or []
+        
+        if not refunded_bets:
+            return {
+                'total_refunds': 0,
+                'total_refunded_amount': 0,
+                'total_original_stakes': 0,
+                'average_refund': 0
+            }
+        
+        total_refunded_amount = sum(bet.get('payout', 0) for bet in refunded_bets)
+        total_original_stakes = sum(bet.get('stake', 0) for bet in refunded_bets)
+        
+        return {
+            'total_refunds': len(refunded_bets),
+            'total_refunded_amount': total_refunded_amount,
+            'total_original_stakes': total_original_stakes,
+            'average_refund': total_refunded_amount // len(refunded_bets) if refunded_bets else 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting refund summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get refund summary")
+
+
 @router.get("/event-picks/{event_id}")
 async def get_event_pick_stats(
     event_id: int,
@@ -451,7 +1081,12 @@ async def get_event_pick_stats(
 # Admin/System Functions (for your cron jobs)
 
 @router.post("/admin/settle-event/{event_id}")
-async def settle_event_predictions(event_id: int):
+@limiter.limit("10/minute")  # Rate limit for settlement operations
+async def settle_event_predictions(
+    event_id: int,
+    req: Request,
+    authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
+):
     """Settle all predictions for an event (called by your fight results scraper)"""
     try:
         supabase = get_db_connection()

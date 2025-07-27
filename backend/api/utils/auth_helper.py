@@ -1,8 +1,8 @@
 import jwt
 import os
 import logging
-from typing import Optional
-from fastapi import HTTPException, Header
+from typing import Optional, List
+from fastapi import HTTPException, Header, Depends
 import requests
 from functools import lru_cache
 import json
@@ -88,6 +88,23 @@ def verify_cognito_token(token: str) -> Optional[dict]:
     except Exception as e:
         logger.error(f"Error verifying token: {str(e)}")
         return None
+
+def extract_user_groups(payload: dict) -> List[str]:
+    """Extract user groups from Cognito JWT payload"""
+    groups = []
+    
+    # Cognito groups can be in different fields depending on configuration
+    if 'cognito:groups' in payload:
+        groups = payload['cognito:groups']
+    elif 'groups' in payload:
+        groups = payload['groups']
+    
+    return groups if isinstance(groups, list) else []
+
+def is_admin(payload: dict) -> bool:
+    """Check if user is in admin group"""
+    groups = extract_user_groups(payload)
+    return 'admin' in groups
 
 def is_valid_uuid(uuid_string):
     """Check if a string is a valid UUID"""
@@ -235,9 +252,57 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
         logger.error(f"Token validation error: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
+def get_admin_user_from_auth_header(authorization: str = Header(None)) -> str:
+    """Extract user ID and verify admin group membership"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No authorization header")
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+    
+    token = authorization.split(" ")[1]
+    
+    try:
+        payload_data = verify_cognito_token(token)
+        
+        if not payload_data:
+            logger.warning("Failed to verify JWT token for admin access")
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        
+        # Check if user is admin
+        if not is_admin(payload_data):
+            logger.warning(f"Non-admin user attempted to access admin endpoint: {payload_data.get('email', 'unknown')}")
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Extract and validate user ID
+        raw_user_id = payload_data.get('sub')
+        if not raw_user_id:
+            raise HTTPException(status_code=401, detail="No user ID in token")
+        
+        user_id = sanitize_user_id(raw_user_id)
+        if not user_id:
+            logger.error(f"Could not sanitize admin user_id from token: {raw_user_id[:10]}...")
+            raise HTTPException(status_code=401, detail="Invalid user ID format")
+        
+        logger.info(f"Admin access granted to user: {user_id[:8]}... (email: {payload_data.get('email', 'unknown')})")
+        return user_id
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Admin token validation error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 # Alternative simpler version if you want to handle auth in your frontend
 def get_user_id_simple(user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
     """Simple version - get user_id from custom header (less secure, for testing)"""
     if not user_id:
         raise HTTPException(status_code=401, detail="User ID header required")
+    return user_id
+
+def get_admin_user_simple(user_id: Optional[str] = Header(None, alias="X-User-ID")) -> str:
+    """Simple admin version - for testing only, does not verify admin status"""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User ID header required")
+    logger.warning("Using simple admin auth - NOT SECURE for production!")
     return user_id 

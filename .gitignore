@@ -96,7 +96,7 @@ ENV/
 # Environment variables
 .env
 .cursorignore
-
+/frontend/src/app/admin/page.tsx
 
 # Logs
 *.log

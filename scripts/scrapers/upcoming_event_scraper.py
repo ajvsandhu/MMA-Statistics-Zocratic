@@ -1132,13 +1132,18 @@ def save_to_database(event_data):
         logger.info(f"Checking if event already exists: {event_data['event_name']}")
         existing_response = supabase.table('upcoming_events').select('*').eq('event_url', event_data['event_url']).execute()
         
+        event_id = None
+        is_update = False
+        
         if existing_response.data and len(existing_response.data) > 0:
             # Event exists, update it
             existing_event = existing_response.data[0]
-            logger.info(f"Event already exists with ID {existing_event['id']}, updating...")
+            event_id = existing_event['id']
+            is_update = True
+            logger.info(f"Event already exists with ID {event_id}, updating...")
             
             # First, deactivate all other events
-            supabase.table('upcoming_events').update({'is_active': False}).neq('id', existing_event['id']).execute()
+            supabase.table('upcoming_events').update({'is_active': False}).neq('id', event_id).execute()
             
             # Update the existing event
             response = supabase.table('upcoming_events').update({
@@ -1152,10 +1157,22 @@ def save_to_database(event_data):
                 'completed_fights': event_data.get('completed_fights', 0),
                 'results_updated_at': event_data.get('results_updated_at'),
                 'is_active': True
-            }).eq('id', existing_event['id']).execute()
+            }).eq('id', event_id).execute()
             
             if response.data:
-                logger.info(f"Successfully updated existing event with ID: {existing_event['id']}")
+                logger.info(f"Successfully updated existing event with ID: {event_id}")
+                
+                # INDUSTRY BEST PRACTICE: Check for fight changes and process refunds
+                try:
+                    logger.info("Checking for fight changes that require refunds...")
+                    refund_result = check_and_process_refunds(event_id)
+                    if refund_result and refund_result.get('total_bets_refunded', 0) > 0:
+                        logger.warning(f"REFUNDS PROCESSED: {refund_result['total_bets_refunded']} bets refunded "
+                                     f"for {refund_result['total_amount_refunded']} coins due to fight changes")
+                except Exception as e:
+                    logger.error(f"Error processing refunds for event {event_id}: {str(e)}")
+                    # Don't fail the entire update if refund processing fails
+                
                 return True
             else:
                 logger.error("Failed to update existing event")
@@ -1183,7 +1200,8 @@ def save_to_database(event_data):
         }).execute()
         
         if response.data:
-            logger.info(f"Successfully created new event with ID: {response.data[0]['id']}")
+            event_id = response.data[0]['id']
+            logger.info(f"Successfully created new event with ID: {event_id}")
             return True
         else:
             logger.error("Failed to create new event")
@@ -1194,6 +1212,33 @@ def save_to_database(event_data):
         import traceback
         traceback.print_exc()
         return False
+
+
+def check_and_process_refunds(event_id):
+    """
+    Check for fight changes and process refunds automatically.
+    Industry best practice: Conservative approach - refund when in doubt.
+    """
+    try:
+        import requests
+        from backend.constants import API_BASE_URL
+        
+        # Use the refund API endpoint
+        url = f"{API_BASE_URL}/api/v1/predictions-game/admin/check-and-refund-changes/{event_id}"
+        
+        # Note: In production, you'd want proper authentication here
+        response = requests.post(url, timeout=30)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Refund API call failed: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error calling refund API: {str(e)}")
+        return None
+
 
 def main():
     parser = argparse.ArgumentParser(description='UFC Upcoming Event Scraper')
