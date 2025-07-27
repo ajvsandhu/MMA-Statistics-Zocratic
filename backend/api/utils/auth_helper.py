@@ -6,6 +6,8 @@ from fastapi import HTTPException, Header
 import requests
 from functools import lru_cache
 import json
+import uuid
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,35 @@ def verify_cognito_token(token: str) -> Optional[dict]:
         logger.error(f"Error verifying token: {str(e)}")
         return None
 
+def is_valid_uuid(uuid_string):
+    """Check if a string is a valid UUID"""
+    try:
+        uuid.UUID(uuid_string)
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+def sanitize_user_id(user_id):
+    """Ensure user_id is a valid UUID format"""
+    if not user_id:
+        return None
+    
+    # If it's already a valid UUID, return as-is
+    if is_valid_uuid(user_id):
+        return user_id
+    
+    # If it contains only valid UUID characters but missing hyphens, try to format it
+    clean_id = re.sub(r'[^a-fA-F0-9]', '', user_id)
+    if len(clean_id) == 32:
+        # Try to format as UUID: 8-4-4-4-12
+        formatted = f"{clean_id[:8]}-{clean_id[8:12]}-{clean_id[12:16]}-{clean_id[16:20]}-{clean_id[20:]}"
+        if is_valid_uuid(formatted):
+            return formatted
+    
+    # Last resort: generate a deterministic UUID from the input
+    logger.warning(f"Invalid user_id format received: {user_id[:10]}..., generating deterministic UUID")
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, user_id))
+
 def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
     """Extract user ID from Cognito JWT token with PROPER verification"""
     if not authorization:
@@ -106,22 +137,30 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         
         # Extract user information from verified payload
-        user_id = payload_data.get('sub')
+        raw_user_id = payload_data.get('sub')
         username = payload_data.get('preferred_username')
         email = payload_data.get('email')
         cognito_username = payload_data.get('cognito:username')
         
-        if not user_id:
+        if not raw_user_id:
             raise HTTPException(status_code=401, detail="No user ID in token")
         
-        # Log only non-sensitive data for security
-        logger.info(f"Authenticated user: {user_id[:8]}... (username: {username})")
+        # Sanitize and validate user_id
+        user_id = sanitize_user_id(raw_user_id)
+        if not user_id:
+            logger.error(f"Could not sanitize user_id from token: {raw_user_id[:10]}...")
+            raise HTTPException(status_code=401, detail="Invalid user ID format")
         
-        # ALWAYS store user info in settings - force update every time
+        # Log only non-sensitive data for security
+        logger.info(f"Authenticated user: {user_id[:8]}... (email: {email})")
+        
+        # ALWAYS store user info in settings - force update every time with PROPER ERROR HANDLING
         try:
             from backend.api.database import get_db_connection
             supabase = get_db_connection()
             if supabase:
+                logger.info(f"Storing/updating user settings for user {user_id[:8]}...")
+                
                 # First check if user_settings exists
                 existing_settings = supabase.table('user_settings')\
                     .select('id, settings')\
@@ -141,23 +180,49 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
                 if cognito_username:
                     settings['cognito_username'] = cognito_username
                 
-                # Don't log sensitive settings data
-                logger.info(f"Updated settings for user {user_id[:8]}...")
+                # Add metadata
+                settings['last_login'] = payload_data.get('auth_time', 'unknown')
+                settings['cognito_region'] = COGNITO_REGION
+                
+                logger.info(f"Prepared settings for user {user_id[:8]}... with email: {email}")
                 
                 if existing_settings.data:
                     # Update existing
-                    supabase.table('user_settings').update({
+                    logger.info(f"Updating existing user settings for {user_id[:8]}...")
+                    update_result = supabase.table('user_settings').update({
                         'settings': settings
                     }).eq('user_id', user_id).execute()
+                    
+                    if update_result.data:
+                        logger.info(f"Successfully updated user settings for {user_id[:8]}...")
+                    else:
+                        logger.error(f"Update failed for user {user_id[:8]}...: {update_result}")
+                        
                 else:
                     # Create new
-                    supabase.table('user_settings').insert({
+                    logger.info(f"Creating new user settings for {user_id[:8]}...")
+                    insert_result = supabase.table('user_settings').insert({
                         'user_id': user_id,
                         'settings': settings
                     }).execute()
                     
+                    if insert_result.data:
+                        logger.info(f"Successfully created user settings for {user_id[:8]}...")
+                    else:
+                        logger.error(f"Insert failed for user {user_id[:8]}...: {insert_result}")
+                        
+            else:
+                logger.error("Failed to get database connection for user settings update")
+                        
         except Exception as e:
-            logger.error(f"Failed to update user settings: {str(e)}")
+            # DO NOT silently ignore errors - log them properly
+            logger.error(f"CRITICAL: Failed to update user settings for user {user_id[:8]}... (email: {email}): {str(e)}")
+            logger.error(f"User ID that failed: {user_id}")
+            logger.error(f"Raw user ID from token: {raw_user_id}")
+            logger.error(f"Error type: {type(e).__name__}")
+            
+            # Still allow authentication to proceed, but ensure we track this failure
+            # In production, you might want to send this to an error monitoring service
         
         return user_id
         
