@@ -643,8 +643,8 @@ async def get_transaction_history(
 @router.post("/admin/refund-fight", response_model=RefundResult)
 @limiter.limit("3/minute")  # Stricter rate limit for refund operations
 async def refund_fight_manually(
-    request: FightCancellationRequest,
-    req: Request,
+    req_body: FightCancellationRequest,
+    request: Request,
     authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
 ):
     """
@@ -652,7 +652,7 @@ async def refund_fight_manually(
     For admin use when fights are cancelled or significantly changed.
     """
     try:
-        logger.info(f"Admin refund requested by user {authorization[:8]}... for fight {request.fight_id}: {request.reason}")
+        logger.info(f"Admin refund requested by user {authorization[:8]}... for fight {req_body.fight_id}: {req_body.reason}")
         
         supabase = get_db_connection()
         if not supabase:
@@ -661,7 +661,7 @@ async def refund_fight_manually(
         # Get all pending bets for this fight
         bets_response = supabase.table('bets')\
             .select('*')\
-            .eq('fight_id', request.fight_id)\
+            .eq('fight_id', req_body.fight_id)\
             .eq('status', 'pending')\
             .execute()
         
@@ -675,9 +675,9 @@ async def refund_fight_manually(
         
         # Create a change object for processing
         change = {
-            'fight_id': request.fight_id,
-            'change_reasons': [request.reason],
-            'refund_type': request.refund_type
+            'fight_id': req_body.fight_id,
+            'change_reasons': [req_body.reason],
+            'refund_type': req_body.refund_type
         }
         
         # Get event_id from the first bet
@@ -698,7 +698,7 @@ async def refund_fight_manually(
 @limiter.limit("10/minute")  # Rate limit for auto-refund checks
 async def check_and_refund_fight_changes(
     event_id: int,
-    req: Request,
+    request: Request,
     authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
 ):
     """
@@ -836,8 +836,8 @@ async def get_refund_status(
 @router.post("/admin/distribute-bonus", response_model=BonusDistributionResult)
 @limiter.limit("5/minute")  # Admin endpoints should be rate limited
 async def distribute_bonus_coins(
-    request: BonusDistributionRequest,
-    req: Request,
+    req_body: BonusDistributionRequest,
+    request: Request,
     authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
 ):
     """
@@ -845,18 +845,18 @@ async def distribute_bonus_coins(
     Admin endpoint to give bonus coins to all users or specific users.
     """
     try:
-        logger.info(f"Admin bonus distribution requested by user {authorization[:8]}... - Amount: {request.amount}, Reason: {request.reason}")
+        logger.info(f"Admin bonus distribution requested by user {authorization[:8]}... - Amount: {req_body.amount}, Reason: {req_body.reason}")
         
         supabase = get_db_connection()
         if not supabase:
             raise HTTPException(status_code=503, detail="Database unavailable")
         
         # Get target accounts
-        if request.target_users:
+        if req_body.target_users:
             # Distribute to specific users
             accounts_response = supabase.table('coin_accounts')\
                 .select('user_id, balance')\
-                .in_('user_id', request.target_users)\
+                .in_('user_id', req_body.target_users)\
                 .execute()
         else:
             # Distribute to all users
@@ -876,7 +876,7 @@ async def distribute_bonus_coins(
             try:
                 user_id = account['user_id']
                 current_balance = account['balance']
-                new_balance = current_balance + request.amount
+                new_balance = current_balance + req_body.amount
                 
                 # Update balance
                 update_response = supabase.table('coin_accounts')\
@@ -888,9 +888,9 @@ async def distribute_bonus_coins(
                     # Create transaction record
                     transaction_data = {
                         'user_id': user_id,
-                        'amount': request.amount,
+                        'amount': req_body.amount,
                         'type': 'admin_bonus',
-                        'reason': request.reason,
+                        'reason': req_body.reason,
                         'balance_before': current_balance,
                         'balance_after': new_balance
                     }
@@ -900,13 +900,13 @@ async def distribute_bonus_coins(
                     successful += 1
                     distribution_details.append({
                         'user_id': user_id[:8] + "...",
-                        'amount': request.amount,
+                        'amount': req_body.amount,
                         'old_balance': current_balance,
                         'new_balance': new_balance,
                         'status': 'success'
                     })
                     
-                    logger.info(f"✅ Distributed {request.amount} coins to user {user_id[:8]}... (balance: {current_balance} → {new_balance})")
+                    logger.info(f"✅ Distributed {req_body.amount} coins to user {user_id[:8]}... (balance: {current_balance} → {new_balance})")
                 else:
                     failed += 1
                     distribution_details.append({
@@ -1084,7 +1084,7 @@ async def get_event_pick_stats(
 @limiter.limit("10/minute")  # Rate limit for settlement operations
 async def settle_event_predictions(
     event_id: int,
-    req: Request,
+    request: Request,
     authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
 ):
     """Settle all predictions for an event (called by your fight results scraper)"""

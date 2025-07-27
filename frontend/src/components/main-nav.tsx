@@ -120,7 +120,7 @@ export function MainNav() {
     { href: "/fight-predictions", label: "Predictions" },
     { href: "/fighters", label: "Fighters" },
     { href: "/fight-predictions/events", label: "Live Events" },
-    { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/leaderboard", label: "P4P" },
     { href: "/zobot", label: "Zobot" },
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" }
