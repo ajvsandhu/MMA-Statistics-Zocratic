@@ -548,9 +548,9 @@ async def settle_event_predictions(event_id: int):
             if not bet_update_response.data:
                 continue
                 
-            # Update user balance if they won
+            # Update user stats based on win/loss
             if won and payout_amount > 0:
-                # Get current balance
+                # Get current balance and total_won
                 balance_response = supabase.table('coin_accounts')\
                     .select('balance, total_won')\
                     .eq('user_id', user_id)\
@@ -572,7 +572,7 @@ async def settle_event_predictions(event_id: int):
                         .execute()
                         
                     if balance_update_response.data:
-                        # Create transaction record
+                        # Create transaction record for win
                         transaction_data = {
                             'user_id': user_id,
                             'amount': payout_amount,
@@ -582,6 +582,40 @@ async def settle_event_predictions(event_id: int):
                             'ref_id': bet_id,
                             'balance_before': current_balance,
                             'balance_after': new_balance
+                        }
+                        
+                        supabase.table('coin_transactions').insert(transaction_data).execute()
+            else:
+                # User lost - update total_lost
+                account_response = supabase.table('coin_accounts')\
+                    .select('balance, total_lost')\
+                    .eq('user_id', user_id)\
+                    .execute()
+                    
+                if account_response.data:
+                    current_balance = account_response.data[0]['balance']
+                    current_total_lost = account_response.data[0]['total_lost'] or 0
+                    
+                    new_total_lost = current_total_lost + stake
+                    
+                    loss_update_response = supabase.table('coin_accounts')\
+                        .update({
+                            'total_lost': new_total_lost
+                        })\
+                        .eq('user_id', user_id)\
+                        .execute()
+                        
+                    if loss_update_response.data:
+                        # Create transaction record for loss
+                        transaction_data = {
+                            'user_id': user_id,
+                            'amount': -stake,  # Negative amount to indicate loss
+                            'type': 'bet_lost',
+                            'reason': f'Lost bet on {bet["fighter_name"]}',
+                            'ref_table': 'bets',
+                            'ref_id': bet_id,
+                            'balance_before': current_balance,
+                            'balance_after': current_balance  # Balance doesn't change on loss (already deducted when placed)
                         }
                         
                         supabase.table('coin_transactions').insert(transaction_data).execute()

@@ -119,6 +119,14 @@ export default function EventAnalysisPage() {
   const [userBets, setUserBets] = useState<any[]>([])
   const [predictionWindowOpen, setPredictionWindowOpen] = useState<boolean>(true)
 
+  // Function to check if event has passed
+  const isEventPassed = () => {
+    if (!eventData?.event_date) return false
+    const eventDate = new Date(eventData.event_date)
+    const now = new Date()
+    return eventDate < now
+  }
+
   // Function to check prediction window status
   const checkPredictionWindow = async () => {
     if (!isAuthenticated || !eventData?.id) return
@@ -166,13 +174,57 @@ export default function EventAnalysisPage() {
     }
   }, [isAuthenticated, eventData?.id])
 
-  // Fetch coin balance when user is authenticated - ONLY ONCE
+  // Fetch coin balance when user is authenticated - independent of event data
   useEffect(() => {
-    let isMounted = true; // Prevent state updates if component unmounts
+    let isMounted = true;
 
-    async function fetchInitialData() {
-      if (!isAuthenticated || !eventData?.id) {
+    async function fetchBalance() {
+      if (!isAuthenticated) {
         setCoinBalance(null)
+        return
+      }
+
+      try {
+        const token = await getToken()
+        if (!token || !isMounted) return
+
+        console.log('Fetching user balance...')
+        const balanceResponse = await fetch(ENDPOINTS.GET_BALANCE, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!isMounted) return;
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json()
+          setCoinBalance(balanceData.balance)
+          console.log('Balance loaded:', balanceData.balance)
+        } else {
+          console.error('Failed to fetch balance:', balanceResponse.status, balanceResponse.statusText)
+          setCoinBalance(0) // Set to 0 instead of null to stop loading state
+        }
+      } catch (error) {
+        console.error('Error fetching balance:', error)
+        setCoinBalance(0) // Set to 0 instead of null to stop loading state
+      }
+    }
+
+    fetchBalance()
+    
+    return () => {
+      isMounted = false;
+    }
+  }, [isAuthenticated]) // Only depend on authentication status
+
+  // Fetch event-specific bets when both auth and event data are available
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchEventBets() {
+      if (!isAuthenticated || !eventData?.id) {
         setUserBets([])
         return
       }
@@ -181,44 +233,32 @@ export default function EventAnalysisPage() {
         const token = await getToken()
         if (!token || !isMounted) return
 
-        // Fetch both balance and bets in parallel - use actual event ID from eventData
-        const [balanceResponse, betsResponse] = await Promise.all([
-          fetch(ENDPOINTS.GET_BALANCE, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }),
-          fetch(`${ENDPOINTS.MY_PICKS}?event_id=${eventData.id}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
-        ])
+        console.log('Fetching event bets for event ID:', eventData.id)
+        const betsResponse = await fetch(`${ENDPOINTS.MY_PICKS}?event_id=${eventData.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
 
-        if (!isMounted) return; // Component unmounted
-
-        if (balanceResponse.ok) {
-          const balanceData = await balanceResponse.json()
-          setCoinBalance(balanceData.balance)
-          console.log('Initial balance loaded:', balanceData.balance)
-        }
+        if (!isMounted) return;
 
         if (betsResponse.ok) {
           const betsData = await betsResponse.json()
           setUserBets(betsData)
-          console.log('Initial bets loaded:', betsData.length, 'bets')
+          console.log('Event bets loaded:', betsData.length, 'bets')
+        } else {
+          console.error('Failed to fetch bets:', betsResponse.status, betsResponse.statusText)
         }
       } catch (error) {
-        console.error('Error fetching initial data:', error)
+        console.error('Error fetching event bets:', error)
       }
     }
 
-    fetchInitialData()
+    fetchEventBets()
     
     return () => {
-      isMounted = false; // Cleanup to prevent state updates after unmount
+      isMounted = false;
     }
   }, [isAuthenticated, eventData?.id]) // Run when authentication status or event ID changes
 
@@ -226,27 +266,17 @@ export default function EventAnalysisPage() {
   const refreshBalance = async () => {
     console.log('Manually refreshing balance and bets...')
     
-    if (!eventData?.id) return
-    
     try {
       const token = await getToken()
       if (!token) return
 
-      // Fetch both balance and bets in parallel - use actual event ID
-      const [balanceResponse, userBetsResponse] = await Promise.all([
-        fetch(ENDPOINTS.GET_BALANCE, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }),
-        fetch(`${ENDPOINTS.MY_PICKS}?event_id=${eventData.id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
-      ])
+      // Always refresh balance
+      const balanceResponse = await fetch(ENDPOINTS.GET_BALANCE, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
 
       if (balanceResponse.ok) {
         const balanceData = await balanceResponse.json()
@@ -254,10 +284,20 @@ export default function EventAnalysisPage() {
         console.log('Balance manually refreshed:', balanceData.balance)
       }
 
-      if (userBetsResponse.ok) {
-        const betsData = await userBetsResponse.json()
-        setUserBets(betsData)
-        console.log('Bets manually refreshed:', betsData.length, 'bets')
+      // Only refresh bets if we have event data
+      if (eventData?.id) {
+        const userBetsResponse = await fetch(`${ENDPOINTS.MY_PICKS}?event_id=${eventData.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (userBetsResponse.ok) {
+          const betsData = await userBetsResponse.json()
+          setUserBets(betsData)
+          console.log('Bets manually refreshed:', betsData.length, 'bets')
+        }
       }
     } catch (error) {
       console.error('Error manually refreshing data:', error)
@@ -570,14 +610,14 @@ export default function EventAnalysisPage() {
                             <Button 
                               className={cn(
                                 "mt-2 font-medium px-4 py-2 rounded-lg shadow-sm transition-colors",
-                                predictionWindowOpen 
+                                predictionWindowOpen && !isEventPassed()
                                   ? "bg-green-600 hover:bg-green-700 text-white" 
                                   : "bg-gray-400 text-gray-600 cursor-not-allowed"
                               )}
                               size="sm"
-                              disabled={!predictionWindowOpen}
+                              disabled={!predictionWindowOpen || isEventPassed()}
                                                              onClick={() => {
-                                 if (predictionWindowOpen && fight.odds_data?.fighter1_odds?.odds) {
+                                 if (predictionWindowOpen && !isEventPassed() && fight.odds_data?.fighter1_odds?.odds) {
                                    console.log('DEBUG: Setting modal state with event ID:', eventData.id)
                                    setModalState({
                                      isOpen: true,
@@ -591,7 +631,7 @@ export default function EventAnalysisPage() {
                                }}
                             >
                               <Coins className="h-3 w-3 mr-1" />
-                              {predictionWindowOpen ? "Place Pick" : "Picks Locked"}
+                              {predictionWindowOpen && !isEventPassed() ? "Place Pick" : "Picks Locked"}
                             </Button>
                           )}
                         </div>
@@ -667,14 +707,14 @@ export default function EventAnalysisPage() {
                             <Button 
                               className={cn(
                                 "mt-2 font-medium px-4 py-2 rounded-lg shadow-sm transition-colors",
-                                predictionWindowOpen 
+                                predictionWindowOpen && !isEventPassed()
                                   ? "bg-green-600 hover:bg-green-700 text-white" 
                                   : "bg-gray-400 text-gray-600 cursor-not-allowed"
                               )}
                               size="sm"
-                              disabled={!predictionWindowOpen}
+                              disabled={!predictionWindowOpen || isEventPassed()}
                               onClick={() => {
-                                if (predictionWindowOpen && fight.odds_data?.fighter2_odds?.odds) {
+                                if (predictionWindowOpen && !isEventPassed() && fight.odds_data?.fighter2_odds?.odds) {
                                   setModalState({
                                     isOpen: true,
                                     eventId: eventData.id, // Use actual event ID
@@ -687,7 +727,7 @@ export default function EventAnalysisPage() {
                               }}
                             >
                               <Coins className="h-3 w-3 mr-1" />
-                              {predictionWindowOpen ? "Place Pick" : "Picks Locked"}
+                              {predictionWindowOpen && !isEventPassed() ? "Place Pick" : "Picks Locked"}
                             </Button>
                           )}
                         </div>
