@@ -22,23 +22,13 @@ PYTHONPATH=. python scripts/scrapers/ufc_rankings_scraper.py
 
 echo "UFC Rankings Scraper completed."
 
-# Check if there are any changes to commit
-if [[ -n $(git status --porcelain) ]]; then
-    echo "Changes detected. Committing and pushing to GitHub..."
-    
-    # Add all changes
-    git add .
-    
-    # Commit with timestamp
-    TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-    git commit -m "Auto-update UFC rankings data - $TIMESTAMP"
-    
-    # Push to GitHub
-    git push origin main
-    
-    echo "Changes successfully pushed to GitHub."
-else
-    echo "No changes detected. Nothing to commit."
-fi
+# Run coin distribution
+echo ""
+echo "Running Coin Distribution..."
+PYTHONPATH=. python scripts/simple_coin_distribution.py
+
+echo "Coin distribution completed."
+
+
 
 echo "Script completed."

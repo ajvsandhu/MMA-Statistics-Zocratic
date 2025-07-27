@@ -43,24 +43,7 @@ python backend/ml_new/train.py
 # Restart the server to load the new model
 sudo systemctl restart zocratic
 
-# Check if there are any changes to commit
-if [[ -n $(git status --porcelain) ]]; then
-    echo "Changes detected. Committing and pushing to GitHub..."
-    
-    # Add all changes
-    git add .
-    
-    # Commit with timestamp
-    TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-    git commit -m "Auto-update UFC rankings data - $TIMESTAMP"
-    
-    # Push to GitHub
-    git push origin main
-    
-    echo "Changes successfully pushed to GitHub."
-else
-    echo "No changes detected. Nothing to commit."
-fi
+
 
 echo "Script completed."
 

@@ -13,7 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from backend.api.database import get_db_connection
 
-def distribute_coins(amount=500, reason="Bonus distribution"):
+def distribute_coins(amount=500, reason="Weekly bonus"):
     """Give coins to everyone. Simple."""
     
     print(f"🪙 Giving {amount} coins to everyone...")
@@ -71,20 +71,8 @@ def distribute_coins(amount=500, reason="Bonus distribution"):
         print(f"❌ Script failed: {e}")
 
 if __name__ == "__main__":
-    # Parse arguments
+    # Default values - change here if needed
     amount = 500
-    reason = "Bonus distribution"
+    reason = "Weekly bonus"
     
-    if len(sys.argv) > 1:
-        amount = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        reason = " ".join(sys.argv[2:])
-    
-    print(f"About to give {amount} coins to ALL users")
-    print(f"Reason: {reason}")
-    confirm = input("Continue? (y/n): ")
-    
-    if confirm.lower() in ['y', 'yes']:
-        distribute_coins(amount, reason)
-    else:
-        print("Cancelled") 
+    distribute_coins(amount, reason) 
