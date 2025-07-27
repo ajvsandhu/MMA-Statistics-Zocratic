@@ -187,27 +187,29 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
                 logger.info(f"Prepared settings for user {user_id[:8]}... with email: {email}")
                 
                 if existing_settings.data:
-                    # Update existing
+                    # Update existing - ensure we preserve existing data and add new info
                     logger.info(f"Updating existing user settings for {user_id[:8]}...")
+                    
+                    # Merge new settings with existing ones, giving priority to JWT data
                     update_result = supabase.table('user_settings').update({
                         'settings': settings
                     }).eq('user_id', user_id).execute()
                     
                     if update_result.data:
-                        logger.info(f"Successfully updated user settings for {user_id[:8]}...")
+                        logger.info(f"Successfully updated user settings for {user_id[:8]}... with email: {email}")
                     else:
                         logger.error(f"Update failed for user {user_id[:8]}...: {update_result}")
                         
                 else:
-                    # Create new
-                    logger.info(f"Creating new user settings for {user_id[:8]}...")
+                    # Create new user entry
+                    logger.info(f"Creating new user settings for {user_id[:8]}... with email: {email}")
                     insert_result = supabase.table('user_settings').insert({
                         'user_id': user_id,
                         'settings': settings
                     }).execute()
                     
                     if insert_result.data:
-                        logger.info(f"Successfully created user settings for {user_id[:8]}...")
+                        logger.info(f"Successfully created user settings for {user_id[:8]}... with email: {email}")
                     else:
                         logger.error(f"Insert failed for user {user_id[:8]}...: {insert_result}")
                         

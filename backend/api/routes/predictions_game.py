@@ -157,16 +157,21 @@ async def get_coin_balance(
         if not response.data or len(response.data) == 0:
             # Create account if it doesn't exist - need to create user_settings first
             
-            # First create user_settings entry (required for foreign key)
+            # Check if user_settings exists, but DON'T create minimal entries
+            # Let the auth_helper handle proper user settings creation
             try:
                 settings_check = supabase.table('user_settings').select('user_id').eq('user_id', user_id).execute()
                 if not settings_check.data:
-                    supabase.table('user_settings').insert({
-                        'user_id': user_id,
-                        'settings': {'notifications': False}
-                    }).execute()
+                    logger.warning(f"User {user_id[:8]}... accessing predictions without proper auth - user_settings missing")
+                    raise HTTPException(
+                        status_code=401, 
+                        detail="User profile not found. Please log out and log back in to complete registration."
+                    )
+            except HTTPException:
+                raise
             except Exception as e:
-                logger.warning(f"User settings creation issue: {e}")
+                logger.error(f"User settings check failed: {e}")
+                raise HTTPException(status_code=503, detail="Unable to verify user profile")
             
             # Then create coin account with INSERT to avoid duplicates
             try:
