@@ -927,7 +927,7 @@ async def distribute_bonus_coins(
                 })
                 logger.error(f"❌ Error processing user {user_id[:8] if 'user_id' in locals() else 'unknown'}...: {e}")
         
-        total_distributed = successful * request.amount
+        total_distributed = successful * req_body.amount
         
         logger.info(f"✅ Bonus distribution completed: {successful} successful, {failed} failed, {total_distributed} total coins distributed")
         

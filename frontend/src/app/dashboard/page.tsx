@@ -91,8 +91,6 @@ export default function DashboardPage() {
       setError(null);
       const headers = getAuthHeaders();
       
-      console.log('Dashboard: Fetching data with headers:', headers);
-      
       // Use the centralized API configuration
       
       // Fetch balance
@@ -101,10 +99,8 @@ export default function DashboardPage() {
           headers,
           method: 'GET'
         });
-        console.log('Balance response status:', balanceResponse.status);
         if (balanceResponse.ok) {
           const balanceData = await balanceResponse.json();
-          console.log('Balance data:', balanceData);
           setBalance(balanceData);
         } else {
           console.error('Balance fetch failed:', balanceResponse.status, balanceResponse.statusText);
@@ -119,10 +115,8 @@ export default function DashboardPage() {
           headers,
           method: 'GET'
         });
-        console.log('Picks response status:', picksResponse.status);
         if (picksResponse.ok) {
           const picksData = await picksResponse.json();
-          console.log('Picks data:', picksData);
           setPicks(picksData);
         } else {
           console.error('Picks fetch failed:', picksResponse.status, picksResponse.statusText);
@@ -137,10 +131,8 @@ export default function DashboardPage() {
           headers,
           method: 'GET'
         });
-        console.log('Transactions response status:', transactionsResponse.status);
         if (transactionsResponse.ok) {
           const transactionsData = await transactionsResponse.json();
-          console.log('Transactions data:', transactionsData);
           setTransactions(transactionsData);
         } else {
           console.error('Transactions fetch failed:', transactionsResponse.status, transactionsResponse.statusText);
@@ -155,10 +147,8 @@ export default function DashboardPage() {
           headers,
           method: 'GET'
         });
-        console.log('Rank response status:', rankResponse.status);
         if (rankResponse.ok) {
           const rankData = await rankResponse.json();
-          console.log('Rank data:', rankData);
           setUserRank(rankData);
         } else {
           console.error('Rank fetch failed:', rankResponse.status, rankResponse.statusText);

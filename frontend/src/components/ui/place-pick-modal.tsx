@@ -82,8 +82,6 @@ export function PlacePickModal({
         odds_american: oddsAmerican,
       }
 
-      console.log('Placing pick with data:', requestBody)
-
       const response = await fetch(ENDPOINTS.PLACE_PICK, {
         method: "POST",
         headers: {
@@ -93,11 +91,7 @@ export function PlacePickModal({
         body: JSON.stringify(requestBody),
       })
 
-                    console.log('Response status:', response.status)
-       console.log('Response headers:', response.headers.get('content-type'))
-       
        const responseData = await response.json()
-       console.log('Response data:', responseData)
 
        if (!response.ok) {
          // Handle HTTP error statuses

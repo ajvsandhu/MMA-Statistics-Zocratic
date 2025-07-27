@@ -205,7 +205,6 @@ export default function EventAnalysisPage() {
         const token = await getToken()
         if (!token || !isMounted) return
 
-        console.log('Fetching user balance...')
         const balanceResponse = await fetch(ENDPOINTS.GET_BALANCE, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -218,7 +217,6 @@ export default function EventAnalysisPage() {
         if (balanceResponse.ok) {
           const balanceData = await balanceResponse.json()
           setCoinBalance(balanceData.balance)
-          console.log('Balance loaded:', balanceData.balance)
         } else {
           console.error('Failed to fetch balance:', balanceResponse.status, balanceResponse.statusText)
           setCoinBalance(0) // Set to 0 instead of null to stop loading state
@@ -250,7 +248,6 @@ export default function EventAnalysisPage() {
         const token = await getToken()
         if (!token || !isMounted) return
 
-        console.log('Fetching event bets for event ID:', eventData.id)
         const betsResponse = await fetch(`${ENDPOINTS.MY_PICKS}?event_id=${eventData.id}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -263,7 +260,6 @@ export default function EventAnalysisPage() {
         if (betsResponse.ok) {
           const betsData = await betsResponse.json()
           setUserBets(betsData)
-          console.log('Event bets loaded:', betsData.length, 'bets')
         } else {
           console.error('Failed to fetch bets:', betsResponse.status, betsResponse.statusText)
         }
@@ -281,8 +277,6 @@ export default function EventAnalysisPage() {
 
   // Function to refresh balance after successful bet - CALL MANUALLY ONLY
   const refreshBalance = async () => {
-    console.log('Manually refreshing balance and bets...')
-    
     try {
       const token = await getToken()
       if (!token) return
@@ -298,7 +292,6 @@ export default function EventAnalysisPage() {
       if (balanceResponse.ok) {
         const balanceData = await balanceResponse.json()
         setCoinBalance(balanceData.balance)
-        console.log('Balance manually refreshed:', balanceData.balance)
       }
 
       // Only refresh bets if we have event data
@@ -313,7 +306,6 @@ export default function EventAnalysisPage() {
         if (userBetsResponse.ok) {
           const betsData = await userBetsResponse.json()
           setUserBets(betsData)
-          console.log('Bets manually refreshed:', betsData.length, 'bets')
         }
       }
     } catch (error) {

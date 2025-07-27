@@ -15,7 +15,6 @@ import { useAuth } from "@/hooks/use-auth"
 // Utility function to check if user is admin
 const isUserAdmin = (idToken: string | undefined): boolean => {
   if (!idToken) {
-    console.log('No idToken provided for admin check');
     return false;
   }
   
@@ -23,13 +22,9 @@ const isUserAdmin = (idToken: string | undefined): boolean => {
     // Decode JWT token (simple base64 decode of payload)
     const payload = JSON.parse(atob(idToken.split('.')[1]));
     const groups = payload['cognito:groups'] || payload['groups'] || [];
-    console.log('JWT payload groups:', groups);
-    console.log('Full JWT payload:', payload);
     const isAdmin = Array.isArray(groups) && groups.includes('admin');
-    console.log('User is admin:', isAdmin);
     return isAdmin;
   } catch (error) {
-    console.error('Error checking admin status:', error);
     return false;
   }
 };
