@@ -121,17 +121,33 @@ export default function EventAnalysisPage() {
 
   // Function to check if event has passed
   const isEventPassed = () => {
-    if (!eventData?.event_date) return false
-    const eventDate = new Date(eventData.event_date)
-    const now = new Date()
-    return eventDate < now
+    if (!eventData?.event_date && !eventData?.event_start_time) return false
+    
+    // Try event_start_time first, then fall back to event_date
+    const dateString = eventData.event_start_time || eventData.event_date
+    
+    try {
+      const eventDate = new Date(dateString)
+      
+      // Check if the date parsing was successful
+      if (isNaN(eventDate.getTime())) {
+        return false // If we can't parse the date, assume event hasn't passed
+      }
+      
+      const now = new Date()
+      const hasEventPassed = eventDate < now
+      
+      return hasEventPassed
+    } catch (error) {
+      return false // If there's an error, assume event hasn't passed
+    }
   }
 
   // Function to check prediction window status
   const checkPredictionWindow = async () => {
     if (!isAuthenticated || !eventData?.id) return
 
-    console.log('DEBUG: Checking prediction window for event ID:', eventData.id)
+
 
     try {
       const token = await getToken()
@@ -147,6 +163,7 @@ export default function EventAnalysisPage() {
 
       if (response.ok) {
         const data = await response.json()
+
         setPredictionWindowOpen(data.prediction_window_open)
       }
     } catch (error) {
@@ -313,8 +330,7 @@ export default function EventAnalysisPage() {
                  if (response.ok) {
            // Active event exists - use it
            const eventData = await response.json()
-           console.log('DEBUG: Fetched event data:', eventData)
-           console.log('DEBUG: Event ID is:', eventData.id)
+           
            setEventData(eventData)
            setError(null)
         } else {
@@ -616,19 +632,18 @@ export default function EventAnalysisPage() {
                               )}
                               size="sm"
                               disabled={!predictionWindowOpen || isEventPassed()}
-                                                             onClick={() => {
-                                 if (predictionWindowOpen && !isEventPassed() && fight.odds_data?.fighter1_odds?.odds) {
-                                   console.log('DEBUG: Setting modal state with event ID:', eventData.id)
-                                   setModalState({
-                                     isOpen: true,
-                                     eventId: eventData.id, // Use actual event ID
-                                     fightId: fight.fight_id,
-                                     fighterId: fight.fighter1_id,
-                                     fighterName: fight.fighter1_name,
-                                     oddsAmerican: fight.odds_data.fighter1_odds.odds,
-                                   })
-                                 }
-                               }}
+                                                        onClick={() => {
+                            if (predictionWindowOpen && !isEventPassed() && fight.odds_data?.fighter1_odds?.odds) {
+                              setModalState({
+                                isOpen: true,
+                                eventId: eventData.id, // Use actual event ID
+                                fightId: fight.fight_id,
+                                fighterId: fight.fighter1_id,
+                                fighterName: fight.fighter1_name,
+                                oddsAmerican: fight.odds_data.fighter1_odds.odds,
+                              })
+                            }
+                          }}
                             >
                               <Coins className="h-3 w-3 mr-1" />
                               {predictionWindowOpen && !isEventPassed() ? "Place Pick" : "Picks Locked"}
@@ -714,6 +729,8 @@ export default function EventAnalysisPage() {
                               size="sm"
                               disabled={!predictionWindowOpen || isEventPassed()}
                               onClick={() => {
+
+                                
                                 if (predictionWindowOpen && !isEventPassed() && fight.odds_data?.fighter2_odds?.odds) {
                                   setModalState({
                                     isOpen: true,

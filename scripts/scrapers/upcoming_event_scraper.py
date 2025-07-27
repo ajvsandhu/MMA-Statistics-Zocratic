@@ -963,7 +963,7 @@ def apply_fighter_replacements(matchups, detected_changes):
     
     return updated_matchups
 
-def add_odds_to_matchups(matchups):
+def add_odds_to_matchups(matchups, ufc_event_data=None):
     """Add betting odds to each matchup"""
     if not odds_service_available:
         logger.warning("Odds service is not available. Skipping odds step.")
@@ -992,13 +992,71 @@ def add_odds_to_matchups(matchups):
         
         logger.info(f"Found {len(odds_events)} MMA events with odds")
         
-        # EXTRACT EVENT START TIME from odds data
+        # EXTRACT EVENT START TIME from odds data, but use actual event date if odds time is in past
         event_start_time = None
-        for event in odds_events:
-            commence_time = event.get('commence_time')
+        for odds_event in odds_events:
+            commence_time = odds_event.get('commence_time')
             if commence_time:
-                event_start_time = commence_time
-                logger.info(f"Found event start time from odds API: {event_start_time}")
+                from datetime import datetime, timedelta
+                import dateutil.parser
+                try:
+                    # Parse the commence time
+                    if isinstance(commence_time, str):
+                        # Handle ISO format with Z
+                        if commence_time.endswith('Z'):
+                            commence_time = commence_time.replace('Z', '+00:00')
+                        original_time = datetime.fromisoformat(commence_time)
+                    else:
+                        original_time = commence_time
+                    
+                    current_time = datetime.now(original_time.tzinfo if original_time.tzinfo else None)
+                    
+                    # If the original time is in the future, use it as is
+                    if original_time > current_time:
+                        event_start_time = original_time.isoformat()
+                        logger.info(f"Using original event start time from odds API: {event_start_time}")
+                    else:
+                        # If odds time is in the past, construct event time from UFC Stats event date
+                        logger.warning(f"Odds API time is in the past ({original_time}), using UFC Stats event date instead")
+                        
+                        # Parse the event date from UFC Stats (e.g., "August 02, 2025")
+                        ufc_event_date = ufc_event_data.get('date', '') if ufc_event_data else ''
+                        
+                        if ufc_event_date:
+                            try:
+                                # Parse the UFC event date and set a reasonable time (e.g., 8 PM ET)
+                                parsed_date = dateutil.parser.parse(ufc_event_date)
+                                # Set time to 8 PM ET (which is 1 AM UTC the next day for most events)
+                                event_datetime = parsed_date.replace(hour=1, minute=0, second=0, microsecond=0)
+                                # Add one day since UFC events are typically at night
+                                if parsed_date.hour == 0:  # If no time was parsed, it defaults to midnight
+                                    event_datetime = event_datetime + timedelta(days=1)
+                                
+                                # Ensure it's timezone aware (UTC)
+                                if event_datetime.tzinfo is None:
+                                    event_datetime = event_datetime.replace(tzinfo=original_time.tzinfo or datetime.now().astimezone().tzinfo)
+                                
+                                event_start_time = event_datetime.isoformat()
+                                logger.info(f"Set event start time based on UFC date '{ufc_event_date}': {event_start_time}")
+                            except Exception as date_error:
+                                logger.warning(f"Failed to parse UFC event date '{ufc_event_date}': {date_error}")
+                                # Fallback: add 24 hours to current time
+                                fallback_time = current_time + timedelta(hours=24)
+                                event_start_time = fallback_time.isoformat()
+                                logger.info(f"Using 24-hour fallback: {event_start_time}")
+                        else:
+                            # No UFC date available, use 24-hour fallback
+                            fallback_time = current_time + timedelta(hours=24)
+                            event_start_time = fallback_time.isoformat()
+                            logger.info(f"No UFC date available, using 24-hour fallback: {event_start_time}")
+                    
+                except Exception as e:
+                    logger.warning(f"Error parsing commence time '{commence_time}': {e}")
+                    # Fallback: use current time + 24 hours
+                    current_time = datetime.now()
+                    event_start_time = (current_time + timedelta(hours=24)).isoformat()
+                    logger.info(f"Using 24-hour fallback event start time: {event_start_time}")
+                
                 break
         
         # DETECT FIGHTER CHANGES BEFORE MATCHING ODDS
@@ -1180,7 +1238,7 @@ def main():
     # Add odds if requested and extract event start time
     event_start_time = None
     if not args.no_odds:
-        enriched_matchups, event_start_time = add_odds_to_matchups(enriched_matchups)
+        enriched_matchups, event_start_time = add_odds_to_matchups(enriched_matchups, event)
     
     # Create the final event data structure
     event_data = {

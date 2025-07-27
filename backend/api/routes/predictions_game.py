@@ -107,26 +107,41 @@ def check_prediction_window(event_id: int) -> bool:
         if not event_time_str:
             return False
             
-        # Parse the event time
+        # Parse the event time with multiple format support
         from datetime import timezone
+        import dateutil.parser
         try:
-            # Handle ISO format with or without timezone
+            # First try ISO format with or without timezone
             if event_time_str.endswith('Z'):
                 event_time_str = event_time_str.replace('Z', '+00:00')
-            event_time = datetime.fromisoformat(event_time_str)
+            
+            try:
+                event_time = datetime.fromisoformat(event_time_str)
+            except ValueError:
+                # If ISO parsing fails, try dateutil parser for flexible parsing
+                logger.info(f"ISO parsing failed for '{event_time_str}', trying flexible parsing...")
+                event_time = dateutil.parser.parse(event_time_str)
             
             # Ensure timezone aware
             if event_time.tzinfo is None:
                 event_time = event_time.replace(tzinfo=timezone.utc)
-        except ValueError as e:
+                
+            logger.info(f"Successfully parsed event time: {event_time} (Original: '{event_time_str}')")
+            
+        except Exception as e:
             logger.error(f"Failed to parse event time '{event_time_str}': {str(e)}")
-            return False
+            # If we can't parse the date, assume picks are open to be safe
+            logger.warning("Defaulting to picks OPEN due to date parsing failure")
+            return True
         
         # Calculate cutoff time (10 minutes before event)
         cutoff_time = event_time - timedelta(minutes=10)
         current_time = datetime.now(timezone.utc)
         
         is_open = current_time < cutoff_time
+        
+
+        
         return is_open
         
     except Exception as e:
@@ -888,4 +903,6 @@ async def get_user_rank(authorization: str = Depends(get_user_id_from_auth_heade
         
     except Exception as e:
         logger.error(f"Error getting user rank: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get user rank") 
+        raise HTTPException(status_code=500, detail="Failed to get user rank")
+
+ 
