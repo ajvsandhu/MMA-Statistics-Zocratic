@@ -168,7 +168,7 @@ export function UsernameInput({
           size="sm"
           onClick={handleGenerateRandom}
           disabled={disabled}
-          className="text-xs text-primary hover:text-primary/80 h-6 px-2 py-1"
+          className="text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 h-6 px-2 py-1 transition-colors"
         >
           <RefreshCw className="h-3 w-3 mr-1" />
           Generate Random Username
