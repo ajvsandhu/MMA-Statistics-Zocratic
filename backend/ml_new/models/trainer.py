@@ -288,71 +288,13 @@ class UFCTrainer:
             raise RuntimeError("Database connection failed")
         
         try:
-            # Build query for metadata
-            query = supabase.table('ml_models').select('*').eq('model_name', model_name)
+            # Use direct bucket loading since ml_models table doesn't exist
+            logger.info("🔄 Loading latest model directly from bucket...")
+            return self.load_latest_model_from_bucket_direct()
             
-            if model_version:
-                query = query.eq('model_version', model_version)
-            else:
-                # Get the active model
-                query = query.eq('is_active', True)
-            
-            # Order by creation date (newest first)
-            query = query.order('created_at', desc=True).limit(1)
-            
-            response = query.execute()
-            
-            if not response.data:
-                logger.warning(f"No model found with name '{model_name}' in ml_models table" + 
-                             (f" version '{model_version}'" if model_version else ""))
-                logger.info("🔄 Attempting to load latest model directly from bucket...")
-                return self.load_latest_model_from_bucket_direct()
-            
-            model_record = response.data[0]
-            bucket_path = model_record['bucket_path']
-            
-            # Download from bucket
-            file_response = supabase.storage.from_('ml-models').download(bucket_path)
-            
-            if not file_response:
-                raise RuntimeError(f"Failed to download model from bucket: {bucket_path}")
-            
-            # Create temporary file and load model
-            with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as temp_file:
-                temp_file.write(file_response)
-                temp_file_path = temp_file.name
-            
-            try:
-                # Load model data
-                model_data = joblib.load(temp_file_path)
-                
-                # Set trainer attributes
-                self.model = model_data['model']
-                self.scaler = model_data['scaler']
-                self.features = model_data['features']
-                
-                logger.info(f"✅ Model '{model_name}' v{model_record['model_version']} loaded from bucket")
-                logger.info(f"📁 File size: {model_record['file_size'] / 1024 / 1024:.2f} MB")
-                
-                return model_record
-                
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-                
         except Exception as e:
             logger.error(f"❌ Error loading model from bucket: {str(e)}")
-            # If database lookup fails, try direct bucket listing as fallback
-            if "No model found with name" in str(e):
-                logger.info("🔄 Attempting to load latest model directly from bucket as fallback...")
-                try:
-                    return self.load_latest_model_from_bucket_direct()
-                except Exception as fallback_error:
-                    logger.error(f"❌ Fallback method also failed: {str(fallback_error)}")
-                    raise fallback_error
-            else:
-                raise
+            raise
 
     def save_model(self, model_path):
         """Save model, scaler and features to disk."""

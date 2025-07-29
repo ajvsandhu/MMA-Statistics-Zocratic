@@ -371,7 +371,7 @@ def check_prediction_window(event_id: int) -> bool:
         is_open = current_time < cutoff_time
         
 
-        
+            
         return is_open
         
     except Exception as e:
@@ -1363,9 +1363,10 @@ async def get_leaderboard():
                 user_active_picks[user_id] = 0
             user_active_picks[user_id] += pick['stake']
         
-        # Get all picks for stats
+        # Get all picks for stats (excluding refunded bets)
         all_picks_response = supabase.table('bets')\
             .select('user_id, status')\
+            .neq('status', 'refunded')\
             .execute()
         
         # Group picks by user_id and status
@@ -1442,10 +1443,16 @@ async def get_leaderboard():
         for i, user in enumerate(leaderboard_data):
             user['rank'] = i + 1
         
+        # Calculate global statistics (excluding refunded bets)
+        total_picks = sum(stats['total'] for stats in user_pick_stats.values())
+        total_wagered = sum(account['total_wagered'] for account in accounts_response.data)
+        
         return JSONResponse(content={
             "success": True,
             "leaderboard": leaderboard_data,
-            "total_users": len(leaderboard_data)
+            "total_users": len(leaderboard_data),
+            "total_picks": total_picks,
+            "total_wagered": total_wagered
         })
         
     except Exception as e:
@@ -1489,8 +1496,7 @@ async def get_user_rank(authorization: str = Depends(get_user_id_from_auth_heade
         active_picks_value = sum(pick['stake'] for pick in active_picks_response.data or [])
         user_portfolio_value = account['balance'] + active_picks_value
         
-        # Efficiently calculate rank using a single query with aggregation
-        # Get all users' portfolio values to calculate rank
+        # Get all users' portfolio values to calculate rank (same logic as leaderboard)
         all_accounts_response = supabase.table('coin_accounts')\
             .select('user_id, balance')\
             .execute()
@@ -1509,21 +1515,26 @@ async def get_user_rank(authorization: str = Depends(get_user_id_from_auth_heade
                 user_active_totals[user_id_key] = 0
             user_active_totals[user_id_key] += pick['stake']
         
-        # Calculate all portfolio values
-        all_portfolio_values = []
-        higher_portfolio_count = 0
+        # Calculate all portfolio values and create ranking data
+        all_portfolio_data = []
         
         for acc in all_accounts_response.data or []:
             other_active_value = user_active_totals.get(acc['user_id'], 0)
             other_portfolio = acc['balance'] + other_active_value
-            all_portfolio_values.append(other_portfolio)
-            
-            # Count how many users have higher portfolio value
-            if other_portfolio > user_portfolio_value:
-                higher_portfolio_count += 1
+            all_portfolio_data.append({
+                'user_id': acc['user_id'],
+                'portfolio_value': other_portfolio
+            })
         
-        # Current rank is count of higher portfolios + 1
-        current_rank = higher_portfolio_count + 1 if user_portfolio_value > 0 else None
+        # Sort by portfolio value (descending) and assign ranks (same as leaderboard)
+        all_portfolio_data.sort(key=lambda x: x['portfolio_value'], reverse=True)
+        
+        # Find current user's rank
+        current_rank = None
+        for i, user_data in enumerate(all_portfolio_data):
+            if user_data['user_id'] == user_id:
+                current_rank = i + 1
+                break
         
         # For now, highest rank = current rank (you could store this in a separate table)
         highest_rank = current_rank
@@ -1533,11 +1544,79 @@ async def get_user_rank(authorization: str = Depends(get_user_id_from_auth_heade
             "current_rank": current_rank,
             "highest_rank": highest_rank,
             "portfolio_value": user_portfolio_value,
-            "total_users": len(all_portfolio_values)
+            "total_users": len(all_portfolio_data)
         })
         
     except Exception as e:
         logger.error(f"Error getting user rank: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to get user rank")
+        raise HTTPException(status_code=500, detail="Failed to get user rank") 
+
+@router.post("/admin/run-scraper")
+@limiter.limit("5/minute")  # Rate limit for scraper runs
+async def run_scraper_with_admin(
+    request: Request,
+    authorization: str = Depends(get_admin_user_simple if USE_SIMPLE_AUTH else get_admin_user_from_auth_header)
+):
+    """
+    Run the upcoming event scraper with admin privileges to process refunds.
+    This endpoint allows admins to trigger the scraper with proper authentication.
+    """
+    try:
+        import subprocess
+        import sys
+        import os
+        from pathlib import Path
+        
+        # Get the admin token from the request body
+        body = await request.json()
+        admin_token = body.get('admin_token')
+        
+        if not admin_token:
+            raise HTTPException(status_code=400, detail="Admin token required")
+        
+        # Get the project root directory
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        scraper_path = project_root / "scripts" / "scrapers" / "upcoming_event_scraper.py"
+        
+        if not scraper_path.exists():
+            raise HTTPException(status_code=500, detail="Scraper script not found")
+        
+        # Run the scraper with admin token
+        cmd = [
+            sys.executable,
+            str(scraper_path),
+            "--admin-token",
+            admin_token
+        ]
+        
+        logger.info("Running scraper with admin privileges...")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=project_root,
+            timeout=300  # 5 minute timeout
+        )
+        
+        if result.returncode == 0:
+            logger.info("Scraper completed successfully")
+            return {
+                "success": True,
+                "message": "Scraper completed successfully",
+                "output": result.stdout
+            }
+        else:
+            logger.error(f"Scraper failed: {result.stderr}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Scraper failed: {result.stderr}"
+            )
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Scraper timed out")
+        raise HTTPException(status_code=408, detail="Scraper timed out")
+    except Exception as e:
+        logger.error(f"Error running scraper: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to run scraper: {str(e)}") 
 
  

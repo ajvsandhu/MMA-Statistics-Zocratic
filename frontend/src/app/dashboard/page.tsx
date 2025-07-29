@@ -168,15 +168,16 @@ export default function DashboardPage() {
     }
   };
 
-  // Calculate statistics
+  // Calculate statistics (excluding refunded bets)
+  const validPicks = picks.filter(p => p.status !== 'refunded');
   const stats = {
-    totalBets: picks.length,
-    activeBets: picks.filter(p => p.status === 'pending').length,
-    wonBets: picks.filter(p => p.status === 'won').length,
-    lostBets: picks.filter(p => p.status === 'lost').length,
-    winRate: picks.length > 0 ? ((picks.filter(p => p.status === 'won').length / picks.filter(p => p.status !== 'pending').length) * 100) : 0,
-    totalPotentialPayout: picks.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.potential_payout, 0),
-    avgStake: picks.length > 0 ? picks.reduce((sum, p) => sum + p.stake, 0) / picks.length : 0,
+    totalBets: validPicks.length,
+    activeBets: validPicks.filter(p => p.status === 'pending').length,
+    wonBets: validPicks.filter(p => p.status === 'won').length,
+    lostBets: validPicks.filter(p => p.status === 'lost').length,
+    winRate: validPicks.length > 0 ? ((validPicks.filter(p => p.status === 'won').length / validPicks.filter(p => p.status !== 'pending').length) * 100) : 0,
+    totalPotentialPayout: validPicks.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.potential_payout, 0),
+    avgStake: validPicks.length > 0 ? validPicks.reduce((sum, p) => sum + p.stake, 0) / validPicks.length : 0,
     profitLoss: (balance?.total_won || 0) - (balance?.total_lost || 0),
     roi: (balance?.total_wagered || 0) > 0 ? (((balance?.total_won || 0) - (balance?.total_lost || 0)) / (balance?.total_wagered || 0)) * 100 : 0
   };
@@ -445,8 +446,17 @@ export default function DashboardPage() {
                       </div>
                       <div className="text-right space-y-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant={pick.status === 'won' ? 'default' : pick.status === 'lost' ? 'destructive' : 'secondary'}>
-                            {pick.status === 'pending' ? 'Active' : pick.status === 'won' ? 'Won' : 'Lost'}
+                          <Badge variant={
+                            pick.status === 'won' ? 'default' : 
+                            pick.status === 'lost' ? 'destructive' : 
+                            pick.status === 'refunded' ? 'outline' : 
+                            'secondary'
+                          }>
+                            {pick.status === 'pending' ? 'Active' : 
+                             pick.status === 'won' ? 'Won' : 
+                             pick.status === 'lost' ? 'Lost' : 
+                             pick.status === 'refunded' ? 'Voided' : 
+                             'Unknown'}
                           </Badge>
                           <span className="font-medium">{formatCurrency(pick.stake)}</span>
                         </div>

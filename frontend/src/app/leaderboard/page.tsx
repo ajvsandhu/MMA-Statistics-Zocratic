@@ -1,26 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { createPortal } from 'react-dom';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
   Trophy, 
-  Medal, 
-  Award,
   Crown,
-  TrendingUp,
   Users,
-  Target,
-  Coins,
   Activity,
   Star,
-  ChevronUp,
-  ChevronDown,
+  TrendingUp,
+  Target,
+  Coins,
+  X,
+  Calendar,
+  Award,
   Sparkles,
-  Flame
+  Flame,
+  Zap
 } from 'lucide-react';
 import { ENDPOINTS } from '@/lib/api-config';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/hooks/use-auth';
 
 interface LeaderboardUser {
   rank: number;
@@ -38,27 +41,336 @@ interface LeaderboardUser {
   roi: number;
   total_picks: number;
   member_since: string;
+  highest_rank?: number;
+  rank_change?: 'up' | 'down' | 'same';
 }
 
-export default function LeaderboardPage() {
+// User Profile Modal Component
+const UserProfileModal = ({ user, isOpen, onClose }: { 
+  user: LeaderboardUser | null, 
+  isOpen: boolean, 
+  onClose: () => void 
+}) => {
+  const [activePicks, setActivePicks] = useState<any[]>([]);
+  const [loadingPicks, setLoadingPicks] = useState(false);
+  const { isAuthenticated, getAuthHeaders, userProfile } = useAuth();
+
+  // Check if this is the current user's profile
+  const isOwnProfile = userProfile && user && userProfile.email === user.email;
+
+  // Fetch user's active picks - MOVED BEFORE EARLY RETURN TO FIX HOOKS ERROR
+  const fetchActivePicks = async () => {
+    try {
+      setLoadingPicks(true);
+      
+      // Only fetch picks if user is authenticated AND viewing their own profile
+      if (!isAuthenticated || !isOwnProfile) {
+        setActivePicks([]);
+        return;
+      }
+
+      const headers = getAuthHeaders();
+      let response = await fetch(`${ENDPOINTS.MY_PICKS}?limit=100`, {
+        headers,
+        method: 'GET'
+      });
+      
+      if (!response.ok) {
+        console.log(`Active picks fetch failed, status: ${response.status}`);
+        setActivePicks([]);
+        return;
+      }
+      
+      const data = await response.json();
+      // Filter for pending (active) picks only
+      const pendingPicks = (data || []).filter((pick: any) => pick.status === 'pending');
+      setActivePicks(pendingPicks);
+    } catch (error) {
+      console.log('Active picks not available:', error);
+      setActivePicks([]);
+    } finally {
+      setLoadingPicks(false);
+    }
+  };
+
+  // Fetch picks when user changes - HOOKS MUST BE CALLED IN SAME ORDER EVERY RENDER
+  useEffect(() => {
+    if (user && isOpen) {
+      fetchActivePicks();
+    } else {
+      setActivePicks([]);
+      setLoadingPicks(false);
+    }
+  }, [user?.user_id, isOpen, isAuthenticated, isOwnProfile]);
+
+  if (!user) return null;
+
+  const formatCurrency = (amount: number) => `${amount.toLocaleString()} coins`;
+  const formatPercentage = (percent: number) => `${percent.toFixed(1)}%`;
+  const getDisplayName = (user: LeaderboardUser) => {
+    return user.display_name || user.username || user.email.split('@')[0];
+  };
+  const getUserInitials = (email: string, displayName?: string, username?: string) => {
+    if (displayName) {
+      return displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (username && username !== email.split('@')[0]) {
+      return username.slice(0, 2).toUpperCase();
+    }
+    return email.split('@')[0].slice(0, 2).toUpperCase();
+  };
+
+  // Modal content
+  const modalContent = (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[99999] overflow-hidden" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}>
+          {/* Full viewport backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 w-full h-full bg-black/80 backdrop-blur-lg"
+            onClick={onClose}
+          />
+          
+          {/* Modal Container */}
+          <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="pointer-events-auto relative z-10"
+            >
+              <Card className="w-full max-w-2xl bg-background/98 backdrop-blur-xl border border-primary/20 shadow-2xl max-h-[90vh] overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="max-h-[90vh] overflow-y-auto">
+                    <div className="p-6">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-lg font-bold text-primary-foreground">
+                            {getUserInitials(user.email, user.display_name, user.username)}
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold">{getDisplayName(user)}</h3>
+                            <Badge variant="outline" className="text-xs">
+                              Rank #{user.rank}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={onClose}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="space-y-4 mb-6">
+                        {/* Portfolio Value */}
+                        <div className="text-center p-4 rounded-lg bg-primary/5 border border-primary/20">
+                          <div className="text-2xl font-bold text-primary">
+                            {formatCurrency(user.portfolio_value)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Portfolio Value</div>
+                        </div>
+
+                        {/* Performance Stats */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="text-center p-3 rounded-lg bg-background border">
+                            <div className="text-lg font-bold text-green-600">
+                              {formatPercentage(user.win_rate)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Win Rate</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-background border">
+                            <div className="text-lg font-bold">{user.total_picks}</div>
+                            <div className="text-xs text-muted-foreground">Total Picks</div>
+                          </div>
+                        </div>
+
+                        {/* Achievement & Financial Stats */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="text-center p-3 rounded-lg bg-background border">
+                            <div className="text-sm font-bold text-yellow-600 flex items-center justify-center gap-1">
+                              <Trophy className="w-3 h-3" />
+                              #{user.highest_rank || user.rank}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Best Rank</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-background border">
+                            <div className="text-sm font-bold text-blue-600">
+                              {formatCurrency(user.total_won)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Total Won</div>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-background border">
+                            <div className="text-sm font-bold text-orange-600">
+                              {formatCurrency(user.total_invested)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Invested</div>
+                          </div>
+                        </div>
+
+                        {/* Member Since */}
+                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>Member since {new Date(user.member_since).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Active Picks Section */}
+                      <div className="border-t pt-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Target className="h-5 w-5 text-primary" />
+                          <h4 className="text-lg font-semibold">Active Picks</h4>
+                          {activePicks.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {activePicks.length}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {loadingPicks ? (
+                          <div className="space-y-3">
+                            {[...Array(3)].map((_, i) => (
+                              <div key={i} className="animate-pulse">
+                                <div className="h-16 bg-muted rounded-lg"></div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : !isOwnProfile ? (
+                          <div className="text-center py-6 text-muted-foreground">
+                            <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Private Information</p>
+                            <p className="text-xs">Active picks are only visible on your own profile</p>
+                          </div>
+                        ) : activePicks.length > 0 ? (
+                          <div className="space-y-3 max-h-60 overflow-y-auto">
+                            {activePicks.map((pick, index) => (
+                              <div key={index} className="p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="font-medium text-sm truncate">
+                                    {pick.fighter_name}
+                                  </div>
+                                  <Badge variant="secondary" className="text-xs">
+                                    Active
+                                  </Badge>
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                                  <span>
+                                    {pick.created_at ? new Date(pick.created_at).toLocaleDateString() : 'Recently placed'}
+                                  </span>
+                                  <span>
+                                    Odds: {pick.odds_american ? (pick.odds_american > 0 ? `+${pick.odds_american}` : pick.odds_american) : 'TBD'}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center justify-between">
+                                  <div className="text-sm">
+                                    <span className="font-medium">Stake: {pick.stake ? `${pick.stake} coins` : 'N/A'}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-sm font-bold text-green-600">
+                                      Potential: {pick.potential_payout ? `${Math.round(pick.potential_payout)} coins` : 'TBD'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 text-muted-foreground">
+                            <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No active picks</p>
+                            <p className="text-xs">You haven't placed any picks yet</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+
+  return createPortal(modalContent, document.body);
+};
+
+export default function P4PLeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [previousRanks, setPreviousRanks] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // Separate state for background refresh
   const [error, setError] = useState<string | null>(null);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchLeaderboard();
+    
+    // Auto-refresh every 2 minutes to keep data current
+    const refreshInterval = setInterval(() => {
+      fetchLeaderboard(true); // Silent refresh
+    }, 120000); // 2 minutes
+
+    return () => clearInterval(refreshInterval);
   }, []);
 
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = async (silentRefresh = false) => {
     try {
+      if (!silentRefresh) {
       setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+      
       const response = await fetch(ENDPOINTS.LEADERBOARD);
       
       if (response.ok) {
         const data = await response.json();
-        setLeaderboard(data.leaderboard || []);
+        const newLeaderboard = data.leaderboard || [];
+        
+        // Calculate rank changes and highest ranks
+        const updatedLeaderboard = newLeaderboard.map((user: LeaderboardUser) => {
+          const previousRank = previousRanks.get(user.user_id);
+          let rank_change: 'up' | 'down' | 'same' = 'same';
+          
+          if (previousRank !== undefined) {
+            if (user.rank < previousRank) {
+              rank_change = 'up';
+            } else if (user.rank > previousRank) {
+              rank_change = 'down';
+            }
+          }
+          
+          // Calculate highest rank (lowest number = highest rank)
+          const currentHighest = user.highest_rank || user.rank;
+          const highest_rank = Math.min(currentHighest, user.rank);
+          
+          return {
+            ...user,
+            rank_change,
+            highest_rank
+          };
+        });
+        
+        // Update previous ranks for next comparison
+        const newPreviousRanks = new Map();
+        updatedLeaderboard.forEach((user: LeaderboardUser) => {
+          newPreviousRanks.set(user.user_id, user.rank);
+        });
+        setPreviousRanks(newPreviousRanks);
+        
+        setLeaderboard(updatedLeaderboard);
         setTotalUsers(data.total_users || 0);
+        setLastUpdated(new Date());
+        setError(null);
       } else {
         setError('Failed to load leaderboard');
       }
@@ -67,6 +379,7 @@ export default function LeaderboardPage() {
       console.error('Leaderboard error:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -87,239 +400,398 @@ export default function LeaderboardPage() {
     return user.display_name || user.username || user.email.split('@')[0];
   };
 
-  const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return <Crown className="w-7 h-7 text-yellow-500" />;
-      case 2:
-        return <Medal className="w-7 h-7 text-gray-400" />;
-      case 3:
-        return <Award className="w-7 h-7 text-amber-600" />;
-      default:
-        return <span className="w-7 h-7 flex items-center justify-center text-lg font-bold text-muted-foreground">#{rank}</span>;
-    }
+  const openUserProfile = (user: LeaderboardUser) => {
+    setSelectedUser(user);
   };
-
-  const getRankBadgeColor = (rank: number) => {
-    if (rank === 1) return "bg-gradient-to-r from-yellow-400 to-yellow-600 text-black shadow-lg";
-    if (rank === 2) return "bg-gradient-to-r from-gray-300 to-gray-500 text-black shadow-lg";
-    if (rank === 3) return "bg-gradient-to-r from-amber-400 to-amber-600 text-black shadow-lg";
-    if (rank <= 10) return "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md";
-    return "bg-gradient-to-r from-gray-600 to-gray-800 text-white";
-  };
-
-  const getTopThree = () => leaderboard.slice(0, 3);
-  const getRestOfLeaderboard = () => leaderboard.slice(3);
 
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-12">
         <div className="animate-pulse space-y-8">
-          <div className="h-12 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded-2xl w-1/2 mx-auto"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-72 bg-gradient-to-br from-gray-200 to-gray-300 rounded-2xl"></div>
-            ))}
-          </div>
+          <div className="h-12 bg-muted rounded-2xl w-1/2 mx-auto"></div>
+          <div className="h-80 bg-muted rounded-2xl"></div>
         </div>
       </div>
     );
   }
 
+  const topThree = leaderboard.slice(0, 3);
+  const restOfUsers = leaderboard.slice(3);
+
   return (
     <div className="container mx-auto px-4 py-12 space-y-12">
       {/* Header */}
-      <div className="text-center space-y-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-center gap-4">
-            <Trophy className="w-10 h-10 text-yellow-500" />
-            <h1 className="text-5xl md:text-6xl font-thin text-foreground">
-              Global Leaderboard
+      <div className="text-center space-y-4 sm:space-y-6 px-4">
+        <div className="flex items-center justify-center gap-2 sm:gap-4">
+          <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-500" />
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-light tracking-tight">
+            P4P Leaderboard
             </h1>
-            <Trophy className="w-10 h-10 text-yellow-500" />
-          </div>
-          <div className="w-24 h-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full mx-auto"></div>
+          <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-500" />
         </div>
-        <p className="text-xl text-muted-foreground leading-relaxed max-w-3xl mx-auto">
+        <p className="text-base sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
           Elite traders ranked by total portfolio value (balance + active picks)
         </p>
-        <div className="flex items-center justify-center gap-8 text-sm">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20">
-            <Users className="w-5 h-5 text-blue-600" />
-            <span className="font-medium">{totalUsers} active traders</span>
-          </div>
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
-            <Activity className="w-5 h-5 text-green-600" />
-            <span className="font-medium">Updated live</span>
-          </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
+          <Badge variant="outline" className="flex items-center gap-2 text-xs sm:text-sm">
+            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            {totalUsers} active traders
+          </Badge>
+          <Badge variant="outline" className="flex items-center gap-2 text-xs sm:text-sm">
+            <Activity className={`w-3 h-3 sm:w-4 sm:h-4 ${refreshing ? 'animate-spin' : 'animate-pulse'}`} />
+            {refreshing ? 'Updating...' : 'Updated live'}
+          </Badge>
         </div>
       </div>
 
-      {/* Top 3 Podium */}
-      {getTopThree().length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8 mb-8 sm:mb-10 md:mb-12">
-          {getTopThree().map((user, index) => {
-            const actualRank = user.rank;
-            const podiumOrder = [1, 0, 2];
-            const podiumIndex = podiumOrder.indexOf(index);
-            const height = podiumIndex === 1 ? 'h-72 sm:h-80 md:h-96' : podiumIndex === 0 ? 'h-64 sm:h-72 md:h-80' : 'h-56 sm:h-64 md:h-72';
-            
-            return (
-              <Card key={user.user_id} className={`${height} relative overflow-hidden group transition-all duration-500 hover:shadow-2xl bg-card/50 backdrop-blur-sm border-primary/20 ${
-                actualRank === 1 ? 'border-primary shadow-primary/20' : 
-                actualRank === 2 ? 'border-muted-foreground/40 shadow-muted-foreground/10' : 
-                'border-secondary shadow-secondary/20'
-              }`}>
-                <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity duration-500 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20"></div>
+      {/* Podium */}
+      {topThree.length > 0 && (
+        <div className="relative mb-12">
+          {/* Championship Background Effects */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-yellow-500/5 via-yellow-500/2 to-transparent rounded-full blur-3xl"></div>
+            <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl animate-pulse"></div>
+            <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-gradient-to-bl from-secondary/10 to-transparent rounded-full blur-2xl animate-pulse delay-1000"></div>
+          </div>
 
-                <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 h-full flex flex-col items-center justify-center text-center space-y-1 sm:space-y-2 md:space-y-3 lg:space-y-4 relative z-10">
-                  <div className="relative">
-                    {getRankIcon(actualRank)}
-                    {actualRank === 1 && (
-                      <>
-                        <div className="absolute -top-2 -right-2">
-                          <Sparkles className="w-5 h-5 text-yellow-400 fill-current animate-pulse" />
+          {/* Podium Platform - Fixed 3-Column Grid Layout */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-8 px-4 w-full max-w-4xl mx-auto">
+            
+            {/* 2nd Place - Always in LEFT column */}
+            <div className="flex justify-center items-end">
+              {topThree[1] ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 100, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ delay: 0.4, type: "spring", bounce: 0.4, duration: 0.8 }}
+                  className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
+                  onClick={() => openUserProfile(topThree[1])}
+                >
+                  {/* Climbing Effect */}
+                  <motion.div
+                    animate={{ y: [0, -5, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="text-center mb-3 sm:mb-4 relative"
+                  >
+                    {/* Silver Glow - NO SCALING TO PREVENT BLUR */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-gray-300/20 to-gray-500/20 blur-lg opacity-100 group-hover:opacity-100"></div>
+                    
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 flex items-center justify-center text-lg sm:text-xl font-bold text-black mb-2 shadow-xl ring-2 ring-gray-400/30 group-hover:ring-4 group-hover:ring-gray-400/60 group-hover:shadow-2xl transition-all duration-300">
+                      {getUserInitials(topThree[1].email, topThree[1].display_name, topThree[1].username)}
+                      
+                      {/* Sparkling Effects */}
+                      <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-gray-300 animate-pulse" />
+                    </div>
+
+                    <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors truncate max-w-[80px] sm:max-w-none">
+                      {getDisplayName(topThree[1])}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                      {formatCurrency(topThree[1].portfolio_value)}
+                    </p>
+                  </motion.div>
+
+                  {/* Silver Podium Platform - Medium Height */}
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    animate={{ height: "80px" }}
+                    transition={{ delay: 0.8, duration: 0.6, ease: "easeOut" }}
+                    className="w-20 sm:w-32 bg-gradient-to-t from-gray-400 via-gray-300 to-gray-200 rounded-t-xl flex flex-col items-center justify-start pt-2 sm:pt-3 border-2 border-gray-500/30 shadow-xl relative overflow-hidden"
+                    style={{ height: "80px" }}
+                  >
+                    <Badge className="bg-gray-300 text-black font-bold text-xs sm:text-sm shadow-lg relative z-10">
+                      2nd
+                    </Badge>
+                    
+                    {/* Ladder Rungs Effect - Behind text */}
+                    <div className="absolute bottom-0 left-0 right-0 space-y-2 z-0">
+                      <div className="h-0.5 bg-gray-500/30 mx-2"></div>
+                      <div className="h-0.5 bg-gray-500/20 mx-2"></div>
+                      <div className="h-0.5 bg-gray-500/15 mx-2"></div>
                         </div>
-                        <div className="absolute -bottom-1 -left-1">
-                          <Flame className="w-4 h-4 text-orange-500 fill-current" />
+                  </motion.div>
+                </motion.div>
+              ) : (
+                <div className="opacity-0 w-full max-w-[200px]">
+                  {/* Empty space placeholder for 2nd place */}
                         </div>
-                      </>
                     )}
                   </div>
 
-                  <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl ${getRankBadgeColor(actualRank)} flex items-center justify-center text-sm sm:text-base md:text-lg font-bold group-hover:scale-110 transition-transform duration-300`}>
-                    {getUserInitials(user.email, user.display_name, user.username)}
+            {/* 1st Place - Always in CENTER column */}
+            <div className="flex justify-center items-end">
+              {topThree[0] && (
+                <motion.div
+                  initial={{ opacity: 0, y: 150, scale: 0.7 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", bounce: 0.5, duration: 1 }}
+                  className="flex flex-col items-center cursor-pointer group relative z-10 w-full max-w-[240px]"
+                  onClick={() => openUserProfile(topThree[0])}
+                >
+                  {/* Champion Floating Effect */}
+                  <motion.div
+                    animate={{ y: [0, -8, 0], rotate: [0, 1, -1, 0] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="text-center mb-3 sm:mb-4 relative"
+                  >
+                    {/* Royal Aura - NO SCALING TO PREVENT BLUR */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-yellow-400/30 via-yellow-500/40 to-yellow-600/30 blur-2xl opacity-100 group-hover:opacity-100 animate-pulse"></div>
+                    
+                    {/* Crown */}
+                    <motion.div 
+                      animate={{ rotate: [0, 5, -5, 0] }}
+                      transition={{ duration: 3, repeat: Infinity }}
+                      className="absolute -top-2 sm:-top-3 left-1/2 transform -translate-x-1/2"
+                    >
+                      <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500 drop-shadow-xl" />
+                    </motion.div>
+
+                    {/* Champion Sparkles */}
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                      className="absolute inset-0"
+                    >
+                      <Sparkles className="absolute -top-2 -right-2 w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 animate-pulse" />
+                      <Zap className="absolute -bottom-1 -left-1 w-3 h-3 sm:w-4 sm:h-4 text-orange-500" />
+                      <Star className="absolute top-1/2 -right-3 w-2 h-2 sm:w-3 sm:h-3 text-yellow-300 animate-ping" />
+                    </motion.div>
+                    
+                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-400 to-yellow-600 flex items-center justify-center text-xl sm:text-2xl font-bold text-black mb-2 shadow-2xl ring-4 ring-yellow-500/50 group-hover:ring-6 group-hover:ring-yellow-400/80 group-hover:shadow-yellow-500/40 transition-all duration-300 border-2 border-yellow-200">
+                      {getUserInitials(topThree[0].email, topThree[0].display_name, topThree[0].username)}
+                      
+                      {/* Inner Glow */}
+                      <div className="absolute inset-1 rounded-full bg-gradient-to-br from-yellow-200/30 to-transparent"></div>
                   </div>
 
-                                     <div className="space-y-0.5 sm:space-y-1 w-full">
-                     <h3 className="font-bold text-xs sm:text-sm md:text-base lg:text-lg leading-tight truncate px-1 sm:px-2">
-                       {getDisplayName(user)}
+                    <h3 className="font-bold text-base sm:text-xl group-hover:text-primary transition-colors text-center">
+                      👑 {getDisplayName(topThree[0])}
                      </h3>
-                     <Badge className={`${getRankBadgeColor(actualRank)} font-bold px-1 sm:px-2 py-0.5 text-[9px] sm:text-[10px] md:text-xs`}>
-                       #{actualRank} Champion
+                    <p className="text-sm text-muted-foreground font-medium">
+                      {formatCurrency(topThree[0].portfolio_value)}
+                    </p>
+                    
+                    {/* Champion Title */}
+                    <Badge className="mt-1 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold text-xs border-yellow-300 shadow-lg">
+                      CHAMPION
+                    </Badge>
+                  </motion.div>
+
+                  {/* Gold Podium Platform - Tallest */}
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    animate={{ height: "120px" }}
+                    transition={{ delay: 0.6, duration: 0.8, ease: "easeOut" }}
+                    className="w-24 sm:w-36 bg-gradient-to-t from-yellow-500 via-yellow-400 to-yellow-300 rounded-t-xl flex flex-col items-center justify-start pt-2 sm:pt-3 border-2 border-yellow-600/50 shadow-2xl relative overflow-hidden"
+                    style={{ height: "120px" }}
+                  >
+                    <Badge className="bg-yellow-400 text-black font-bold text-sm sm:text-lg shadow-xl border border-yellow-600 relative z-10">
+                      1st
                      </Badge>
+                    
+                    {/* Royal Ladder Rungs - Behind text */}
+                    <div className="absolute bottom-0 left-0 right-0 space-y-1.5 z-0">
+                      <div className="h-0.5 bg-yellow-600/40 mx-2"></div>
+                      <div className="h-0.5 bg-yellow-600/30 mx-2"></div>
+                      <div className="h-0.5 bg-yellow-600/20 mx-2"></div>
+                      <div className="h-0.5 bg-yellow-600/15 mx-2"></div>
+                      <div className="h-0.5 bg-yellow-600/10 mx-2"></div>
                    </div>
 
-                   <div className="space-y-0.5 sm:space-y-1">
-                     <div className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-primary leading-tight">
-                       {formatCurrency(user.portfolio_value)}
+                    {/* Throne Effect */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-yellow-600/20 to-transparent"></div>
+                  </motion.div>
+                </motion.div>
+              )}
                      </div>
-                     <div className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground font-medium">
-                       Portfolio Value
+
+            {/* 3rd Place - Always in RIGHT column */}
+            <div className="flex justify-center items-end">
+              {topThree[2] ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 80, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ delay: 0.6, type: "spring", bounce: 0.3, duration: 0.7 }}
+                  className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
+                  onClick={() => openUserProfile(topThree[2])}
+                >
+                  {/* Bronze Climbing Effect */}
+                  <motion.div
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                    className="text-center mb-3 sm:mb-4 relative"
+                  >
+                    {/* Bronze Glow - NO SCALING TO PREVENT BLUR */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400/20 to-amber-600/20 blur-lg opacity-100 group-hover:opacity-100"></div>
+                    
+                    <div className="relative mx-auto w-14 h-14 sm:w-18 sm:h-18 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center text-sm sm:text-lg font-bold text-black mb-2 shadow-lg ring-2 ring-amber-500/30 group-hover:ring-4 group-hover:ring-amber-500/60 group-hover:shadow-2xl transition-all duration-300">
+                      {getUserInitials(topThree[2].email, topThree[2].display_name, topThree[2].username)}
+                      
+                      {/* Bronze Effects */}
+                      <Star className="pointer-events-none absolute -top-1 -right-1 w-3 h-3 text-amber-300 animate-pulse" />
+                   </div>
+
+                    <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors truncate max-w-[70px] sm:max-w-none">
+                      {getDisplayName(topThree[2])}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                      {formatCurrency(topThree[2].portfolio_value)}
+                    </p>
+                  </motion.div>
+
+                  {/* Bronze Podium Platform - Shortest */}
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    animate={{ height: "50px" }}
+                    transition={{ delay: 1, duration: 0.5, ease: "easeOut" }}
+                    className="w-18 sm:w-28 bg-gradient-to-t from-amber-500 via-amber-400 to-amber-300 rounded-t-xl flex flex-col items-center justify-start pt-2 sm:pt-3 border-2 border-amber-600/30 shadow-lg relative overflow-hidden"
+                    style={{ height: "50px" }}
+                  >
+                    <Badge className="bg-amber-400 text-black font-bold text-xs sm:text-sm shadow-lg relative z-10">
+                      3rd
+                    </Badge>
+                    
+                    {/* Ladder Rungs Effect - Behind text */}
+                    <div className="absolute bottom-0 left-0 right-0 space-y-2 z-0">
+                      <div className="h-0.5 bg-amber-600/30 mx-2"></div>
+                      <div className="h-0.5 bg-amber-600/20 mx-2"></div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              ) : (
+                <div className="opacity-0 w-full max-w-[200px]">
+                  {/* Empty space placeholder for 3rd place */}
+                     </div>
+              )}
                      </div>
                    </div>
 
-                                     <div className="grid grid-cols-2 gap-1 sm:gap-2 md:gap-3 text-sm w-full px-1 sm:px-2">
-                     <div className="text-center p-0.5 sm:p-1 md:p-2 rounded-lg bg-background/50 backdrop-blur-sm">
-                       <div className="font-semibold text-[10px] sm:text-xs md:text-sm leading-tight">{formatPercentage(user.win_rate)}</div>
-                       <div className="text-muted-foreground text-[8px] sm:text-[9px] md:text-[10px]">Win Rate</div>
-                     </div>
-                     <div className="text-center p-0.5 sm:p-1 md:p-2 rounded-lg bg-background/50 backdrop-blur-sm">
-                       <div className="font-semibold text-[10px] sm:text-xs md:text-sm leading-tight">{user.total_picks}</div>
-                       <div className="text-muted-foreground text-[8px] sm:text-[9px] md:text-[10px]">Total Picks</div>
-                     </div>
-                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          {/* Competitive Message */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.5 }}
+            className="text-center mt-6 sm:mt-8"
+          >
+            <p className="text-sm sm:text-base text-muted-foreground font-medium">
+              🔥 <span className="text-primary font-bold">Climb the ladder</span> and claim your throne! 🔥
+            </p>
+          </motion.div>
         </div>
       )}
 
-      {/* Rest of Leaderboard */}
-      <Card className="bg-card/50 backdrop-blur-sm border border-primary/20 shadow-xl">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-2xl">
-            <Target className="w-6 h-6 text-primary" />
-            Complete Rankings
-          </CardTitle>
-          <CardDescription className="text-base">Elite traders from around the world competing for supremacy</CardDescription>
-        </CardHeader>
+      {/* Rest of Rankings */}
+      {restOfUsers.length > 0 && (
+        <Card className="border border-primary/20 mx-4 sm:mx-0">
         <CardContent className="p-0">
-          <div className="max-h-[700px] overflow-y-auto overflow-x-hidden">
-            {getRestOfLeaderboard().length > 0 ? (
-              <div className="space-y-0">
-                {getRestOfLeaderboard().map((user, index) => (
-                  <div 
+            <div className="p-4 sm:p-6 border-b bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                <h3 className="text-lg sm:text-xl font-semibold">Complete Rankings</h3>
+                <Badge variant="secondary" className="text-xs">
+                  #{restOfUsers.length + 3} fighters climbing
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Every pick counts in the race to the top
+              </p>
+            </div>
+            
+            <div className="max-h-80 sm:max-h-96 overflow-y-auto">
+              {restOfUsers.map((user, index) => (
+                <motion.div 
                     key={user.user_id} 
-                    className="flex items-center justify-between p-3 sm:p-4 md:p-6 border-b last:border-b-0 hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 group"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 md:gap-6 flex-1 min-w-0">
-                      <div className="w-6 sm:w-8 md:w-10 text-center shrink-0">
-                        <span className="font-bold text-sm sm:text-base md:text-xl text-muted-foreground group-hover:text-primary transition-colors">#{user.rank}</span>
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="flex items-center justify-between p-3 sm:p-4 border-b last:border-b-0 hover:bg-muted/30 transition-all cursor-pointer group"
+                  onClick={() => openUserProfile(user)}
+                >
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    {/* Rank with climbing indicator */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="w-6 sm:w-8 text-center font-bold text-sm sm:text-base text-muted-foreground group-hover:text-primary transition-colors">
+                        #{user.rank}
+                      </span>
+                      {/* Rank change indicator */}
+                      {user.rank_change === 'up' && (
+                        <div className="flex items-center">
+                          <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
+                          <span className="text-xs text-green-500 ml-1">↗</span>
+                        </div>
+                      )}
+                      {user.rank_change === 'down' && (
+                        <div className="flex items-center">
+                          <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 rotate-180" />
+                          <span className="text-xs text-red-500 ml-1">↘</span>
+                        </div>
+                      )}
+                      {user.rank <= 10 && user.rank_change === 'same' && (
+                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
+                      )}
                       </div>
                       
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center text-xs sm:text-sm font-bold group-hover:scale-110 transition-transform duration-300 shrink-0">
+                    {/* User Avatar */}
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center font-bold text-xs sm:text-sm group-hover:brightness-110 group-hover:shadow-lg transition-all duration-300 shrink-0">
                         {getUserInitials(user.email, user.display_name, user.username)}
                       </div>
                       
-                      <div className="space-y-1 min-w-0 flex-1">
-                        <div className="font-semibold text-sm sm:text-base md:text-lg truncate group-hover:text-primary transition-colors">
+                    {/* User Info */}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold text-sm sm:text-base truncate group-hover:text-primary transition-colors">
                           {getDisplayName(user)}
-                        </div>
+                      </h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                        {formatCurrency(user.portfolio_value)}
+                      </p>
                       </div>
                     </div>
 
-                    <div className="hidden lg:flex items-center gap-4 xl:gap-6 text-sm shrink-0">
-                      <div className="text-center min-w-0">
-                        <div className="font-bold text-sm xl:text-base text-primary">{formatCurrency(user.portfolio_value)}</div>
-                        <div className="text-xs text-muted-foreground font-medium">Portfolio</div>
-                      </div>
-                      <div className="text-center min-w-0">
-                        <div className="font-semibold text-sm xl:text-base">{formatPercentage(user.win_rate)}</div>
-                        <div className="text-xs text-muted-foreground">Win Rate</div>
-                      </div>
-                      <div className="text-center min-w-0">
-                        <div className="font-semibold text-sm xl:text-base">{formatCurrency(user.total_invested)}</div>
-                        <div className="text-xs text-muted-foreground">Invested</div>
-                      </div>
-                      <div className="text-center min-w-0">
-                        <div className="font-semibold text-sm xl:text-base">{user.total_picks}</div>
-                        <div className="text-xs text-muted-foreground">Picks</div>
-                      </div>
+                  {/* Stats */}
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                      <Badge variant="outline" className="text-xs">
+                        {formatPercentage(user.win_rate)} WR
+                      </Badge>
                     </div>
-
-                    <div className="lg:hidden text-right space-y-1 shrink-0 min-w-0">
-                      <div className="font-bold text-sm sm:text-base text-primary">{formatCurrency(user.portfolio_value)}</div>
-                      <div className="text-xs sm:text-sm text-muted-foreground">
-                        {user.total_picks} picks • {formatPercentage(user.win_rate)} win rate
-                      </div>
-                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {user.total_picks} picks
+                    </p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 text-muted-foreground">
-                <Trophy className="w-16 h-16 mx-auto mb-6 opacity-50" />
-                <h3 className="text-xl font-semibold mb-2">No Rankings Yet</h3>
-                <p>Be the first to make predictions and claim the top spot!</p>
-              </div>
-            )}
+                </motion.div>
+              ))}
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Refresh Button */}
-      <div className="text-center">
+      {/* Manual Refresh Button */}
+      <div className="text-center mt-8">
         <Button 
-          onClick={fetchLeaderboard} 
-          className="gap-3 px-6 py-3 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          onClick={() => fetchLeaderboard(false)} 
+          className="gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
           disabled={loading}
         >
-          <Activity className="w-5 h-5" />
-          {loading ? 'Refreshing...' : 'Refresh Rankings'}
+          <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Refreshing Rankings...' : 'Refresh Leaderboard'}
         </Button>
+        <p className="text-xs text-muted-foreground mt-2">
+          Auto-updates every 2 minutes • Last updated: {lastUpdated.toLocaleTimeString()}
+          {refreshing && <span className="text-primary"> • Updating...</span>}
+        </p>
       </div>
 
+      {/* User Profile Modal */}
+      <UserProfileModal 
+        user={selectedUser}
+        isOpen={!!selectedUser}
+        onClose={() => setSelectedUser(null)}
+      />
+
       {error && (
-        <Card className="border-red-200 bg-gradient-to-r from-red-50/50 to-pink-50/50 dark:border-red-800 dark:from-red-950/20 dark:to-pink-950/20 max-w-md mx-auto">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3 text-red-800 dark:text-red-200">
-              <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
-                <Activity className="w-4 h-4 text-red-600" />
-              </div>
-              <span className="font-medium">{error}</span>
-            </div>
+        <Card className="border-red-500/50 bg-red-500/5 max-w-md mx-auto">
+          <CardContent className="p-4 text-center text-red-600">
+            <p>{error}</p>
           </CardContent>
         </Card>
       )}

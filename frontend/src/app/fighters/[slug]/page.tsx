@@ -29,7 +29,7 @@ export default function FighterIdPage() {
     <PageTransition variant="fade">
       <div className="container relative mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
-          <div className="sticky top-24 z-50 max-w-2xl mx-auto w-full mb-16">
+          <div className="sticky top-24 z-10 max-w-2xl mx-auto w-full mb-16">
             <FighterSearch 
               onSelectFighter={handleSelectFighter} 
               clearSearch={true}

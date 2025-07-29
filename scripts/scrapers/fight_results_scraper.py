@@ -730,10 +730,9 @@ def monitor_event():
             # INDUSTRY BEST PRACTICE: Check for any fight changes that require refunds
             try:
                 logger.info("Checking for fight changes that may require refunds...")
-                from scripts.scrapers.upcoming_event_scraper import check_and_process_refunds
-                refund_result = check_and_process_refunds(updated_event['id'])
+                refund_result = detect_and_process_refunds_direct(updated_event['id'])
                 if refund_result and refund_result.get('total_bets_refunded', 0) > 0:
-                    logger.warning(f"REFUNDS PROCESSED during results update: {refund_result['total_bets_refunded']} bets "
+                    logger.warning(f"🔄 REFUNDS PROCESSED during results update: {refund_result['total_bets_refunded']} bets "
                                  f"refunded for {refund_result['total_amount_refunded']} coins due to fight changes")
             except Exception as e:
                 logger.error(f"Error processing refunds during results update: {str(e)}")
@@ -773,6 +772,234 @@ def monitor_event():
             logger.error("❌ Failed to export completed event to bucket")
     
     return True
+
+def detect_and_process_refunds_direct(event_id):
+    """
+    Direct database refund processing without API calls.
+    This function checks for fight changes and processes refunds automatically.
+    """
+    if not db_available or not supabase:
+        logger.warning("Database not available for refund processing")
+        return None
+    
+    try:
+        logger.info(f"Checking for fight changes in event {event_id} that require refunds...")
+        
+        # Get current event data
+        current_response = supabase.table('upcoming_events')\
+            .select('*')\
+            .eq('id', event_id)\
+            .execute()
+        
+        if not current_response.data:
+            logger.error(f"Event {event_id} not found")
+            return None
+        
+        current_event = current_response.data[0]
+        current_fights = current_event.get('fights', [])
+        
+        # Try to get previous version of this event from the database
+        previous_response = supabase.table('upcoming_events')\
+            .select('*')\
+            .eq('event_url', current_event['event_url'])\
+            .neq('id', event_id)\
+            .order('scraped_at', desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if not previous_response.data:
+            logger.info("No previous version found - treating as new event, no refunds needed")
+            return {"total_bets_refunded": 0, "total_amount_refunded": 0}
+        
+        previous_event = previous_response.data[0]
+        previous_fights = previous_event.get('fights', [])
+        
+        # Detect changes
+        changes = detect_fight_changes_direct(previous_fights, current_fights)
+        
+        if not changes:
+            logger.info("No significant fight changes detected")
+            return {"total_bets_refunded": 0, "total_amount_refunded": 0}
+        
+        logger.info(f"Detected {len(changes)} fight changes requiring refunds")
+        
+        # Process refunds for all changes
+        total_refunded = 0
+        total_amount = 0
+        
+        for change in changes:
+            fight_id = change['fight_id']
+            change_reasons = change['change_reasons']
+            refund_type = change['refund_type']
+            
+            logger.info(f"Processing refunds for fight {fight_id}: {', '.join(change_reasons)}")
+            
+            # Get all pending bets for this fight
+            bets_response = supabase.table('bets')\
+                .select('*')\
+                .eq('event_id', event_id)\
+                .eq('fight_id', fight_id)\
+                .eq('status', 'pending')\
+                .execute()
+            
+            if not bets_response.data:
+                logger.info(f"No pending bets found for fight {fight_id}")
+                continue
+            
+            for bet in bets_response.data:
+                user_id = bet['user_id']
+                bet_id = bet['id']
+                stake = bet['stake']
+                
+                # Calculate refund amount
+                refund_amount = stake if refund_type == 'full_refund' else int(stake * 0.5)
+                
+                # Get current user balance
+                balance_response = supabase.table('coin_accounts')\
+                    .select('balance, total_wagered')\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                if not balance_response.data:
+                    logger.error(f"User account not found for user {user_id}")
+                    continue
+                
+                current_balance = balance_response.data[0]['balance']
+                current_total_wagered = balance_response.data[0]['total_wagered'] or 0
+                
+                # Calculate new balances
+                new_balance = current_balance + refund_amount
+                new_total_wagered = max(0, current_total_wagered - stake)  # Reduce total wagered
+                
+                # Update bet status to refunded
+                current_timestamp = datetime.now().isoformat()
+                bet_update_response = supabase.table('bets')\
+                    .update({
+                        'status': 'refunded',
+                        'payout': refund_amount,
+                        'settled_at': current_timestamp,
+                        'refund_reason': '; '.join(change_reasons)
+                    })\
+                    .eq('id', bet_id)\
+                    .execute()
+                
+                if not bet_update_response.data:
+                    logger.error(f"Failed to update bet {bet_id} to refunded status")
+                    continue
+                
+                # Update user balance
+                balance_update_response = supabase.table('coin_accounts')\
+                    .update({
+                        'balance': new_balance,
+                        'total_wagered': new_total_wagered
+                    })\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                if not balance_update_response.data:
+                    logger.error(f"Failed to update balance for user {user_id}")
+                    continue
+                
+                # Create transaction record
+                transaction_data = {
+                    'user_id': user_id,
+                    'amount': refund_amount,
+                    'type': 'bet_refunded',
+                    'reason': f'Refund for {bet["fighter_name"]} - {"; ".join(change_reasons)}',
+                    'ref_table': 'bets',
+                    'ref_id': bet_id,
+                    'balance_before': current_balance,
+                    'balance_after': new_balance
+                }
+                
+                transaction_response = supabase.table('coin_transactions')\
+                    .insert(transaction_data)\
+                    .execute()
+                
+                if transaction_response.data:
+                    total_refunded += 1
+                    total_amount += refund_amount
+                    logger.info(f"✅ REFUNDED {refund_amount} coins to user {user_id[:8]}... for bet on {bet['fighter_name']}")
+                else:
+                    logger.error(f"Failed to create transaction record for refund {bet_id}")
+        
+        # Log the changes for audit trail
+        for change in changes:
+            logger.warning(f"🔄 REFUND PROCESSED - Fight {change['fight_id']}: {', '.join(change['change_reasons'])}")
+        
+        result = {"total_bets_refunded": total_refunded, "total_amount_refunded": total_amount}
+        logger.info(f"✅ Refund processing completed: {total_refunded} bets refunded for {total_amount} coins")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error processing refunds directly: {str(e)}")
+        return None
+
+
+def detect_fight_changes_direct(old_fights, new_fights):
+    """
+    Detect significant changes in fights that warrant refunds.
+    Direct version for use within scrapers.
+    """
+    changes = []
+    
+    # Create lookup for old fights
+    old_fights_map = {fight.get('fight_id'): fight for fight in old_fights}
+    
+    for new_fight in new_fights:
+        fight_id = new_fight.get('fight_id')
+        old_fight = old_fights_map.get(fight_id)
+        
+        if not old_fight:
+            # New fight added - no refund needed
+            continue
+            
+        change_reasons = []
+        
+        # Check for fighter changes (most critical)
+        if (old_fight.get('fighter1_name') != new_fight.get('fighter1_name') or
+            old_fight.get('fighter2_name') != new_fight.get('fighter2_name') or
+            old_fight.get('fighter1_id') != new_fight.get('fighter1_id') or
+            old_fight.get('fighter2_id') != new_fight.get('fighter2_id')):
+            change_reasons.append("Fighter substitution detected")
+            
+        # Check for fight cancellation
+        if new_fight.get('status') == 'cancelled' or new_fight.get('cancelled', False):
+            change_reasons.append("Fight cancelled")
+            
+        # Check for significant weight class changes
+        if (old_fight.get('weight_class') and new_fight.get('weight_class') and
+            old_fight.get('weight_class') != new_fight.get('weight_class')):
+            change_reasons.append("Weight class changed")
+            
+        # Check for fight type changes (title vs non-title)
+        if (old_fight.get('is_title_fight') != new_fight.get('is_title_fight')):
+            change_reasons.append("Title fight status changed")
+        
+        if change_reasons:
+            changes.append({
+                'fight_id': fight_id,
+                'old_fight': old_fight,
+                'new_fight': new_fight,
+                'change_reasons': change_reasons,
+                'refund_type': 'full_refund'  # Default to full refund for safety
+            })
+    
+    # Check for removed fights
+    new_fight_ids = {fight.get('fight_id') for fight in new_fights}
+    for old_fight in old_fights:
+        fight_id = old_fight.get('fight_id')
+        if fight_id not in new_fight_ids:
+            changes.append({
+                'fight_id': fight_id,
+                'old_fight': old_fight,
+                'new_fight': None,
+                'change_reasons': ['Fight removed from card'],
+                'refund_type': 'full_refund'
+            })
+    
+    return changes
+
 
 def main():
     parser = argparse.ArgumentParser(description='UFC Fight Results Scraper')

@@ -73,6 +73,7 @@ interface FighterSearchProps {
   onSelectFighter: (fighter: Fighter) => void
   clearSearch?: boolean
   searchBarId?: string
+  autoFocus?: boolean // Add autoFocus prop for mobile keyboard opening
 }
 
 interface SearchFilters {
@@ -112,7 +113,7 @@ const FighterDetailedInfo = React.memo(({ fighter }: { fighter: string }) => {
 // Add a constant for filter storage
 const FILTER_STORAGE_KEY = "fighter-search-filters";
 
-export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: FighterSearchProps) {
+export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoFocus }: FighterSearchProps) {
   const [searchTerm, setSearchTerm] = React.useState("")
   const [fighters, setFighters] = React.useState<Fighter[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
@@ -589,6 +590,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
             onChange={handleInputChange}
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
+            autoFocus={autoFocus}
             className={cn(
               isMobile 
                 ? "w-full pl-9 pr-4 h-10"
@@ -596,7 +598,11 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
               "bg-background/60 backdrop-blur-sm",
               "border border-white/20 rounded-lg",
               "placeholder:text-muted-foreground/70",
-              "focus:ring-2 focus:ring-primary/50", // More prominent focus state
+              "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0", // Remove default focus styles
+              "focus:outline-none focus:ring-0", // Remove all focus rings
+              "active:outline-none active:ring-0", // Remove active state highlights
+              "-webkit-tap-highlight-color: transparent", // Remove mobile tap highlights
+              "focus:border-primary/50", // Subtle focus state with border color change
               "shadow-sm hover:shadow-md focus:shadow-lg", // Add depth on interaction
               "transition-all duration-200"
             )}
@@ -685,7 +691,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId }: Fig
         {showSuggestions && (searchTerm || searchHistory.length > 0) && (
           <motion.div
             className={cn(
-              "absolute top-full left-0 right-0 mt-2 z-40",
+              "absolute top-full left-0 right-0 mt-2 z-[99999]",
               "bg-background/95 backdrop-blur-xl",
               "border border-white/20 rounded-lg shadow-xl",
               "overflow-hidden"

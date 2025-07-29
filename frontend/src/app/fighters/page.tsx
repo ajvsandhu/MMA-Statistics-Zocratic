@@ -64,7 +64,7 @@ function FightersContent() {
           <AnimatedItem 
             variant="fadeUp" 
             delay={0.2} 
-            className="sticky top-24 z-30 max-w-2xl mx-auto w-full mb-16"
+            className="sticky top-24 z-10 max-w-2xl mx-auto w-full mb-16"
           >
             <FighterSearch 
               onSelectFighter={handleFighterSelect} 

@@ -152,6 +152,9 @@ except Exception as e:
     odds_service_available = False
     get_odds_service = None
 
+# Import the refund functions from fight_results_scraper
+from scripts.scrapers.fight_results_scraper import detect_and_process_refunds_direct
+
 def fetch_upcoming_event(max_retries=3):
     """Fetch the next upcoming UFC event from ufcstats.com"""
     # First try the upcoming events page
@@ -466,11 +469,14 @@ def enrich_matchups_with_ids(matchups):
             matchup["fighter1_id"] = fighter1_id
             matchup["fighter1_tap_link"] = fighter1_tap_link
             matchup["fighter1_image"] = fighter1_image
+            # Create fighter page link for the name
+            matchup["fighter1_page_link"] = f"/fighters/{fighter1_id}"
         else:
             logger.warning(f"Could not find ID for fighter: {matchup['fighter1_name']}")
             matchup["fighter1_id"] = None
             matchup["fighter1_tap_link"] = None
             matchup["fighter1_image"] = None
+            matchup["fighter1_page_link"] = None
             
         # Get fighter2 data
         fighter2_id, fighter2_tap_link, fighter2_image = get_fighter_id_by_url(matchup["fighter2_url"])
@@ -478,11 +484,14 @@ def enrich_matchups_with_ids(matchups):
             matchup["fighter2_id"] = fighter2_id
             matchup["fighter2_tap_link"] = fighter2_tap_link
             matchup["fighter2_image"] = fighter2_image
+            # Create fighter page link for the name
+            matchup["fighter2_page_link"] = f"/fighters/{fighter2_id}"
         else:
             logger.warning(f"Could not find ID for fighter: {matchup['fighter2_name']}")
             matchup["fighter2_id"] = None
             matchup["fighter2_tap_link"] = None
             matchup["fighter2_image"] = None
+            matchup["fighter2_page_link"] = None
     
     return matchups
 
@@ -1121,7 +1130,7 @@ def add_odds_to_matchups(matchups, ufc_event_data=None):
             matchup['odds_event_id'] = None
         return matchups, None
 
-def save_to_database(event_data):
+def save_to_database(event_data, admin_token=None):
     """Save event data to the database using upsert to prevent duplicates"""
     if not db_available or not supabase:
         logger.error("Database not available. Cannot save event data.")
@@ -1165,7 +1174,7 @@ def save_to_database(event_data):
                 # INDUSTRY BEST PRACTICE: Check for fight changes and process refunds
                 try:
                     logger.info("Checking for fight changes that require refunds...")
-                    refund_result = check_and_process_refunds(event_id)
+                    refund_result = detect_and_process_refunds_direct(event_id)
                     if refund_result and refund_result.get('total_bets_refunded', 0) > 0:
                         logger.warning(f"REFUNDS PROCESSED: {refund_result['total_bets_refunded']} bets refunded "
                                      f"for {refund_result['total_amount_refunded']} coins due to fight changes")
@@ -1214,33 +1223,47 @@ def save_to_database(event_data):
         return False
 
 
-def check_and_process_refunds(event_id):
+def check_and_process_refunds(event_id, admin_token=None):
     """
     Check for fight changes and process refunds automatically.
-    Industry best practice: Conservative approach - refund when in doubt.
+    
+    Args:
+        event_id: The event ID to check for refunds
+        admin_token: Optional admin JWT token. If provided, will attempt refund API call.
     """
     try:
-        import requests
-        from backend.constants import API_BASE_URL
-        
-        # Use the refund API endpoint
-        url = f"{API_BASE_URL}/api/v1/predictions-game/admin/check-and-refund-changes/{event_id}"
-        
-        # Note: In production, you'd want proper authentication here
-        response = requests.post(url, timeout=30)
-        
-        if response.status_code == 200:
-            return response.json()
+        if admin_token:
+            # Admin token provided - attempt refund API call
+            import requests
+            from backend.constants import API_BASE_URL
+            
+            url = f"{API_BASE_URL}/api/v1/predictions-game/admin/check-and-refund-changes/{event_id}"
+            
+            headers = {
+                'Authorization': f'Bearer {admin_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(url, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"Refund API call successful: {result.get('total_bets_refunded', 0)} bets refunded")
+                return result
+            else:
+                logger.error(f"Refund API call failed: {response.status_code} - {response.text}")
+                return None
         else:
-            logger.error(f"Refund API call failed: {response.status_code} - {response.text}")
+            # No admin token - just log that refunds should be checked manually
+            logger.info(f"Refund check for event {event_id} - please use admin dashboard to process refunds manually")
             return None
             
     except Exception as e:
-        logger.error(f"Error calling refund API: {str(e)}")
+        logger.error(f"Error in refund check: {str(e)}")
         return None
 
 
-def main():
+def main(admin_token=None):
     parser = argparse.ArgumentParser(description='UFC Upcoming Event Scraper')
     parser.add_argument('--output', type=str, default='frontend/public/upcoming_event.json',
                        help='Output file path (default: frontend/public/upcoming_event.json) - DEPRECATED, now saves to database')
@@ -1250,7 +1273,11 @@ def main():
                        help='Skip fetching betting odds for matchups')
     parser.add_argument('--save-to-file', action='store_true',
                        help='Also save to JSON file (for backward compatibility)')
+    parser.add_argument('--admin-token', type=str, help='Admin JWT token for refund processing')
     args = parser.parse_args()
+    
+    # Use provided admin token or from args
+    token_to_use = admin_token or args.admin_token
     
     # Create the directory if it doesn't exist (only if saving to file)
     if args.save_to_file:
@@ -1318,7 +1345,7 @@ def main():
         })
     
     # Save to database (primary method)
-    database_success = save_to_database(event_data)
+    database_success = save_to_database(event_data, token_to_use)
     
     # Optionally save to JSON file for backward compatibility
     if args.save_to_file:

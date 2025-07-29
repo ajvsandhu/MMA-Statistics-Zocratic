@@ -135,11 +135,14 @@ async def setup_dependencies(app: FastAPI):
         try:
             logger.info("🪣 Attempting to load model from Supabase bucket...")
             model_info = app.state.trainer.load_model_from_bucket("advanced_leakproof_model")
-            logger.info(f"✅ Model loaded from bucket: version {model_info['model_version']}")
+            logger.info(f"✅ Model loaded from bucket: version {model_info.get('model_version', 'unknown')}")
             logger.info(f"📊 Training accuracy: {model_info.get('training_accuracy', 'N/A')}")
             logger.info(f"📊 Validation accuracy: {model_info.get('validation_accuracy', 'N/A')}")
             logger.info(f"📊 Test accuracy: {model_info.get('test_accuracy', 'N/A')}")
-            logger.info(f"💾 File size: {model_info.get('file_size', 0) / 1024 / 1024:.2f} MB")
+            file_size = model_info.get('file_size', 0)
+            if file_size > 0:
+                logger.info(f"💾 File size: {file_size / 1024 / 1024:.2f} MB")
+            logger.info(f"🔗 Source: {model_info.get('source', 'bucket')}")
         except Exception as bucket_error:
             logger.warning(f"❌ Failed to load model from bucket: {str(bucket_error)}")
             logger.info("⬇️ Falling back to file-based model loading...")

@@ -5,12 +5,14 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { Menu, X, User, LogOut, Settings as SettingsIcon, BarChart3, Sparkles, Shield } from "lucide-react"
+import { Menu, X, User, LogOut, Settings as SettingsIcon, BarChart3, Sparkles, Shield, Search, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 import { useTheme, THEMES_LIST, type Theme } from "@/lib/theme-provider"
 import { Check, Palette } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
+import { FighterSearch } from "@/components/fighter-search"
+import { useRouter } from "next/navigation"
 
 // Utility function to check if user is admin
 const isUserAdmin = (idToken: string | undefined): boolean => {
@@ -29,14 +31,26 @@ const isUserAdmin = (idToken: string | undefined): boolean => {
   }
 };
 
+// Define Fighter interface
+interface Fighter {
+  id: string;
+  name: string;
+}
+
 export function MainNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobile, setIsMobile] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = React.useState(false)
+  const [mobileSearchExpanded, setMobileSearchExpanded] = React.useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = React.useState(false)
   const { theme, setTheme } = useTheme()
   const { isAuthenticated, isLoading, userProfile, signOut, getIdToken } = useAuth()
   
+  // Check if we're on a fighters page
+  const isFightersPage = pathname?.startsWith('/fighters')
+
   React.useEffect(() => {
     const checkMobile = () => {
       const newIsMobile = window.innerWidth <= 768
@@ -46,6 +60,7 @@ export function MainNav() {
         if (!newIsMobile) {
           setMobileMenuOpen(false)
           setThemeMenuOpen(false)
+          setMobileSearchExpanded(false)
         }
       }
     }
@@ -59,6 +74,7 @@ export function MainNav() {
   React.useEffect(() => {
     setMobileMenuOpen(false)
     setThemeMenuOpen(false)
+    setMobileSearchExpanded(false)
   }, [pathname])
 
   // Close menu when clicking outside or pressing escape
@@ -73,11 +89,50 @@ export function MainNav() {
           setThemeMenuOpen(false)
         }
       }
+      
+      // Close mobile search if clicking outside (only on mobile) - but don't close menu
+      if (isMobile && mobileSearchExpanded && event.target instanceof Element) {
+        const searchContainer = event.target.closest('[data-mobile-search-container]')
+        const menuContent = event.target.closest('[data-mobile-menu]')
+        if (!searchContainer && !menuContent) {
+          setMobileSearchExpanded(false)
+        }
+      }
+    }
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (isMobile && mobileSearchExpanded && event.target instanceof Element) {
+        const searchContainer = event.target.closest('[data-mobile-search-container]')
+        const menuContent = event.target.closest('[data-mobile-menu]')
+        if (!searchContainer && !menuContent) {
+          setMobileSearchExpanded(false)
+        }
+      }
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      // Close search on any swipe/touch movement outside the search area - but preserve menu
+      if (isMobile && mobileSearchExpanded && event.target instanceof Element) {
+        const searchContainer = event.target.closest('[data-mobile-search-container]')
+        const menuContent = event.target.closest('[data-mobile-menu]')
+        if (!searchContainer && !menuContent) {
+          setMobileSearchExpanded(false)
+        }
+      }
+    }
+
+    const handleScroll = () => {
+      // Close search on scroll but keep menu open
+      if (isMobile && mobileSearchExpanded) {
+        setMobileSearchExpanded(false)
+      }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (themeMenuOpen) {
+        if (mobileSearchExpanded) {
+          setMobileSearchExpanded(false)
+        } else if (themeMenuOpen) {
           setThemeMenuOpen(false)
         } else if (mobileMenuOpen) {
           setMobileMenuOpen(false)
@@ -85,21 +140,29 @@ export function MainNav() {
       }
     }
 
-    if (mobileMenuOpen) {
+    if (mobileMenuOpen || mobileSearchExpanded) {
       document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('touchstart', handleTouchStart, { passive: true })
+      document.addEventListener('touchmove', handleTouchMove, { passive: true })
+      document.addEventListener('scroll', handleScroll, { passive: true })
       document.addEventListener('keydown', handleEscape)
       // Prevent body scroll when menu is open
-      document.body.style.overflow = 'hidden'
+      if (mobileMenuOpen) {
+        document.body.style.overflow = 'hidden'
+      }
     } else {
       document.body.style.overflow = ''
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('scroll', handleScroll)
       document.removeEventListener('keydown', handleEscape)
       document.body.style.overflow = ''
     }
-  }, [mobileMenuOpen, themeMenuOpen])
+  }, [mobileMenuOpen, themeMenuOpen, mobileSearchExpanded, isMobile])
 
   const handleSignOut = async () => {
     try {
@@ -109,13 +172,19 @@ export function MainNav() {
       console.error('Sign out error:', error)
     }
   }
+
+  const handleFighterSelect = (fighter: Fighter) => {
+    // Navigate to the fighter details page
+    router.push(`/fighters/${fighter.id}`)
+    // Close the mobile search only, keep menu open
+    setMobileSearchExpanded(false)
+  }
   
   const links = [
     { href: "/", label: "Home" },
     { href: "/fight-predictions", label: "Predictions" },
-    { href: "/fighters", label: "Fighters" },
-    { href: "/fight-predictions/events", label: "Live Events" },
-    { href: "/leaderboard", label: "P4P" },
+    { href: "/fight-predictions/events", label: "Events" },
+    { href: "/leaderboard", label: "P4P Leaderboard" },
     { href: "/zobot", label: "Zobot" },
     { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" }
@@ -140,19 +209,126 @@ export function MainNav() {
     open: { opacity: 1, x: 0 },
   }
 
+  const mobileSearchVariants = {
+    collapsed: { 
+      width: 40,
+      x: 0,
+      transition: { 
+        duration: 0.3, 
+        ease: "easeInOut"
+      }
+    },
+    expanded: { 
+      width: "calc(100vw - 170px)", 
+      x: -60, 
+      transition: { 
+        duration: 0.3, 
+        ease: "easeInOut"
+      }
+    }
+  }
+
+  // Logo fade animation variants with improved timing
+  const logoVariants = {
+    visible: { 
+      opacity: 1,
+      transition: { 
+        duration: 0.3, 
+        ease: "easeInOut"
+      }
+    },
+    hidden: { 
+      opacity: 0,
+      transition: { 
+        duration: 0.2, 
+        ease: "easeInOut"
+      }
+    }
+  }
+
+  // Content animation variants
+  const contentVariants = {
+    icon: {
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.15 }
+    },
+    input: {
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.2, delay: 0.1 }
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.95,
+      transition: { duration: 0.15 }
+    }
+  }
+
   if (isMobile) {
     return (
       <>
-        <Link href="/" className="font-light text-lg sm:text-xl text-foreground">
-          ZOCRATIC
-        </Link>
+        <motion.div
+          variants={logoVariants}
+          animate={mobileSearchExpanded ? "hidden" : "visible"}
+        >
+          <Link href="/" className="font-light text-lg sm:text-xl text-foreground">
+            ZOCRATIC
+          </Link>
+        </motion.div>
         <div className="flex-1" />
-        <div className="relative">
+        
+        {/* Mobile Search Bar - Expandable - Hidden on fighters pages */}
+        {pathname && !pathname.startsWith('/fighters') && (
+          <div className="flex items-center gap-2 relative z-[10000]" data-mobile-search-container>
+            <motion.div
+              variants={mobileSearchVariants}
+              animate={mobileSearchExpanded ? "expanded" : "collapsed"}
+              className="relative"
+            >
+              <AnimatePresence mode="wait">
+                {mobileSearchExpanded ? (
+                  <motion.div
+                    key="search-input"
+                    variants={contentVariants}
+                    initial="exit"
+                    animate="input"
+                    exit="exit"
+                    className="w-full"
+                  >
+                    <FighterSearch 
+                      onSelectFighter={handleFighterSelect}
+                      clearSearch={false}
+                      autoFocus={true}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.button
+                    key="search-icon"
+                    variants={contentVariants}
+                    initial="exit"
+                    animate="icon"
+                    exit="exit"
+                    onClick={() => setMobileSearchExpanded(true)}
+                    className="flex items-center justify-center w-10 h-10 transition-all duration-200 focus:outline-none focus:ring-0"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                    aria-label="Search fighters"
+                  >
+                    <Search className="h-5 w-5 text-white" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        )}
+
+        <div className="relative z-[10001]">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="relative z-50 hover:bg-white/10 rounded-xl h-10 w-10"
+            className="relative z-50 hover:bg-white/10 rounded-xl h-10 w-10 focus:outline-none focus:ring-0"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
             aria-label="Toggle navigation menu"
           >
             <AnimatePresence mode="wait">
@@ -189,7 +365,7 @@ export function MainNav() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[200]"
+                  className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[20000]"
                   style={{ 
                     clipPath: 'polygon(0 80px, 100% 80px, 100% 100%, 0 100%)'
                   }}
@@ -202,8 +378,13 @@ export function MainNav() {
                   initial="closed"
                   animate="open"
                   exit="closed"
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="absolute top-full right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-[var(--nav-border)] bg-[hsl(var(--background))]/95 backdrop-blur-xl shadow-2xl z-[210]"
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="absolute top-full right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-[var(--nav-border)] bg-[hsl(var(--background))]/95 backdrop-blur-xl shadow-2xl z-[20010]"
+                  style={{
+                    // Ensure menu stays positioned correctly even when search expands
+                    transform: mobileSearchExpanded ? 'translateX(-60px)' : 'translateX(0px)',
+                    transition: 'transform 0.3s ease-in-out'
+                  }}
                   data-mobile-menu
                 >
                   <div className="p-4">
@@ -218,12 +399,16 @@ export function MainNav() {
                       >
                         {isAuthenticated ? (
                           <div className="space-y-3">
-                            <div className="px-4 py-3 rounded-xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
+                            {/* Account Dropdown Header */}
+                            <button
+                              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+                              className="flex items-center justify-between w-full px-4 py-3 rounded-xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 hover:from-primary/20 hover:to-secondary/20 transition-all duration-200"
+                            >
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
                                   <User className="h-5 w-5 text-white" />
                                 </div>
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 text-left">
                                   <p className="text-sm font-semibold text-[var(--nav-text)] truncate">
                                     {userProfile.preferred_username || userProfile.email || 'User'}
                                   </p>
@@ -232,44 +417,62 @@ export function MainNav() {
                                   </p>
                                 </div>
                               </div>
-                            </div>
-                            {isAuthenticated && (
-                              <>
-                                <Link
-                                  href="/settings"
-                                  className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
-                                  onClick={() => setMobileMenuOpen(false)}
-                                >
-                                  <SettingsIcon className="h-4 w-4" />
-                                  <span>Settings</span>
-                                </Link>
-                                <Link
-                                  href="/dashboard"
-                                  className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
-                                  onClick={() => setMobileMenuOpen(false)}
-                                >
-                                  <BarChart3 className="h-4 w-4" />
-                                  <span>Dashboard</span>
-                                </Link>
-                                {isUserAdmin(getIdToken()) && (
-                                  <Link
-                                    href="/admin"
-                                    className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)] bg-blue-500/10 border border-blue-500/30"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                  >
-                                    <Shield className="h-4 w-4 text-blue-400" />
-                                    <span className="text-blue-400 font-semibold">Admin</span>
-                                  </Link>
-                                )}
-                              </>
-                            )}
-                            <button
-                              onClick={handleSignOut}
-                              className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-red-500/10 text-red-500 hover:text-red-400"
-                            >
-                              <LogOut className="h-4 w-4" />
-                              Sign Out
+                              <motion.div
+                                animate={{ rotate: accountMenuOpen ? 180 : 0 }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              </motion.div>
                             </button>
+
+                            {/* Account Dropdown Content */}
+                            <AnimatePresence>
+                              {accountMenuOpen && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: "auto" }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="space-y-1 pl-4">
+                                    <Link
+                                      href="/settings"
+                                      className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
+                                      onClick={() => setMobileMenuOpen(false)}
+                                    >
+                                      <SettingsIcon className="h-4 w-4" />
+                                      <span>Settings</span>
+                                    </Link>
+                                    <Link
+                                      href="/dashboard"
+                                      className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)]"
+                                      onClick={() => setMobileMenuOpen(false)}
+                                    >
+                                      <BarChart3 className="h-4 w-4" />
+                                      <span>Dashboard</span>
+                                    </Link>
+                                    {isUserAdmin(getIdToken()) && (
+                                      <Link
+                                        href="/admin"
+                                        className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-[var(--nav-bg-active)] text-[var(--nav-text)] bg-blue-500/10 border border-blue-500/30"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                      >
+                                        <Shield className="h-4 w-4 text-blue-400" />
+                                        <span className="text-blue-400 font-semibold">Admin</span>
+                                      </Link>
+                                    )}
+                                    <button
+                                      onClick={handleSignOut}
+                                      className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 hover:bg-red-500/10 text-red-500 hover:text-red-400"
+                                    >
+                                      <LogOut className="h-4 w-4" />
+                                      Sign Out
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         ) : (
                           <div className="flex gap-2">
@@ -323,88 +526,6 @@ export function MainNav() {
                         </motion.div>
                       )
                     })}
-                    
-                    {/* Separator */}
-                    <motion.div
-                      variants={itemVariants}
-                      initial="closed"
-                      animate="open"
-                      transition={{ delay: (links.length + 1) * 0.05, duration: 0.2 }}
-                      className="my-3 h-px bg-gradient-to-r from-transparent via-border to-transparent"
-                    />
-                    
-                    {/* Theme Switcher */}
-                    <motion.div
-                      variants={itemVariants}
-                      initial="closed"
-                      animate="open"
-                      transition={{ delay: (links.length + 2) * 0.05, duration: 0.2 }}
-                      className="relative"
-                    >
-                      <button
-                        onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-                        className={cn(
-                          "flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
-                          "hover:bg-[var(--nav-bg-active)] hover:text-[var(--nav-text-hover)]",
-                          themeMenuOpen ? "bg-[var(--nav-bg-active)] text-[var(--nav-text)]" : "text-muted-foreground"
-                        )}
-                      >
-                        <span>Theme</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs opacity-70">
-                            {THEMES_LIST.find(t => t.value === theme)?.label || "Dark"}
-                          </span>
-                          <Palette className="h-4 w-4" />
-                        </div>
-                      </button>
-                      
-                      {/* Theme Options */}
-                      <AnimatePresence>
-                        {themeMenuOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute top-full left-0 right-0 mt-1 bg-[hsl(var(--background))]/95 backdrop-blur-xl border border-[var(--nav-border)] rounded-xl shadow-xl z-[220] overflow-hidden"
-                          >
-                            {THEMES_LIST.map((themeOption, index) => (
-                              <motion.button
-                                key={themeOption.value}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: index * 0.03, duration: 0.15 }}
-                                onClick={() => {
-                                  setTheme(themeOption.value as Theme)
-                                  setThemeMenuOpen(false)
-                                }}
-                                className={cn(
-                                  "w-full flex items-center justify-between px-4 py-3 text-sm transition-all duration-200",
-                                  "hover:bg-[var(--nav-bg-active)] hover:text-[var(--nav-text-hover)]",
-                                  theme === themeOption.value ? "bg-[var(--nav-bg-active)] text-[var(--nav-text)] font-semibold" : "text-muted-foreground"
-                                )}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div 
-                                    className={cn(
-                                      "w-3 h-3 rounded-full border",
-                                      themeOption.value === "light" && "bg-zinc-200 border-zinc-400",
-                                      themeOption.value === "dark" && "bg-zinc-800 border-zinc-600",
-                                      themeOption.value === "theme-teal" && "bg-[#00e5e9] border-[#00aebb]",
-                                      themeOption.value === "theme-purple" && "bg-purple-500 border-purple-600",
-                                      themeOption.value === "theme-fire" && "bg-orange-500 border-orange-600",
-                                      themeOption.value === "theme-crimson" && "bg-[#ca3f40] border-[#4b4643]",
-                                    )}
-                                  />
-                                  <span>{themeOption.label}</span>
-                                </div>
-                                {theme === themeOption.value && <Check className="h-3 w-3" />}
-                              </motion.button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
                   </div>
                 </motion.div>
               </>
@@ -455,6 +576,15 @@ export function MainNav() {
       {/* Desktop Auth Section */}
       <div className="flex-1" />
       <div className="flex items-center gap-4">
+        {/* Desktop Search Bar - Always Visible - Hidden on fighters pages */}
+        {pathname && !pathname.startsWith('/fighters') && (
+          <div className="w-80" data-desktop-search-container>
+            <FighterSearch 
+              onSelectFighter={handleFighterSelect}
+              clearSearch={false}
+            />
+          </div>
+        )}
         {!isLoading && (
           <UserMenu isAuthenticated={isAuthenticated} userProfile={userProfile} onSignOut={handleSignOut} isAdmin={isUserAdmin(getIdToken())} />
         )}
@@ -486,14 +616,23 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut, isAdmin }: { isAuth
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
-        className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 hover:from-primary/30 hover:to-secondary/30 border border-primary/30 transition-all duration-200"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="User menu"
-      >
-        <User className="h-5 w-5 text-primary" />
-      </button>
-      {open && (
+      {isAuthenticated ? (
+        <button
+          className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 hover:from-primary/30 hover:to-secondary/30 border border-primary/30 transition-all duration-200"
+          onClick={() => setOpen((v) => !v)}
+          aria-label="User menu"
+        >
+          <User className="h-5 w-5 text-primary" />
+        </button>
+      ) : (
+        <Link
+          href="/auth"
+          className="flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 hover:from-primary/30 hover:to-secondary/30 border border-primary/30 transition-all duration-200 text-sm font-medium text-primary hover:text-primary/80"
+        >
+          Sign Up
+        </Link>
+      )}
+      {open && isAuthenticated && (
         <motion.div
           initial={{ opacity: 0, y: -10, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}

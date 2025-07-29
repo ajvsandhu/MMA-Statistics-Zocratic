@@ -45,6 +45,9 @@ SERVER_HOST = os.getenv('API_HOST', "0.0.0.0")
 SERVER_PORT = int(os.getenv('API_PORT', 8000))
 DEBUG_MODE = os.getenv('DEBUG', 'False').lower() == 'true'
 
+# API Base URL - constructed from server configuration
+API_BASE_URL = "https://api.zocraticmma.com"
+
 # CORS Configuration
 CORS_ORIGINS = os.getenv('CORS_ORIGINS', "http://localhost:3000,http://localhost:8000,https://ufc-fighter-data-api.vercel.app,https://ufc-fighter-data-api-git-main.vercel.app,https://www.zocraticmma.com,https://zocraticmma.com,https://zocratic-mma-statistics-backend.onrender.com").split(',')
 CORS_ORIGINS_REGEX = os.getenv("CORS_ORIGINS_REGEX", "")

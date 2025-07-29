@@ -8,14 +8,16 @@ import { Button } from "@/components/ui/button"
 import Link from 'next/link'
 import Image from 'next/image'
 import { PageTransition, AnimatedContainer, AnimatedItem } from "@/components/page-transition"
-import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft, CheckCircle, XCircle, Trophy, Coins } from 'lucide-react'
+import { ArrowUpRight, Calendar, Clock, ExternalLink, ArrowLeft, CheckCircle, XCircle, Trophy, Coins, Target, HelpCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
 import { ENDPOINTS } from "@/lib/api-config"
 import { FighterOdds } from "@/components/ui/odds-display"
 import { FightHistoryModal } from "@/components/ui/fight-history-modal"
 import { PlacePickModal } from "@/components/ui/place-pick-modal"
+import { UserBetsModal } from "@/components/ui/user-bets-modal"
 import { EventCountdown } from "@/components/ui/event-countdown"
+import { OnboardingModal } from "@/components/onboarding-modal"
 import { useAuth } from '@/hooks/use-auth'
 
 interface Fighter {
@@ -58,11 +60,13 @@ interface Fight {
   fighter1_id: number
   fighter1_tap_link: string
   fighter1_image: string
+  fighter1_page_link?: string
   fighter2_name: string
   fighter2_url: string
   fighter2_id: number
   fighter2_tap_link: string
   fighter2_image: string
+  fighter2_page_link?: string
   prediction: Prediction
   odds_data?: OddsData | null
   odds_event_id?: string | null
@@ -98,7 +102,7 @@ interface Event {
   id: number
 }
 
-export default function EventAnalysisPage() {
+export default function EventsPage() {
   const router = useRouter()
   const [eventData, setEventData] = useState<Event | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -118,6 +122,8 @@ export default function EventAnalysisPage() {
 
   const [userBets, setUserBets] = useState<any[]>([])
   const [predictionWindowOpen, setPredictionWindowOpen] = useState<boolean>(true)
+  const [userBetsModalOpen, setUserBetsModalOpen] = useState(false)
+  const [onboardingModalOpen, setOnboardingModalOpen] = useState(false)
 
   // Function to check if event has passed
   const isEventPassed = () => {
@@ -458,7 +464,9 @@ export default function EventAnalysisPage() {
       <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
         <AnimatedContainer className="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
           <AnimatedItem variant="fadeIn" className="space-y-2">
-            <div className="flex items-center justify-between min-h-[3rem] mb-4">
+            {/* Mobile-optimized header */}
+            <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:min-h-[3rem] mb-4">
+              {/* Back button and title - always on top */}
               <div className="flex items-center gap-1 sm:gap-2">
                 <Button
                   variant="ghost"
@@ -468,63 +476,97 @@ export default function EventAnalysisPage() {
                   <ArrowLeft className="h-4 w-4" />
                   <span className="sr-only sm:not-sr-only text-sm">Back</span>
                 </Button>
-                <h2 className="text-sm sm:text-lg md:text-xl font-light">Event Analysis</h2>
+                <h2 className="text-sm sm:text-lg md:text-xl font-light">Fight Predictions</h2>
               </div>
-              <div className="flex items-center gap-2 sm:gap-4">
+              
+              {/* Action buttons and balance - organized for mobile */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                {/* Action buttons - moved to the left */}
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="gap-1 text-sm px-3"
+                    onClick={() => setOnboardingModalOpen(true)}
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                    <span className="hidden sm:inline">How It Works</span>
+                    <span className="sm:hidden">Help</span>
+                  </Button>
+                  {isAuthenticated && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1 text-sm px-3"
+                      onClick={() => setUserBetsModalOpen(true)}
+                    >
+                      <Target className="h-4 w-4" />
+                      <span className="hidden sm:inline">My Picks</span>
+                      <span className="sm:hidden">Picks</span>
+                    </Button>
+                  )}
+                  <FightHistoryModal />
+                </div>
+                
+                {/* Balance section - moved to the right */}
                 {isAuthenticated ? (
                   coinBalance !== null ? (
-                    <div className="flex items-center gap-1 sm:gap-2 bg-primary/10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg">
-                      <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                      <span className="font-semibold text-xs sm:text-sm">{coinBalance} coins</span>
+                    <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-2 bg-primary/10 px-3 py-2 rounded-lg">
+                      <Coins className="h-4 w-4 text-primary" />
+                      <span className="font-semibold text-sm">{coinBalance} coins</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1 sm:gap-2 bg-muted px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg">
-                      <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground animate-pulse" />
-                      <span className="text-xs sm:text-sm text-muted-foreground">Loading...</span>
+                    <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-2 bg-muted px-3 py-2 rounded-lg">
+                      <Coins className="h-4 w-4 text-muted-foreground animate-pulse" />
+                      <span className="text-sm text-muted-foreground">Loading...</span>
                     </div>
                   )
                 ) : (
-                  <Link href="/auth">
-                    <Button variant="outline" size="sm" className="gap-1 text-xs sm:text-sm px-2 sm:px-3">
+                  <Link href="/auth" className="w-full sm:w-auto">
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1 text-sm px-3">
                       <span className="hidden sm:inline">Sign In to Place Picks</span>
                       <span className="sm:hidden">Sign In</span>
                     </Button>
                   </Link>
                 )}
-                <FightHistoryModal />
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-thin leading-tight">{eventData.event_name}</h1>
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+            {/* Event title and date - mobile optimized */}
+            <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-thin leading-tight text-center sm:text-left">{eventData.event_name}</h1>
+              <div className="flex items-center justify-center sm:justify-start gap-2 text-muted-foreground text-sm">
+                <Calendar className="h-4 w-4" />
                 <span>{eventData.event_date || 'Date Unknown'}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1 sm:gap-2">
-              <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                <Clock className="h-2 w-2 sm:h-3 sm:w-3" /> 
-                <span className="text-xs">Last Updated: {new Date(eventData.scraped_at || eventData.exported_at || Date.now()).toLocaleString()}</span>
-              </Badge>
-              <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                <Trophy className="h-2 w-2 sm:h-3 sm:w-3" />
-                <span className="text-xs">{eventData.completed_fights || 0}/{eventData.total_fights || 0} Fights</span>
-              </Badge>
-              {eventData.event_url && (
-                <Link 
-                  href={eventData.event_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <ExternalLink className="h-2 w-2 sm:h-3 sm:w-3" /> 
-                  UFC Stats
-                </Link>
-              )}
-              {/* Compact countdown next to UFC Stats for upcoming events */}
+            {/* Badges and info - mobile optimized */}
+            <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+              <div className="flex flex-wrap justify-center sm:justify-start gap-2">
+                <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                  <Clock className="h-3 w-3" /> 
+                  <span className="text-xs">Last Updated: {new Date(eventData.scraped_at || eventData.exported_at || Date.now()).toLocaleString()}</span>
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                  <Trophy className="h-3 w-3" />
+                  <span className="text-xs">{eventData.completed_fights || 0}/{eventData.total_fights || 0} Fights</span>
+                </Badge>
+                {eventData.event_url && (
+                  <Link 
+                    href={eventData.event_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <ExternalLink className="h-3 w-3" /> 
+                    UFC Stats
+                  </Link>
+                )}
+              </div>
+              
+              {/* Countdown section - mobile optimized */}
               {eventData.status !== 'completed' && eventData.event_start_time && isAuthenticated && (
-                <div className="flex items-center gap-1 sm:gap-2">
+                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2">
                   <span className="text-xs sm:text-sm text-muted-foreground">Picks Lock In:</span>
                   <EventCountdown 
                     eventStartTime={eventData.event_start_time} 
@@ -555,7 +597,13 @@ export default function EventAnalysisPage() {
                     <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 space-y-2 sm:space-y-3 md:space-y-4">
                       <div className="flex flex-row gap-1 sm:gap-2 md:gap-8 items-center">
                         <div className="flex flex-col items-center text-center flex-1 w-[40%] min-w-0">
-                          <div className="relative w-16 md:w-32 h-16 md:h-32 mb-2 md:mb-4 overflow-hidden rounded-full">
+                          {/* Fighter image - links to Tapology */}
+                          <Link 
+                            href={fight.fighter1_tap_link || '#'} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="relative w-16 md:w-32 h-16 md:h-32 mb-2 md:mb-4 overflow-hidden rounded-full hover:opacity-80 transition-opacity"
+                          >
                             {fight.fighter1_image ? (
                               <div className="w-full h-full relative">
                                 <Image 
@@ -579,33 +627,40 @@ export default function EventAnalysisPage() {
                                 <span className="text-[8px] md:text-xs font-bold">✓</span>
                               </div>
                             )}
-                          </div>
+                          </Link>
                           
-                          <div className="min-h-[2.5rem] sm:min-h-[3rem] flex items-center justify-center">
-                            <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter1_name}</h3>
-                          </div>
-                          
-                          {/* Display odds for fighter 1 */}
-                          <div className="mt-1 flex justify-center">
-                            <FighterOdds
-                              fighterName={fight.fighter1_name}
-                              odds={fight.odds_data?.fighter1_odds?.odds || null}
-                              bookmaker={fight.odds_data?.fighter1_odds?.bookmaker || null}
-                              size="sm"
-                              className="text-center"
-                            />
-                          </div>
-                          
-                          <div className="flex items-center gap-1 mt-1 justify-center">
-                            <Link 
-                              href={fight.fighter1_tap_link || '#'} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-[10px] md:text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
-                            >
-                              Tapology <ExternalLink className="h-2 w-2 md:h-3 md:w-3" />
-                            </Link>
-                          </div>
+                                                     {/* Fighter name - links to fighter page */}
+                           <div className="min-h-[2.5rem] sm:min-h-[3rem] flex flex-col items-center justify-center">
+                             {fight.fighter1_page_link ? (
+                               <div className="text-center">
+                                 <Link 
+                                   href={fight.fighter1_page_link}
+                                   className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight hover:text-primary transition-colors"
+                                 >
+                                   {fight.fighter1_name}
+                                 </Link>
+                                 <Link 
+                                   href={fight.fighter1_page_link}
+                                   className="text-[8px] sm:text-[10px] text-muted-foreground mt-1 opacity-60 hover:text-primary transition-colors underline"
+                                 >
+                                   View Profile
+                                 </Link>
+                               </div>
+                             ) : (
+                               <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter1_name}</h3>
+                             )}
+                           </div>
+                           
+                           {/* Display odds for fighter 1 */}
+                           <div className="mt-1 flex justify-center">
+                             <FighterOdds
+                               fighterName={fight.fighter1_name}
+                               odds={fight.odds_data?.fighter1_odds?.odds || null}
+                               bookmaker={fight.odds_data?.fighter1_odds?.bookmaker || null}
+                               size="sm"
+                               className="text-center"
+                             />
+                           </div>
                           <div className="mt-1 md:mt-3 text-center">
                             <div className="text-[10px] md:text-sm text-muted-foreground mb-0 md:mb-1">Win Probability</div>
                             <div 
@@ -651,7 +706,13 @@ export default function EventAnalysisPage() {
                         </div>
 
                         <div className="flex flex-col items-center text-center flex-1 w-[40%] min-w-0">
-                          <div className="relative w-16 md:w-32 h-16 md:h-32 mb-2 md:mb-4 overflow-hidden rounded-full">
+                          {/* Fighter image - links to Tapology */}
+                          <Link 
+                            href={fight.fighter2_tap_link || '#'} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="relative w-16 md:w-32 h-16 md:h-32 mb-2 md:mb-4 overflow-hidden rounded-full hover:opacity-80 transition-opacity"
+                          >
                             {fight.fighter2_image ? (
                               <div className="w-full h-full relative">
                                 <Image 
@@ -675,33 +736,40 @@ export default function EventAnalysisPage() {
                                 <span className="text-[8px] md:text-xs font-bold">✓</span>
                               </div>
                             )}
-                          </div>
+                          </Link>
                           
-                          <div className="min-h-[2.5rem] sm:min-h-[3rem] flex items-center justify-center">
-                            <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter2_name}</h3>
-                          </div>
-                          
-                          {/* Display odds for fighter 2 */}
-                          <div className="mt-1 flex justify-center">
-                            <FighterOdds
-                              fighterName={fight.fighter2_name}
-                              odds={fight.odds_data?.fighter2_odds?.odds || null}
-                              bookmaker={fight.odds_data?.fighter2_odds?.bookmaker || null}
-                              size="sm"
-                              className="text-center"
-                            />
-                          </div>
-                          
-                          <div className="flex items-center gap-1 mt-1 justify-center">
-                            <Link 
-                              href={fight.fighter2_tap_link || '#'} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-[10px] md:text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
-                            >
-                              Tapology <ExternalLink className="h-2 w-2 md:h-3 md:w-3" />
-                            </Link>
-                          </div>
+                                                     {/* Fighter name - links to fighter page */}
+                           <div className="min-h-[2.5rem] sm:min-h-[3rem] flex flex-col items-center justify-center">
+                             {fight.fighter2_page_link ? (
+                               <div className="text-center">
+                                 <Link 
+                                   href={fight.fighter2_page_link}
+                                   className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight hover:text-primary transition-colors"
+                                 >
+                                   {fight.fighter2_name}
+                                 </Link>
+                                 <Link 
+                                   href={fight.fighter2_page_link}
+                                   className="text-[8px] sm:text-[10px] text-muted-foreground mt-1 opacity-60 hover:text-primary transition-colors underline"
+                                 >
+                                   View Profile
+                                 </Link>
+                               </div>
+                             ) : (
+                               <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter2_name}</h3>
+                             )}
+                           </div>
+                           
+                           {/* Display odds for fighter 2 */}
+                           <div className="mt-1 flex justify-center">
+                             <FighterOdds
+                               fighterName={fight.fighter2_name}
+                               odds={fight.odds_data?.fighter2_odds?.odds || null}
+                               bookmaker={fight.odds_data?.fighter2_odds?.bookmaker || null}
+                               size="sm"
+                               className="text-center"
+                             />
+                           </div>
                           <div className="mt-1 md:mt-3 text-center">
                             <div className="text-[10px] md:text-sm text-muted-foreground mb-0 md:mb-1">Win Probability</div>
                             <div 
@@ -833,63 +901,27 @@ export default function EventAnalysisPage() {
             </p>
           </AnimatedItem>
 
-          {/* User Bets Section */}
-          {isAuthenticated && userBets.length > 0 && (
-            <AnimatedItem variant="fadeUp" delay={0.4} className="mt-6 sm:mt-8">
-              <Card className="border-primary/20 bg-card/50 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <span className="text-primary">🎯</span>
-                    Your Picks for This Event
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="max-h-[500px] overflow-y-auto">
-                    <div className="space-y-3">
-                      {userBets.map((bet, index) => (
-                        <div key={bet.id} className="flex items-center justify-between p-3 bg-primary/5 hover:bg-primary/10 border border-primary/10 rounded-lg transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
-                              {index + 1}
-                            </div>
-                            <div>
-                              <div className="font-semibold">{bet.fighter_name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {bet.odds_american > 0 ? `+${bet.odds_american}` : bet.odds_american} odds
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-primary">{bet.stake} coins</div>
-                            <div className="text-sm text-muted-foreground">
-                              Potential: {bet.potential_payout} coins
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="mt-3 pt-3 border-t border-primary/20">
-                        <div className="flex justify-between text-sm">
-                          <span>Total Wagered:</span>
-                          <span className="font-semibold">{userBets.reduce((sum, bet) => sum + bet.stake, 0)} coins</span>
-                        </div>
-                        <div className="flex justify-between text-sm text-primary">
-                          <span>Potential Total Payout:</span>
-                          <span className="font-semibold">{userBets.reduce((sum, bet) => sum + bet.potential_payout, 0)} coins</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </AnimatedItem>
-          )}
-                                   </AnimatedContainer>
-          <PlacePickModal 
-           {...modalState}
-           onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
-           onSuccess={refreshBalance}
-         />
-       </div>
-     </PageTransition>
-   )
+
+        </AnimatedContainer>
+        
+        <PlacePickModal 
+          {...modalState}
+          onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+          onSuccess={refreshBalance}
+        />
+        
+        <UserBetsModal
+          eventId={eventData?.id || 0}
+          eventName={eventData?.event_name || ''}
+          isOpen={userBetsModalOpen}
+          onClose={() => setUserBetsModalOpen(false)}
+        />
+
+        <OnboardingModal
+          isOpen={onboardingModalOpen}
+          onClose={() => setOnboardingModalOpen(false)}
+        />
+      </div>
+    </PageTransition>
+  )
 } 

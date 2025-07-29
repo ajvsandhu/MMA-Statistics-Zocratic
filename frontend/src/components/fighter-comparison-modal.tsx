@@ -2,17 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trophy, Coins, Target, TrendingUp, Users, Star } from 'lucide-react';
+import { X, Swords, Brain, Target, TrendingUp, Users, Star, Search, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { createPortal } from 'react-dom';
 
-interface OnboardingModalProps {
+interface FighterComparisonModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
+export function FighterComparisonModal({ isOpen, onClose }: FighterComparisonModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -30,135 +30,130 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
 
   const steps = [
     {
-      title: "Welcome to Zocratic MMA",
-      description: "Make predictions on UFC fights and compete with other fans.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Star className="h-4 w-4 text-white" /></div>,
+      title: "Fighter Comparison Tool",
+      description: "Compare any two UFC fighters with AI-powered predictions.",
+      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Swords className="h-4 w-4 text-white" /></div>,
       content: (
-        <div className="h-[200px] flex flex-col justify-between">
+        <div className="h-[180px] flex flex-col justify-between">
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground text-center">
-              Test your MMA knowledge by making predictions on upcoming UFC fights using real betting odds.
+              Our advanced AI analyzes fighter stats, fighting styles, and historical data to predict match outcomes.
             </p>
             
             <div className="bg-muted/30 rounded-lg p-4 text-center">
-              <Coins className="h-8 w-8 text-primary mx-auto mb-2" />
-              <p className="font-semibold text-sm">Start with 1,000 free coins</p>
-              <p className="text-xs text-muted-foreground">No real money required</p>
+              <Brain className="h-8 w-8 text-primary mx-auto mb-2" />
+              <p className="font-semibold text-sm">AI-Powered Analysis</p>
+              <p className="text-xs text-muted-foreground">Machine learning predictions</p>
             </div>
           </div>
           
           <p className="text-xs text-center text-muted-foreground">
-            Ready to get started? Let's learn the basics.
+            Let's see how to compare fighters and get predictions.
           </p>
         </div>
       )
     },
     {
       title: "How It Works",
-      description: "Four simple steps to start making predictions.",
+      description: "Three simple steps to get AI predictions.",
       icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Target className="h-4 w-4 text-white" /></div>,
       content: (
-        <div className="h-[200px] flex flex-col justify-between">
+        <div className="h-[180px] flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">1</div>
               <div>
-                <p className="font-medium text-sm">Browse Events</p>
-                <p className="text-xs text-muted-foreground">Check upcoming UFC fights</p>
+                <p className="font-medium text-sm">Select Two Fighters</p>
+                <p className="text-xs text-muted-foreground">Search and choose any UFC fighters</p>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
               <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">2</div>
               <div>
-                <p className="font-medium text-sm">Pick Winners</p>
-                <p className="text-xs text-muted-foreground">Choose who you think will win</p>
+                <p className="font-medium text-sm">Compare Stats</p>
+                <p className="text-xs text-muted-foreground">View detailed physical and fighting stats</p>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
               <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">3</div>
               <div>
-                <p className="font-medium text-sm">Stake Coins</p>
-                <p className="text-xs text-muted-foreground">Bet your virtual coins</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">4</div>
-              <div>
-                <p className="font-medium text-sm">Win Rewards</p>
-                <p className="text-xs text-muted-foreground">Earn coins when you're right</p>
+                <p className="font-medium text-sm">Get AI Prediction</p>
+                <p className="text-xs text-muted-foreground">Receive AI-powered fight outcome prediction</p>
               </div>
             </div>
           </div>
           
           <p className="text-xs text-center text-muted-foreground">
-            The more accurate your predictions, the more coins you earn.
+            Our AI considers 15+ factors including striking, grappling, and experience.
           </p>
         </div>
       )
     },
     {
-      title: "Understanding Odds",
-      description: "Learn how betting odds work in MMA.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Trophy className="h-4 w-4 text-white" /></div>,
+      title: "What You'll See",
+      description: "Comprehensive fighter analysis and predictions.",
+      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><BarChart3 className="h-4 w-4 text-white" /></div>,
       content: (
-        <div className="h-[200px] flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="bg-muted/30 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sm">Jon Jones: -200</span>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">FAVORITE</span>
+        <div className="h-[180px] flex flex-col justify-between">
+          <div className="space-y-2">
+            <div className="bg-muted/30 rounded-lg p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Search className="h-3 w-3 text-primary" />
+                <span className="font-semibold text-xs">Fighter Search</span>
               </div>
-              <p className="text-xs text-muted-foreground">Expected to win. Lower payout but safer bet.</p>
+              <p className="text-xs text-muted-foreground">Find any UFC fighter by name</p>
             </div>
             
-            <div className="bg-muted/30 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sm">Tom Aspinall: +170</span>
-                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">UNDERDOG</span>
+            <div className="bg-muted/30 rounded-lg p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <BarChart3 className="h-3 w-3 text-primary" />
+                <span className="font-semibold text-xs">Detailed Stats</span>
               </div>
-              <p className="text-xs text-muted-foreground">Less likely to win. Higher payout but riskier.</p>
+              <p className="text-xs text-muted-foreground">Physical, striking, and grappling comparisons</p>
+            </div>
+            
+            <div className="bg-muted/30 rounded-lg p-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Brain className="h-3 w-3 text-primary" />
+                <span className="font-semibold text-xs">AI Prediction</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Winner prediction with confidence percentage</p>
             </div>
           </div>
           
           <p className="text-xs text-center text-muted-foreground">
-            Favorites have negative odds (-), underdogs have positive odds (+).
+            Perfect for analyzing potential matchups and understanding fighter strengths.
           </p>
         </div>
       )
     },
     {
-      title: "Payouts",
-      description: "How your winnings are calculated.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Users className="h-4 w-4 text-white" /></div>,
+      title: "Understanding Predictions",
+      description: "How our AI analyzes and predicts fight outcomes.",
+      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><TrendingUp className="h-4 w-4 text-white" /></div>,
       content: (
-        <div className="h-[200px] flex flex-col justify-between">
+        <div className="h-[180px] flex flex-col justify-between">
           <div className="space-y-2">
             <div className="bg-green-100 dark:bg-green-900/20 rounded-lg p-2 border border-green-300 dark:border-green-700">
-              <h4 className="font-semibold text-xs text-green-800 dark:text-green-300 mb-1">When You Win</h4>
-              <p className="text-xs text-green-700 dark:text-green-400 mb-1">Get stake back + winnings</p>
-              <div className="bg-green-50 dark:bg-green-800/30 rounded p-1 border border-green-200 dark:border-green-600">
-                <p className="text-xs font-medium text-green-800 dark:text-green-200">
-                  Bet 100 on +170 → Get 270 coins
-                </p>
-              </div>
+              <h4 className="font-semibold text-xs text-green-800 dark:text-green-300 mb-1">High Confidence (80%+)</h4>
+              <p className="text-xs text-green-700 dark:text-green-400">Strong statistical advantage for predicted winner</p>
             </div>
             
-            <div className="bg-red-100 dark:bg-red-900/20 rounded-lg p-2 border border-red-300 dark:border-red-700">
-              <h4 className="font-semibold text-xs text-red-800 dark:text-red-300 mb-1">When You Lose</h4>
-              <p className="text-xs text-red-700 dark:text-red-400 mb-1">Lose your entire stake</p>
-              <div className="bg-red-50 dark:bg-red-800/30 rounded p-1 border border-red-200 dark:border-red-600">
-                <p className="text-xs font-medium text-red-800 dark:text-red-200">
-                  Bet 100 coins → Lose 100 coins
-                </p>
-              </div>
+            <div className="bg-yellow-100 dark:bg-yellow-900/20 rounded-lg p-2 border border-yellow-300 dark:border-yellow-700">
+              <h4 className="font-semibold text-xs text-yellow-800 dark:text-yellow-300 mb-1">Medium Confidence (60-79%)</h4>
+              <p className="text-xs text-yellow-700 dark:text-yellow-400">Close matchup with slight edge to predicted winner</p>
+            </div>
+            
+            <div className="bg-orange-100 dark:bg-orange-900/20 rounded-lg p-2 border border-orange-300 dark:border-orange-700">
+              <h4 className="font-semibold text-xs text-orange-800 dark:text-orange-300 mb-1">Low Confidence (50-59%)</h4>
+              <p className="text-xs text-orange-700 dark:text-orange-400">Very close fight, anything can happen</p>
             </div>
           </div>
           
           <p className="text-xs text-center text-muted-foreground">
-            Start small, learn the fighters first.
+            Remember: Predictions are for entertainment and analysis purposes only.
           </p>
         </div>
       )
@@ -288,7 +283,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
                     onClick={handleNext}
                     className="flex-1 h-11 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
                   >
-                    {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}
+                    {currentStep === steps.length - 1 ? 'Start Comparing' : 'Next'}
                   </Button>
                 </div>
               </CardContent>

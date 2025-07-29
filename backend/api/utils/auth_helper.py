@@ -8,8 +8,26 @@ from functools import lru_cache
 import json
 import uuid
 import re
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+# Cache to avoid database checks for recently verified users
+_user_settings_cache = {}
+CACHE_DURATION_MINUTES = 5  # Cache user settings for 5 minutes
+
+def cleanup_user_settings_cache():
+    """Clean up expired cache entries to prevent memory leaks"""
+    current_time = datetime.now()
+    expired_keys = [
+        key for key, cached_time in _user_settings_cache.items()
+        if current_time - cached_time > timedelta(minutes=CACHE_DURATION_MINUTES * 2)
+    ]
+    for key in expired_keys:
+        del _user_settings_cache[key]
+    
+    if expired_keys:
+        logger.debug(f"Cleaned up {len(expired_keys)} expired cache entries")
 
 # SECURITY: Load Cognito configuration from environment variables (support both backend and frontend env var names)
 def get_env_any(*names):
@@ -173,6 +191,20 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
         
         # ALWAYS store user info in settings - force update every time with PROPER ERROR HANDLING
         try:
+            # Check cache first to avoid unnecessary database calls
+            cache_key = f"{user_id}:{email}"
+            current_time = datetime.now()
+            
+            # Cleanup old cache entries periodically
+            if len(_user_settings_cache) > 100:  # Only cleanup when cache gets large
+                cleanup_user_settings_cache()
+            
+            if cache_key in _user_settings_cache:
+                cached_time = _user_settings_cache[cache_key]
+                if current_time - cached_time < timedelta(minutes=CACHE_DURATION_MINUTES):
+                    logger.debug(f"User settings for {user_id[:8]}... found in cache, skipping database check")
+                    return user_id
+            
             from backend.api.database import get_db_connection
             supabase = get_db_connection()
             if supabase:
@@ -204,18 +236,37 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
                 logger.info(f"Prepared settings for user {user_id[:8]}... with email: {email}")
                 
                 if existing_settings.data:
-                    # Update existing - ensure we preserve existing data and add new info
-                    logger.info(f"Updating existing user settings for {user_id[:8]}...")
+                    # Check if settings need updating by comparing current with existing
+                    existing_data = existing_settings.data[0]['settings'] or {}
                     
-                    # Merge new settings with existing ones, giving priority to JWT data
-                    update_result = supabase.table('user_settings').update({
-                        'settings': settings
-                    }).eq('user_id', user_id).execute()
+                    # Compare key fields to see if update is needed
+                    needs_update = (
+                        existing_data.get('email') != email or
+                        existing_data.get('username') != username or
+                        existing_data.get('display_name') != display_name or
+                        existing_data.get('preferred_username') != preferred_username or
+                        existing_data.get('cognito_username') != cognito_username or
+                        existing_data.get('last_login') != payload_data.get('auth_time', 'unknown')
+                    )
                     
-                    if update_result.data:
-                        logger.info(f"Successfully updated user settings for {user_id[:8]}... with email: {email}")
+                    if needs_update:
+                        logger.info(f"Updating existing user settings for {user_id[:8]}... (data changed)")
+                        
+                        # Merge new settings with existing ones, giving priority to JWT data
+                        update_result = supabase.table('user_settings').update({
+                            'settings': settings
+                        }).eq('user_id', user_id).execute()
+                        
+                        if update_result.data:
+                            logger.info(f"Successfully updated user settings for {user_id[:8]}... with email: {email}")
+                            # Cache the successful update
+                            _user_settings_cache[cache_key] = current_time
+                        else:
+                            logger.error(f"Update failed for user {user_id[:8]}...: {update_result}")
                     else:
-                        logger.error(f"Update failed for user {user_id[:8]}...: {update_result}")
+                        logger.debug(f"User settings for {user_id[:8]}... are up to date, skipping update")
+                        # Cache that no update was needed
+                        _user_settings_cache[cache_key] = current_time
                         
                 else:
                     # Create new user entry
@@ -227,6 +278,8 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
                     
                     if insert_result.data:
                         logger.info(f"Successfully created user settings for {user_id[:8]}... with email: {email}")
+                        # Cache the successful creation
+                        _user_settings_cache[cache_key] = current_time
                     else:
                         logger.error(f"Insert failed for user {user_id[:8]}...: {insert_result}")
                         
