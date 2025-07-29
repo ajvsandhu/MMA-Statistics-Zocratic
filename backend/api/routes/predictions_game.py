@@ -601,6 +601,54 @@ async def get_user_picks(
         logger.error(f"Error getting user picks: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get picks")
 
+@router.get("/user-picks/{user_id}", response_model=List[PredictionPick])
+async def get_user_picks_by_id(
+    user_id: str,
+    event_id: Optional[int] = None,
+    limit: int = 50,
+    authorization: str = Depends(get_user_id_simple if USE_SIMPLE_AUTH else get_user_id_from_auth_header)
+):
+    """Get another user's prediction picks (public data)"""
+    try:
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+            
+        query = supabase.table('bets')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .limit(limit)
+            
+        if event_id:
+            query = query.eq('event_id', event_id)
+            
+        response = query.execute()
+        
+        picks = []
+        for pick in response.data:
+            picks.append(PredictionPick(
+                id=pick['id'],
+                event_id=pick['event_id'],
+                fight_id=pick['fight_id'],
+                fighter_id=pick['fighter_id'],
+                fighter_name=pick['fighter_name'],
+                stake=pick['stake'],
+                odds_american=pick['odds_american'],
+                odds_decimal=float(pick['odds_decimal']),
+                potential_payout=pick['potential_payout'],
+                status=pick['status'],
+                payout=pick.get('payout'),
+                settled_at=pick.get('settled_at'),
+                created_at=pick['created_at']
+            ))
+            
+        return picks
+        
+    except Exception as e:
+        logger.error(f"Error getting user picks by ID: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get picks")
+
 @router.get("/transaction-history", response_model=List[TransactionRecord])
 async def get_transaction_history(
     limit: int = 50,

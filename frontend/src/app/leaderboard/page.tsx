@@ -58,19 +58,14 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
   // Check if this is the current user's profile
   const isOwnProfile = userProfile && user && userProfile.email === user.email;
 
-  // Fetch user's active picks - MOVED BEFORE EARLY RETURN TO FIX HOOKS ERROR
+  // Fetch user's active picks
   const fetchActivePicks = async () => {
     try {
       setLoadingPicks(true);
       
-      // Only fetch picks if user is authenticated AND viewing their own profile
-      if (!isAuthenticated || !isOwnProfile) {
-        setActivePicks([]);
-        return;
-      }
-
+      // Fetch picks for the profile user
       const headers = getAuthHeaders();
-      let response = await fetch(`${ENDPOINTS.MY_PICKS}?limit=100`, {
+      let response = await fetch(`${ENDPOINTS.USER_PICKS}/${user?.user_id}?limit=100`, {
         headers,
         method: 'GET'
       });
@@ -93,7 +88,7 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
     }
   };
 
-  // Fetch picks when user changes - HOOKS MUST BE CALLED IN SAME ORDER EVERY RENDER
+  // Fetch picks when user changes
   useEffect(() => {
     if (user && isOpen) {
       fetchActivePicks();
@@ -101,7 +96,7 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
       setActivePicks([]);
       setLoadingPicks(false);
     }
-  }, [user?.user_id, isOpen, isAuthenticated, isOwnProfile]);
+  }, [user?.user_id, isOpen]);
 
   if (!user) return null;
 
@@ -237,12 +232,6 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
                                 <div className="h-16 bg-muted rounded-lg"></div>
                               </div>
                             ))}
-                          </div>
-                        ) : !isOwnProfile ? (
-                          <div className="text-center py-6 text-muted-foreground">
-                            <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">Private Information</p>
-                            <p className="text-xs">Active picks are only visible on your own profile</p>
                           </div>
                         ) : activePicks.length > 0 ? (
                           <div className="space-y-3 max-h-60 overflow-y-auto">
@@ -457,15 +446,15 @@ export default function P4PLeaderboardPage() {
           {/* Podium Platform - Fixed 3-Column Grid Layout */}
           <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-8 px-4 w-full max-w-4xl mx-auto">
             
-            {/* 2nd Place - Always in LEFT column */}
+            {/* Left Column - 2nd Place */}
             <div className="flex justify-center items-end">
-              {topThree[1] ? (
+              {topThree.find(user => user.rank === 2) ? (
                 <motion.div
                   initial={{ opacity: 0, y: 100, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.4, type: "spring", bounce: 0.4, duration: 0.8 }}
                   className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
-                  onClick={() => openUserProfile(topThree[1])}
+                  onClick={() => openUserProfile(topThree.find(user => user.rank === 2)!)}
                 >
                   {/* Climbing Effect */}
                   <motion.div
@@ -477,17 +466,17 @@ export default function P4PLeaderboardPage() {
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-gray-300/20 to-gray-500/20 blur-lg opacity-100 group-hover:opacity-100"></div>
                     
                     <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 flex items-center justify-center text-lg sm:text-xl font-bold text-black mb-2 shadow-xl ring-2 ring-gray-400/30 group-hover:ring-4 group-hover:ring-gray-400/60 group-hover:shadow-2xl transition-all duration-300">
-                      {getUserInitials(topThree[1].email, topThree[1].display_name, topThree[1].username)}
+                      {getUserInitials(topThree.find(user => user.rank === 2)!.email, topThree.find(user => user.rank === 2)!.display_name, topThree.find(user => user.rank === 2)!.username)}
                       
                       {/* Sparkling Effects */}
                       <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-gray-300 animate-pulse" />
                     </div>
 
                     <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors truncate max-w-[80px] sm:max-w-none">
-                      {getDisplayName(topThree[1])}
+                      {getDisplayName(topThree.find(user => user.rank === 2)!)}
                     </h3>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {formatCurrency(topThree[1].portfolio_value)}
+                      {formatCurrency(topThree.find(user => user.rank === 2)!.portfolio_value)}
                     </p>
                   </motion.div>
 
@@ -518,15 +507,15 @@ export default function P4PLeaderboardPage() {
                     )}
                   </div>
 
-            {/* 1st Place - Always in CENTER column */}
+            {/* Center Column - 1st Place */}
             <div className="flex justify-center items-end">
-              {topThree[0] && (
+              {topThree.find(user => user.rank === 1) && (
                 <motion.div
                   initial={{ opacity: 0, y: 150, scale: 0.7 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", bounce: 0.5, duration: 1 }}
                   className="flex flex-col items-center cursor-pointer group relative z-10 w-full max-w-[240px]"
-                  onClick={() => openUserProfile(topThree[0])}
+                  onClick={() => openUserProfile(topThree.find(user => user.rank === 1)!)}
                 >
                   {/* Champion Floating Effect */}
                   <motion.div
@@ -557,18 +546,18 @@ export default function P4PLeaderboardPage() {
                       <Star className="absolute top-1/2 -right-3 w-2 h-2 sm:w-3 sm:h-3 text-yellow-300 animate-ping" />
                     </motion.div>
                     
-                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-400 to-yellow-600 flex items-center justify-center text-xl sm:text-2xl font-bold text-black mb-2 shadow-2xl ring-4 ring-yellow-500/50 group-hover:ring-6 group-hover:ring-yellow-400/80 group-hover:shadow-yellow-500/40 transition-all duration-300 border-2 border-yellow-200">
-                      {getUserInitials(topThree[0].email, topThree[0].display_name, topThree[0].username)}
+                                        <div className="relative mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-400 to-yellow-600 flex items-center justify-center text-xl sm:text-2xl font-bold text-black mb-2 shadow-2xl ring-4 ring-yellow-500/50 group-hover:ring-6 group-hover:ring-yellow-400/80 group-hover:shadow-yellow-500/40 transition-all duration-300 border-2 border-yellow-200">
+                      {getUserInitials(topThree.find(user => user.rank === 1)!.email, topThree.find(user => user.rank === 1)!.display_name, topThree.find(user => user.rank === 1)!.username)}
                       
                       {/* Inner Glow */}
                       <div className="absolute inset-1 rounded-full bg-gradient-to-br from-yellow-200/30 to-transparent"></div>
-                  </div>
+                    </div>
 
                     <h3 className="font-bold text-base sm:text-xl group-hover:text-primary transition-colors text-center">
-                      👑 {getDisplayName(topThree[0])}
+                      👑 {getDisplayName(topThree.find(user => user.rank === 1)!)}
                      </h3>
                     <p className="text-sm text-muted-foreground font-medium">
-                      {formatCurrency(topThree[0].portfolio_value)}
+                      {formatCurrency(topThree.find(user => user.rank === 1)!.portfolio_value)}
                     </p>
                     
                     {/* Champion Title */}
@@ -605,15 +594,15 @@ export default function P4PLeaderboardPage() {
               )}
                      </div>
 
-            {/* 3rd Place - Always in RIGHT column */}
+            {/* Right Column - 3rd Place */}
             <div className="flex justify-center items-end">
-              {topThree[2] ? (
+              {topThree.find(user => user.rank === 3) ? (
                 <motion.div
                   initial={{ opacity: 0, y: 80, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: 0.6, type: "spring", bounce: 0.3, duration: 0.7 }}
                   className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
-                  onClick={() => openUserProfile(topThree[2])}
+                  onClick={() => openUserProfile(topThree.find(user => user.rank === 3)!)}
                 >
                   {/* Bronze Climbing Effect */}
                   <motion.div
@@ -625,17 +614,17 @@ export default function P4PLeaderboardPage() {
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400/20 to-amber-600/20 blur-lg opacity-100 group-hover:opacity-100"></div>
                     
                     <div className="relative mx-auto w-14 h-14 sm:w-18 sm:h-18 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center text-sm sm:text-lg font-bold text-black mb-2 shadow-lg ring-2 ring-amber-500/30 group-hover:ring-4 group-hover:ring-amber-500/60 group-hover:shadow-2xl transition-all duration-300">
-                      {getUserInitials(topThree[2].email, topThree[2].display_name, topThree[2].username)}
+                      {getUserInitials(topThree.find(user => user.rank === 3)!.email, topThree.find(user => user.rank === 3)!.display_name, topThree.find(user => user.rank === 3)!.username)}
                       
                       {/* Bronze Effects */}
                       <Star className="pointer-events-none absolute -top-1 -right-1 w-3 h-3 text-amber-300 animate-pulse" />
                    </div>
 
                     <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors truncate max-w-[70px] sm:max-w-none">
-                      {getDisplayName(topThree[2])}
+                      {getDisplayName(topThree.find(user => user.rank === 3)!)}
                     </h3>
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {formatCurrency(topThree[2].portfolio_value)}
+                      {formatCurrency(topThree.find(user => user.rank === 3)!.portfolio_value)}
                     </p>
                   </motion.div>
 

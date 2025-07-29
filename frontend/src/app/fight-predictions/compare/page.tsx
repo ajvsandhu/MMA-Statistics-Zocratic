@@ -72,6 +72,67 @@ export default function ComparePage() {
   
   const animationVariants = useMemo(() => getAnimationVariants(isMobile), [isMobile])
 
+  // Restore comparison state from sessionStorage on component mount
+  useEffect(() => {
+    const savedState = sessionStorage.getItem('comparePageState');
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        const now = Date.now();
+        const stateAge = now - state.timestamp;
+        
+        // Only restore state if it's less than 30 minutes old
+        if (stateAge < 30 * 60 * 1000) {
+          if (state.fighter1) {
+            setFighter1(state.fighter1);
+          }
+          if (state.fighter2) {
+            setFighter2(state.fighter2);
+          }
+        } else {
+          // Clear old state
+          sessionStorage.removeItem('comparePageState');
+        }
+      } catch (error) {
+        console.error('Error restoring comparison state:', error);
+        sessionStorage.removeItem('comparePageState');
+      }
+    }
+  }, []);
+
+  // Clear old state on component mount to prevent stale data
+  useEffect(() => {
+    const savedState = sessionStorage.getItem('comparePageState');
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        const now = Date.now();
+        const stateAge = now - state.timestamp;
+        
+        // Clear state older than 30 minutes
+        if (stateAge >= 30 * 60 * 1000) {
+          sessionStorage.removeItem('comparePageState');
+        }
+      } catch (error) {
+        sessionStorage.removeItem('comparePageState');
+      }
+    }
+  }, []);
+
+  // Cleanup function to clear state when component unmounts if no fighters are selected
+  useEffect(() => {
+    return () => {
+      // Only clear state on unmount if no fighters are selected
+      if (!fighter1 && !fighter2) {
+        try {
+          sessionStorage.removeItem('comparePageState');
+        } catch (error) {
+          console.error('Error clearing state on unmount:', error);
+        }
+      }
+    };
+  }, [fighter1, fighter2]);
+
   const fetchFighterData = useCallback(async (fighterId: string): Promise<FighterStats | null> => {
     try {
       if (!fighterId) {
@@ -158,6 +219,32 @@ export default function ComparePage() {
 
   const handleFighter1Select = useCallback((fighter: {id: string, name: string}) => handleFighterSelect(fighter, setFighter1), [handleFighterSelect]);
   const handleFighter2Select = useCallback((fighter: {id: string, name: string}) => handleFighterSelect(fighter, setFighter2), [handleFighterSelect]);
+
+  // Update sessionStorage whenever fighters change
+  useEffect(() => {
+    const comparisonState = {
+      fighter1: fighter1,
+      fighter2: fighter2,
+      timestamp: Date.now()
+    };
+    
+    try {
+      if (fighter1 || fighter2) {
+        sessionStorage.setItem('comparePageState', JSON.stringify(comparisonState));
+      } else {
+        // Clear state if no fighters are selected
+        sessionStorage.removeItem('comparePageState');
+      }
+    } catch (error) {
+      console.error('Error saving comparison state:', error);
+      // Try to clear the storage if it's causing issues
+      try {
+        sessionStorage.removeItem('comparePageState');
+      } catch (clearError) {
+        console.error('Error clearing comparison state:', clearError);
+      }
+    }
+  }, [fighter1, fighter2]);
 
   const getPrediction = useCallback(async () => {
     if (!fighter1 || !fighter2 || !fighter1.id || !fighter2.id) {
@@ -274,6 +361,27 @@ export default function ComparePage() {
 
   // Update the FighterCard component to remove all animations
   const FighterCard = memo(({ fighter, onRemove }: { fighter: FighterStats, onRemove: () => void }) => {
+    const router = useRouter();
+    
+    const handleViewProfile = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Store current comparison state before navigating
+      const comparisonState = {
+        fighter1: fighter1,
+        fighter2: fighter2,
+        timestamp: Date.now()
+      };
+      
+      // Store in sessionStorage so it persists during the session
+      sessionStorage.setItem('comparePageState', JSON.stringify(comparisonState));
+      
+      // Pass the return URL as a query parameter
+      const returnUrl = encodeURIComponent('/fight-predictions/compare');
+      router.push(`/fighters/${fighter.id}?returnTo=${returnUrl}`);
+    };
+
     const cardContent = (
       <>
         <img
@@ -354,6 +462,16 @@ export default function ComparePage() {
                   </>
                 )}
               </div>
+              
+              {/* View Profile Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleViewProfile}
+                className="mt-2 px-2 py-1 h-auto text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 pointer-events-auto"
+              >
+                View Profile
+              </Button>
             </div>
           </div>
         </div>
