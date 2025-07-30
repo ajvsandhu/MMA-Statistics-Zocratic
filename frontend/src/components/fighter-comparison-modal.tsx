@@ -152,9 +152,7 @@ export function FighterComparisonModal({ isOpen, onClose }: FighterComparisonMod
             </div>
           </div>
           
-          <p className="text-xs text-center text-muted-foreground">
-            Remember: Predictions are for entertainment and analysis purposes only.
-          </p>
+        
         </div>
       )
     }
