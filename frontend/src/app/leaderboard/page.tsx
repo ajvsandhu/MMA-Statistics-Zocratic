@@ -19,7 +19,9 @@ import {
   Award,
   Sparkles,
   Flame,
-  Zap
+  Zap,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { ENDPOINTS } from '@/lib/api-config';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -299,6 +301,10 @@ export default function P4PLeaderboardPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 5;
 
   useEffect(() => {
     fetchLeaderboard();
@@ -325,9 +331,13 @@ export default function P4PLeaderboardPage() {
         const data = await response.json();
         const newLeaderboard = data.leaderboard || [];
         
+        // Get stored previous ranks from localStorage for persistent tracking
+        const storedRanks = localStorage.getItem('leaderboardPreviousRanks');
+        const storedPreviousRanks = storedRanks ? new Map(JSON.parse(storedRanks)) : new Map();
+        
         // Calculate rank changes and highest ranks
         const updatedLeaderboard = newLeaderboard.map((user: LeaderboardUser) => {
-          const previousRank = previousRanks.get(user.user_id);
+          const previousRank = storedPreviousRanks.get(user.user_id);
           let rank_change: 'up' | 'down' | 'same' = 'same';
           
           if (previousRank !== undefined) {
@@ -338,9 +348,13 @@ export default function P4PLeaderboardPage() {
             }
           }
           
-          // Calculate highest rank (lowest number = highest rank)
-          const currentHighest = user.highest_rank || user.rank;
-          const highest_rank = Math.min(currentHighest, user.rank);
+          // Calculate highest rank properly (lowest number = highest rank)
+          const storedHighest = localStorage.getItem(`highestRank_${user.user_id}`);
+          const storedHighestRank = storedHighest ? parseInt(storedHighest) : user.rank;
+          const highest_rank = Math.min(storedHighestRank, user.rank);
+          
+          // Store the new highest rank
+          localStorage.setItem(`highestRank_${user.user_id}`, highest_rank.toString());
           
           return {
             ...user,
@@ -349,12 +363,13 @@ export default function P4PLeaderboardPage() {
           };
         });
         
-        // Update previous ranks for next comparison
-        const newPreviousRanks = new Map();
+        // Store current ranks for next comparison
+        const currentRanks = new Map();
         updatedLeaderboard.forEach((user: LeaderboardUser) => {
-          newPreviousRanks.set(user.user_id, user.rank);
+          currentRanks.set(user.user_id, user.rank);
         });
-        setPreviousRanks(newPreviousRanks);
+        localStorage.setItem('leaderboardPreviousRanks', JSON.stringify(Array.from(currentRanks.entries())));
+        setPreviousRanks(currentRanks);
         
         setLeaderboard(updatedLeaderboard);
         setTotalUsers(data.total_users || 0);
@@ -406,6 +421,28 @@ export default function P4PLeaderboardPage() {
 
   const topThree = leaderboard.slice(0, 3);
   const restOfUsers = leaderboard.slice(3);
+
+  // Pagination logic
+  const totalPages = Math.ceil(restOfUsers.length / usersPerPage);
+  const startIndex = (currentPage - 1) * usersPerPage;
+  const endIndex = startIndex + usersPerPage;
+  const currentUsers = restOfUsers.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-12 space-y-12">
@@ -674,26 +711,42 @@ export default function P4PLeaderboardPage() {
         <Card className="border border-primary/20 mx-4 sm:mx-0">
         <CardContent className="p-0">
             <div className="p-4 sm:p-6 border-b bg-muted/30">
-              <div className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-primary" />
-                <h3 className="text-lg sm:text-xl font-semibold">Complete Rankings</h3>
-                <Badge variant="secondary" className="text-xs">
-                  #{restOfUsers.length + 3} fighters climbing
-                </Badge>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg sm:text-xl font-semibold">Complete Rankings</h3>
+                  <Badge variant="secondary" className="text-xs">
+                    #{restOfUsers.length + 3} fighters climbing
+                  </Badge>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">
+                    {currentUsers.length} of {restOfUsers.length} users
+                  </p>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-2">
                 Every pick counts in the race to the top
               </p>
             </div>
             
-            <div className="max-h-80 sm:max-h-96 overflow-y-auto">
-              {restOfUsers.map((user, index) => (
+            <div className="h-[400px] sm:h-[480px] overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentPage}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="h-full"
+                >
+                  {currentUsers.map((user, index) => (
                 <motion.div 
                     key={user.user_id} 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between p-3 sm:p-4 border-b last:border-b-0 hover:bg-muted/30 transition-all cursor-pointer group"
+                  className="flex items-center justify-between p-4 sm:p-5 border-b last:border-b-0 hover:bg-muted/30 transition-all cursor-pointer group min-h-[64px]"
                   onClick={() => openUserProfile(user)}
                 >
                   <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -706,17 +759,17 @@ export default function P4PLeaderboardPage() {
                       {user.rank_change === 'up' && (
                         <div className="flex items-center">
                           <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
-                          <span className="text-xs text-green-500 ml-1">↗</span>
                         </div>
                       )}
                       {user.rank_change === 'down' && (
                         <div className="flex items-center">
                           <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 rotate-180" />
-                          <span className="text-xs text-red-500 ml-1">↘</span>
                         </div>
                       )}
-                      {user.rank <= 10 && user.rank_change === 'same' && (
-                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
+                      {user.rank_change === 'same' && (
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-muted-foreground/40 rounded-full"></div>
+                        </div>
                       )}
                       </div>
                       
@@ -749,8 +802,72 @@ export default function P4PLeaderboardPage() {
                   </div>
                 </motion.div>
               ))}
-          </div>
-        </CardContent>
+              
+              {/* Fill empty space if fewer than 5 users - make them invisible */}
+              {currentUsers.length < 5 && Array.from({ length: 5 - currentUsers.length }, (_, i) => (
+                <div key={`empty-${i}`} className="h-16 sm:h-20 bg-transparent opacity-0" />
+              ))}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between p-4 border-t bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPreviousPage}
+                      disabled={currentPage === 1}
+                      className="h-9 w-9 p-0 rounded-lg"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium text-muted-foreground min-w-[80px] text-center">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                      className="h-9 w-9 p-0 rounded-lg"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {/* Page Numbers */}
+                  <div className="flex items-center gap-1.5">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => goToPage(pageNum)}
+                          className="h-9 w-9 p-0 rounded-lg font-medium"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </CardContent>
       </Card>
       )}
 
