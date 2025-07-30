@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useIsMobile } from "@/lib/utils"
+import Link from "next/link"
 
 // Constants
 const DEFAULT_PLACEHOLDER_IMAGE = '/placeholder-fighter.png'
@@ -497,6 +498,90 @@ const formatRanking = (ranking: string | null): string => {
   return '';  // Return empty string for unranked (99) or invalid rankings
 };
 
+// Helper function to generate fighter URL from name
+const generateFighterUrl = async (fighterName: string): Promise<string> => {
+  if (!fighterName) return '';
+  
+  try {
+    // Search for the fighter by name to get their ID
+    const response = await fetch(`${ENDPOINTS.FIGHTERS_SEARCH}?query=${encodeURIComponent(fighterName)}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.fighters && data.fighters.length > 0) {
+        // Use the first (best match) fighter's ID
+        const fighter = data.fighters[0];
+        return `/fighters/${fighter.id}`;
+      }
+    }
+  } catch (error) {
+    console.error('Error searching for fighter:', error);
+  }
+  
+  // Fallback: convert name to URL-friendly format if search fails
+  const urlName = fighterName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .trim();
+  
+  return `/fighters/${urlName}`;
+};
+
+// Component to handle async opponent link generation
+const OpponentLink = ({ opponentName }: { opponentName: string }) => {
+  const [href, setHref] = React.useState<string>('');
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchUrl = async () => {
+      setIsLoading(true);
+      try {
+        const url = await generateFighterUrl(opponentName);
+        setHref(url);
+      } catch (error) {
+        console.error('Error generating fighter URL:', error);
+        // Fallback to name-based URL
+        const urlName = opponentName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '')
+          .replace(/\s+/g, '-')
+          .trim();
+        setHref(`/fighters/${urlName}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUrl();
+  }, [opponentName]);
+
+  if (isLoading) {
+    return (
+      <p className="text-xl font-medium mb-2">
+        <span className="text-muted-foreground">{opponentName}</span>
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-xl font-medium mb-2">
+      <Link 
+        href={href}
+        className="text-primary hover:text-primary/80 transition-colors duration-200 hover:underline"
+        onClick={(e) => {
+          e.stopPropagation();
+          // Store the current page before navigating
+          sessionStorage.setItem('fighterPageFrom', window.location.pathname);
+          // Clear any old compare page state to prevent interference
+          sessionStorage.removeItem('comparePageState');
+        }}
+      >
+        {opponentName}
+      </Link>
+    </p>
+  );
+};
+
 // Move FightHistoryView outside of FighterDetails
 const FightHistoryView = ({ 
   fightHistory, 
@@ -609,9 +694,9 @@ const FightHistoryView = ({
                             animate={{ opacity: 1, y: 0 }}
                             className="bg-accent/20 rounded-lg p-4 ring-1 ring-primary/10"
                           >
-                            <p className="text-xl font-medium mb-2">
-                              {selectedFight.opponent_display_name || selectedFight.opponent}
-                            </p>
+                            <OpponentLink 
+                              opponentName={selectedFight.opponent_display_name || selectedFight.opponent}
+                            />
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-muted-foreground">Result:</span>
                               <span className={cn(

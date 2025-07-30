@@ -292,6 +292,12 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
         return; // Stop here for compare page
       }
       
+      // Store the current page before navigating to fighter page
+      sessionStorage.setItem('fighterPageFrom', window.location.pathname);
+      
+      // Clear any old compare page state to prevent interference
+      sessionStorage.removeItem('comparePageState');
+      
       // Navigate to the fighter page using ID instead of slug
       router.push(`/fighters/${fighter.id}`);
     } catch (err) {

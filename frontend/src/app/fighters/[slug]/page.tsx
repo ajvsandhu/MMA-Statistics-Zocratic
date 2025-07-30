@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { FighterDetails } from "@/components/fighter-details"
 import { PageTransition } from "@/components/page-transition"
 import { FighterSearch } from "@/components/fighter-search"
@@ -12,6 +12,22 @@ export default function FighterIdPage() {
   const params = useParams();
   const router = useRouter();
   const fighterId = params?.slug as string; // The route parameter is still called slug but contains the ID
+  
+  // Get the stored "from" page when component mounts
+  React.useEffect(() => {
+    // If we don't have a stored from page, try to get it from the referrer
+    const fromPage = sessionStorage.getItem('fighterPageFrom');
+    if (!fromPage) {
+      const referrer = document.referrer;
+      if (referrer && referrer.includes(window.location.origin)) {
+        const referrerUrl = new URL(referrer);
+        const referrerPath = referrerUrl.pathname;
+        if (referrerPath && referrerPath !== '/' && !referrerPath.startsWith('/fighters/')) {
+          sessionStorage.setItem('fighterPageFrom', referrerPath);
+        }
+      }
+    }
+  }, []);
   
   const handleSelectFighter = () => {
     // Empty function to satisfy the prop requirement
@@ -27,47 +43,33 @@ export default function FighterIdPage() {
       // Decode and navigate to the specified return URL
       const decodedReturnUrl = decodeURIComponent(returnTo);
       router.push(decodedReturnUrl);
-    } else {
-      // Check if we have saved compare page state - if so, go back to compare page
-      const savedState = sessionStorage.getItem('comparePageState');
-      if (savedState) {
-        try {
-          const state = JSON.parse(savedState);
-          const now = Date.now();
-          const stateAge = now - state.timestamp;
-          
-          // If we have recent compare state, go back to compare page
-          if (stateAge < 30 * 60 * 1000 && (state.fighter1 || state.fighter2)) {
-            router.push('/fight-predictions/compare');
-            return;
-          }
-        } catch (error) {
-          console.error('Error checking compare state:', error);
-        }
-      }
+      return;
+    }
+    
+    // Get the stored "from" page
+    const fromPage = sessionStorage.getItem('fighterPageFrom');
+    
+    // If we have a stored from page and it's not the current page, go back there
+    if (fromPage && fromPage !== window.location.pathname && !fromPage.startsWith('/fighters/')) {
+      router.push(fromPage);
+      return;
+    }
+    
+    // Fallback to referrer logic
+    const referrer = document.referrer;
+    if (referrer && referrer.includes(window.location.origin)) {
+      const referrerUrl = new URL(referrer);
+      const referrerPath = referrerUrl.pathname;
       
-      // Fall back to referrer logic
-      const referrer = document.referrer;
-      
-      // Check if we came from within our app (same origin)
-      if (referrer && referrer.includes(window.location.origin)) {
-        // Extract the path from the referrer
-        const referrerUrl = new URL(referrer);
-        const referrerPath = referrerUrl.pathname;
-        
-        // If we came from another fighter page, go back to the main pages
-        if (referrerPath.startsWith('/fighters/')) {
-          // Go to a main page instead of another fighter page
-          router.push('/fight-predictions');
-        } else {
-          // Go back to the original referrer
-          router.push(referrerPath);
-        }
-      } else {
-        // If no referrer or external referrer, go to predictions page as default
-        router.push('/fight-predictions');
+      // If we came from a valid page within our app, go back there
+      if (referrerPath && referrerPath !== '/' && !referrerPath.startsWith('/fighters/')) {
+        router.push(referrerPath);
+        return;
       }
     }
+    
+    // Default fallback - go to home page
+    router.push('/');
   };
   
   if (!fighterId) {

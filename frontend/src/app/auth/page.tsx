@@ -86,7 +86,7 @@ export default function AuthPage() {
       newErrors.password = 'Password is required';
     } else if (mode === 'signup' && formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters';
-         } else if (mode === 'signup' && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])/.test(formData.password)) {
+         } else if (mode === 'signup' && !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_])/.test(formData.password)) {
        newErrors.password = 'Password must contain uppercase, lowercase, number, and special character';
     }
 
