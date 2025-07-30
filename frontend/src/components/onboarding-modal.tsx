@@ -261,11 +261,11 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
                     {steps.map((_, index) => (
                       <div
                         key={index}
-                        className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                          index <= currentStep 
-                            ? 'bg-gradient-to-r from-primary to-secondary' 
-                            : 'bg-muted/40'
-                        }`}
+                                                 className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                           index <= currentStep 
+                             ? 'bg-primary' 
+                             : 'bg-muted/40'
+                         }`}
                       />
                     ))}
                   </div>
@@ -286,7 +286,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
                   </Button>
                   <Button
                     onClick={handleNext}
-                    className="flex-1 h-11 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+                    className="flex-1 h-11 bg-primary hover:bg-primary/90"
                   >
                     {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}
                   </Button>

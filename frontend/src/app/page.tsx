@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Trophy, Users, Target, Zap, BarChart3, Star, Sparkles, Award, Calendar, MapPin } from "lucide-react"
+import { ArrowRight, Trophy, Users, Target, Zap, BarChart3, Star, Sparkles, Award, Calendar, MapPin, ChevronDown, ChevronUp } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { motion, useScroll, useTransform, useSpring } from "framer-motion"
 import { API_URL, ENDPOINTS } from "@/lib/api-config"
@@ -367,10 +367,26 @@ export default function HomePage() {
                      </Link>
                    </Button>
               <Button variant="outline" size="lg" className="px-8 py-4 text-lg" asChild>
-                     <Link href="/fighters">
-                       Explore Fighters
+                     <Link href="/about">
+                       About
                      </Link>
                    </Button>
+            </motion.div>
+            
+            {/* Scroll Indicator */}
+            <motion.div 
+              className="absolute bottom-20 left-1/2 transform -translate-x-1/2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 1.2 }}
+            >
+              <motion.div
+                animate={{ y: [0, 8, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="text-muted-foreground/60"
+              >
+                <ChevronDown className="h-5 w-5" />
+              </motion.div>
             </motion.div>
           </motion.div>
                  </div>
@@ -433,6 +449,37 @@ export default function HomePage() {
                   Get AI-powered fight analysis and outcome predictions
                 </p>
                     </div>
+            </motion.div>
+            
+            {/* Scroll Indicators */}
+            <motion.div 
+              className="absolute top-20 left-1/2 transform -translate-x-1/2"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="text-muted-foreground/60"
+              >
+                <ChevronUp className="h-5 w-5" />
+              </motion.div>
+            </motion.div>
+            
+            <motion.div 
+              className="absolute bottom-20 left-1/2 transform -translate-x-1/2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <motion.div
+                animate={{ y: [0, 8, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="text-muted-foreground/60"
+              >
+                <ChevronDown className="h-5 w-5" />
+              </motion.div>
             </motion.div>
                   </div>
           </div>
@@ -614,6 +661,37 @@ export default function HomePage() {
                   </div>
                 </motion.div>
               )}
+              
+              {/* Scroll Indicators */}
+              <motion.div 
+                className="absolute top-20 left-1/2 transform -translate-x-1/2"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+              >
+                <motion.div
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  className="text-muted-foreground/60"
+                >
+                  <ChevronUp className="h-5 w-5" />
+                </motion.div>
+              </motion.div>
+              
+              <motion.div 
+                className="absolute bottom-20 left-1/2 transform -translate-x-1/2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+              >
+                <motion.div
+                  animate={{ y: [0, 8, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  className="text-muted-foreground/60"
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </motion.div>
+              </motion.div>
               </div>
           </div>
         </section>
@@ -648,7 +726,7 @@ export default function HomePage() {
             >
                   <Button 
                     size="lg" 
-                className="px-12 md:px-16 py-6 md:py-8 text-xl md:text-2xl font-light hover:scale-105 transition-transform duration-300 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-2xl"
+                className="px-12 md:px-16 py-6 md:py-8 text-xl md:text-2xl font-light hover:scale-105 transition-transform duration-300 bg-primary hover:bg-primary/90 shadow-2xl"
                     asChild
                   >
                     <Link href="/fight-predictions">
@@ -683,6 +761,22 @@ export default function HomePage() {
                   </Card>
                 </Link>
               ))}
+            </motion.div>
+            
+            {/* Scroll Indicator - Only Up Arrow for Last Section */}
+            <motion.div 
+              className="absolute top-20 left-1/2 transform -translate-x-1/2"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="text-muted-foreground/60"
+              >
+                <ChevronUp className="h-5 w-5" />
+              </motion.div>
             </motion.div>
           </div>
           </div>

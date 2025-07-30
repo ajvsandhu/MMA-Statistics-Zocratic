@@ -131,7 +131,7 @@ export default function FightPredictionsPage() {
                 <Button
                   size="lg"
                   onClick={handleGetStarted}
-                  className="px-8 py-4 text-lg bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                  className="px-8 py-4 text-lg bg-primary hover:bg-primary/90"
                 >
                   Start Comparing
                   <ArrowRight className="ml-2 h-5 w-5" />

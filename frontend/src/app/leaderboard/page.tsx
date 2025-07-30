@@ -144,7 +144,7 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
                       {/* Header */}
                       <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-lg font-bold text-primary-foreground">
+                          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-lg font-bold text-primary-foreground">
                             {getUserInitials(user.email, user.display_name, user.username)}
                           </div>
                           <div>
@@ -721,7 +721,7 @@ export default function P4PLeaderboardPage() {
                       </div>
                       
                     {/* User Avatar */}
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center font-bold text-xs sm:text-sm group-hover:brightness-110 group-hover:shadow-lg transition-all duration-300 shrink-0">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/20 flex items-center justify-center font-bold text-xs sm:text-sm group-hover:brightness-110 group-hover:shadow-lg transition-all duration-300 shrink-0">
                         {getUserInitials(user.email, user.display_name, user.username)}
                       </div>
                       
@@ -758,7 +758,8 @@ export default function P4PLeaderboardPage() {
       <div className="text-center mt-8">
         <Button 
           onClick={() => fetchLeaderboard(false)} 
-          className="gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          variant="default"
+          className="gap-2 px-6 py-3 !bg-primary !hover:bg-primary/90 !text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
           disabled={loading}
         >
           <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

@@ -186,7 +186,6 @@ export function MainNav() {
     { href: "/fight-predictions/events", label: "Events" },
     { href: "/leaderboard", label: "P4P Leaderboard" },
     { href: "/zobot", label: "Zobot" },
-    { href: "/about", label: "About" },
     { href: "/contact", label: "Contact" }
   ]
 
@@ -402,10 +401,10 @@ export function MainNav() {
                             {/* Account Dropdown Header */}
                             <button
                               onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-                              className="flex items-center justify-between w-full px-4 py-3 rounded-xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 hover:from-primary/20 hover:to-secondary/20 transition-all duration-200"
+                              className="flex items-center justify-between w-full px-4 py-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all duration-200"
                             >
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
                                   <User className="h-5 w-5 text-white" />
                                 </div>
                                 <div className="flex-1 min-w-0 text-left">
@@ -479,7 +478,7 @@ export function MainNav() {
                             <Link
                               href="/auth"
                               onClick={() => setMobileMenuOpen(false)}
-                              className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white text-center"
+                              className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 bg-primary hover:bg-primary/90 text-primary-foreground text-center"
                             >
                               Sign In
                             </Link>
@@ -513,7 +512,7 @@ export function MainNav() {
                             className={cn(
                               "flex items-center w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
                               "hover:bg-[var(--nav-bg-active)] hover:text-[var(--nav-text-hover)]",
-                              isActive ? "bg-gradient-to-r from-primary/20 to-secondary/20 text-primary font-semibold border border-primary/30" : "text-muted-foreground"
+                              isActive ? "bg-primary/20 text-primary font-semibold border border-primary/30" : "text-muted-foreground"
                             )}
                             onClick={() => {
                               setMobileMenuOpen(false)
@@ -559,7 +558,7 @@ export function MainNav() {
               {isActive && (
                 <motion.div
                   layoutId="nav-active"
-                  className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-lg border border-primary/30"
+                  className="absolute inset-0 bg-primary/20 rounded-lg border border-primary/30"
                   initial={false}
                   transition={{
                     type: "spring",
@@ -618,7 +617,7 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut, isAdmin }: { isAuth
     <div className="relative" ref={menuRef}>
       {isAuthenticated ? (
         <button
-          className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 hover:from-primary/30 hover:to-secondary/30 border border-primary/30 transition-all duration-200"
+          className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/20 hover:bg-primary/30 border border-primary/30 transition-all duration-200"
           onClick={() => setOpen((v) => !v)}
           aria-label="User menu"
         >
@@ -627,7 +626,7 @@ function UserMenu({ isAuthenticated, userProfile, onSignOut, isAdmin }: { isAuth
       ) : (
         <Link
           href="/auth"
-          className="flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 hover:from-primary/30 hover:to-secondary/30 border border-primary/30 transition-all duration-200 text-sm font-medium text-primary hover:text-primary/80"
+          className="flex items-center px-4 py-2 rounded-xl bg-primary/20 hover:bg-primary/30 border border-primary/30 transition-all duration-200 text-sm font-medium text-primary hover:text-primary/80"
         >
           Sign Up
         </Link>

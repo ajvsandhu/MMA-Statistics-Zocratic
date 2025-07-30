@@ -249,7 +249,7 @@ export default function DashboardPage() {
         </h1>
         <div className="w-24 h-1 bg-gradient-to-r from-primary to-secondary rounded-full mx-auto"></div>
         <p className="text-xl text-muted-foreground max-w-3xl mx-auto">Track your prediction performance and portfolio statistics</p>
-        <Button onClick={fetchDashboardData} className="mt-4 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300">
+        <Button onClick={fetchDashboardData} className="mt-4 bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300">
           <Activity className="w-4 h-4 mr-2" />
           Refresh Data
         </Button>
