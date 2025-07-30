@@ -675,6 +675,90 @@
     display: none;
   }
 
+  /* Custom scrollbar for active picks
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    margin: 8px 0;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, 
+      hsl(var(--primary) / 0.6) 0%, 
+      hsl(var(--primary) / 0.8) 50%, 
+      hsl(var(--primary) / 0.9) 100%);
+    border-radius: 12px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    box-shadow: 
+      0 0 0 1px hsl(var(--primary) / 0.1),
+      0 0 8px hsl(var(--primary) / 0.3),
+      inset 0 1px 0 hsl(var(--primary) / 0.2);
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, 
+      hsl(var(--primary) / 0.8) 0%, 
+      hsl(var(--primary) / 1) 50%, 
+      hsl(var(--primary) / 1) 100%);
+    box-shadow: 
+      0 0 0 1px hsl(var(--primary) / 0.2),
+      0 0 12px hsl(var(--primary) / 0.5),
+      inset 0 1px 0 hsl(var(--primary) / 0.3);
+    transform: scaleY(1.1);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, 
+      hsl(var(--primary) / 0.9) 0%, 
+      hsl(var(--primary) / 1) 50%, 
+      hsl(var(--primary) / 1) 100%);
+    box-shadow: 
+      0 0 0 1px hsl(var(--primary) / 0.3),
+      0 0 16px hsl(var(--primary) / 0.7),
+      inset 0 1px 0 hsl(var(--primary) / 0.4);
+    transform: scaleY(1.05);
+  }
+
+  /* Cool animated gradient border effect */
+  @keyframes scrollbar-glow {
+    0%, 100% {
+      box-shadow: 
+        0 0 0 1px hsl(var(--primary) / 0.1),
+        0 0 8px hsl(var(--primary) / 0.3),
+        inset 0 1px 0 hsl(var(--primary) / 0.2);
+    }
+    50% {
+      box-shadow: 
+        0 0 0 1px hsl(var(--primary) / 0.2),
+        0 0 12px hsl(var(--primary) / 0.5),
+        inset 0 1px 0 hsl(var(--primary) / 0.3);
+    }
+  }
+  
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    animation: scrollbar-glow 2s ease-in-out infinite;
+  }
+
+  /* Firefox fallback with gradient */
+  @supports (scrollbar-color: red blue) {
+    .scrollbar-thin {
+      scrollbar-color: hsl(var(--primary) / 0.7) transparent;
+      scrollbar-width: thin;
+    }
+  }
+
   .glass-effect {
     @apply bg-background/60 backdrop-blur-xl border-white/20;
     position: relative;

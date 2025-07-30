@@ -65,10 +65,8 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
     try {
       setLoadingPicks(true);
       
-      // Fetch picks for the profile user
-      const headers = getAuthHeaders();
-      let response = await fetch(`${ENDPOINTS.USER_PICKS}/${user?.user_id}?limit=100`, {
-        headers,
+      // Fetch picks for the profile user using public endpoint (no auth required)
+      let response = await fetch(`${ENDPOINTS.PUBLIC_USER_PICKS}/${user?.user_id}?limit=100`, {
         method: 'GET'
       });
       
@@ -100,6 +98,19 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
     }
   }, [user?.user_id, isOpen]);
 
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!user) return null;
 
   const formatCurrency = (amount: number) => `${amount.toLocaleString()} coins`;
@@ -119,7 +130,7 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
 
   // Modal content
   const modalContent = (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {isOpen && (
         <div className="fixed inset-0 z-[99999] overflow-hidden" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}>
           {/* Full viewport backdrop */}
@@ -127,6 +138,7 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="absolute inset-0 w-full h-full bg-black/80 backdrop-blur-lg"
             onClick={onClose}
           />
@@ -134,17 +146,34 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
           {/* Modal Container */}
           <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="pointer-events-auto relative z-10"
+              initial={{ opacity: 0, scale: 0.8, y: 50, rotateX: -15 }}
+              animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 50, rotateX: -15 }}
+              transition={{ 
+                duration: 0.4, 
+                ease: [0.25, 0.46, 0.45, 0.94],
+                type: "spring",
+                stiffness: 300,
+                damping: 30
+              }}
+              className="pointer-events-auto relative z-10 w-full max-w-4xl"
             >
-              <Card className="w-full max-w-2xl bg-background/98 backdrop-blur-xl border border-primary/20 shadow-2xl max-h-[90vh] overflow-hidden">
+              <Card className="w-full bg-background/98 backdrop-blur-xl border border-primary/20 shadow-2xl max-h-[90vh] overflow-hidden">
                 <CardContent className="p-0">
-                  <div className="max-h-[90vh] overflow-y-auto">
-                    <div className="p-6">
+                  <div className="max-h-[90vh]">
+                    <motion.div 
+                      className="p-6"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1, duration: 0.3, ease: "easeOut" }}
+                    >
                       {/* Header */}
-                      <div className="flex items-center justify-between mb-6">
+                      <motion.div 
+                        className="flex items-center justify-between mb-6"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2, duration: 0.3, ease: "easeOut" }}
+                      >
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-lg font-bold text-primary-foreground">
                             {getUserInitials(user.email, user.display_name, user.username)}
@@ -159,6 +188,76 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
                         <Button variant="ghost" size="sm" onClick={onClose}>
                           <X className="h-4 w-4" />
                         </Button>
+                      </motion.div>
+
+                      {/* Active Picks Section - Moved Higher */}
+                      <div className="mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
+                            <Target className="h-5 w-5 text-primary" />
+                          </div>
+                          <h4 className="text-xl font-bold">Active Picks</h4>
+                          {activePicks.length > 0 && (
+                            <Badge variant="secondary" className="text-xs ml-2">
+                              {activePicks.length}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {loadingPicks ? (
+                          <div className="space-y-3">
+                            {[...Array(3)].map((_, i) => (
+                              <div key={i} className="animate-pulse">
+                                <div className="h-16 bg-muted rounded-lg"></div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : activePicks.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-64 overflow-y-auto scrollbar-thin" onWheel={(e) => e.stopPropagation()}>
+                            {activePicks.map((pick, index) => (
+                              <div key={index} className="p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="font-semibold text-base truncate">
+                                    {pick.fighter_name}
+                                  </div>
+                                  <Badge variant="secondary" className="text-xs">
+                                    Active
+                                  </Badge>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                  <div className="text-sm text-muted-foreground">
+                                    <div className="font-medium mb-1">Date</div>
+                                    <div>{pick.created_at ? new Date(pick.created_at).toLocaleDateString() : 'Recently placed'}</div>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    <div className="font-medium mb-1">Odds</div>
+                                    <div>{pick.odds_american ? (pick.odds_american > 0 ? `+${pick.odds_american}` : pick.odds_american) : 'TBD'}</div>
+                                  </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="text-sm">
+                                    <div className="font-medium mb-1">Stake</div>
+                                    <div className="font-semibold">{pick.stake ? `${pick.stake} coins` : 'N/A'}</div>
+                                  </div>
+                                  <div className="text-sm">
+                                    <div className="font-medium mb-1">Potential Payout</div>
+                                    <div className="font-bold text-green-600">
+                                      {pick.potential_payout ? `${Math.round(pick.potential_payout)} coins` : 'TBD'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 text-muted-foreground">
+                            <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No active picks</p>
+                            <p className="text-xs">You haven't placed any picks yet</p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Stats Grid */}
@@ -214,71 +313,7 @@ const UserProfileModal = ({ user, isOpen, onClose }: {
                           <span>Member since {new Date(user.member_since).toLocaleDateString()}</span>
                         </div>
                       </div>
-
-                      {/* Active Picks Section */}
-                      <div className="border-t pt-4">
-                        <div className="flex items-center gap-2 mb-4">
-                          <Target className="h-5 w-5 text-primary" />
-                          <h4 className="text-lg font-semibold">Active Picks</h4>
-                          {activePicks.length > 0 && (
-                            <Badge variant="secondary" className="text-xs">
-                              {activePicks.length}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {loadingPicks ? (
-                          <div className="space-y-3">
-                            {[...Array(3)].map((_, i) => (
-                              <div key={i} className="animate-pulse">
-                                <div className="h-16 bg-muted rounded-lg"></div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : activePicks.length > 0 ? (
-                          <div className="space-y-3 max-h-60 overflow-y-auto">
-                            {activePicks.map((pick, index) => (
-                              <div key={index} className="p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="font-medium text-sm truncate">
-                                    {pick.fighter_name}
-                                  </div>
-                                  <Badge variant="secondary" className="text-xs">
-                                    Active
-                                  </Badge>
-                                </div>
-                                
-                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                                  <span>
-                                    {pick.created_at ? new Date(pick.created_at).toLocaleDateString() : 'Recently placed'}
-                                  </span>
-                                  <span>
-                                    Odds: {pick.odds_american ? (pick.odds_american > 0 ? `+${pick.odds_american}` : pick.odds_american) : 'TBD'}
-                                  </span>
-                                </div>
-                                
-                                <div className="flex items-center justify-between">
-                                  <div className="text-sm">
-                                    <span className="font-medium">Stake: {pick.stake ? `${pick.stake} coins` : 'N/A'}</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-sm font-bold text-green-600">
-                                      Potential: {pick.potential_payout ? `${Math.round(pick.potential_payout)} coins` : 'TBD'}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-6 text-muted-foreground">
-                            <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No active picks</p>
-                            <p className="text-xs">You haven't placed any picks yet</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    </motion.div>
                   </div>
                 </CardContent>
               </Card>

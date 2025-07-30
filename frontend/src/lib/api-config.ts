@@ -19,6 +19,7 @@ export const ENDPOINTS = {
   PLACE_PICK: `${API_URL}${API_PREFIX}/predictions-game/place-pick`,
   MY_PICKS: `${API_URL}${API_PREFIX}/predictions-game/my-picks`,
   USER_PICKS: `${API_URL}${API_PREFIX}/predictions-game/user-picks`,
+  PUBLIC_USER_PICKS: `${API_URL}${API_PREFIX}/predictions-game/public-user-picks`,
   TRANSACTION_HISTORY: `${API_URL}${API_PREFIX}/predictions-game/transaction-history`,
   MY_RANK: `${API_URL}${API_PREFIX}/predictions-game/my-rank`,
   LEADERBOARD: `${API_URL}${API_PREFIX}/predictions-game/leaderboard`,

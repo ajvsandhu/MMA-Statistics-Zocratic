@@ -1507,6 +1507,53 @@ async def get_leaderboard():
         logger.error(f"Error getting leaderboard: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get leaderboard")
 
+@router.get("/public-user-picks/{user_id}", response_model=List[PredictionPick])
+async def get_public_user_picks(
+    user_id: str,
+    event_id: Optional[int] = None,
+    limit: int = 50
+):
+    """Get another user's prediction picks (public data - no authentication required)"""
+    try:
+        supabase = get_db_connection()
+        if not supabase:
+            raise HTTPException(status_code=503, detail="Database unavailable")
+            
+        query = supabase.table('bets')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .limit(limit)
+            
+        if event_id:
+            query = query.eq('event_id', event_id)
+            
+        response = query.execute()
+        
+        picks = []
+        for pick in response.data:
+            picks.append(PredictionPick(
+                id=pick['id'],
+                event_id=pick['event_id'],
+                fight_id=pick['fight_id'],
+                fighter_id=pick['fighter_id'],
+                fighter_name=pick['fighter_name'],
+                stake=pick['stake'],
+                odds_american=pick['odds_american'],
+                odds_decimal=float(pick['odds_decimal']),
+                potential_payout=pick['potential_payout'],
+                status=pick['status'],
+                payout=pick.get('payout'),
+                settled_at=pick.get('settled_at'),
+                created_at=pick['created_at']
+            ))
+            
+        return picks
+        
+    except Exception as e:
+        logger.error(f"Error getting public user picks: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get picks")
+
 @router.get("/my-rank")
 async def get_user_rank(authorization: str = Depends(get_user_id_from_auth_header)):
     """Get current user's rank and highest rank achieved"""
