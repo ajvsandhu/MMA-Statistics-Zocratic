@@ -55,31 +55,7 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // Redirect HTTP to HTTPS
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'zocraticmma.com',
-          },
-        ],
-        destination: 'https://zocraticmma.com/:path*',
-        permanent: true,
-      },
-      // Redirect www to non-www
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.zocraticmma.com',
-          },
-        ],
-        destination: 'https://zocraticmma.com/:path*',
-        permanent: true,
-      },
-      // Redirect HTTP www to HTTPS non-www
+    
       {
         source: '/:path*',
         has: [
