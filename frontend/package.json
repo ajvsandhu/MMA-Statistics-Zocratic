@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "install:deps": "npm install --legacy-peer-deps"
+    "install:deps": "npm install --legacy-peer-deps",
+    "generate-sitemap": "node scripts/generate-sitemap.js",
+    "generate-all-fighters": "node scripts/generate-all-fighters.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

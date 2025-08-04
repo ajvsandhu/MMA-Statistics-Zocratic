@@ -27,6 +27,15 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.zocraticmma.com'),
   title: "Zocratic MMA",
   description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
+  keywords: "UFC, MMA, fighter statistics, fight predictions, UFC analysis, fighter profiles, MMA data, UFC rankings, fight analysis, Zocratic MMA",
+  authors: [{ name: "Zocratic MMA" }],
+  creator: "Zocratic MMA",
+  publisher: "Zocratic MMA",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: '32x32' },
@@ -62,6 +71,36 @@ export const metadata: Metadata = {
     'apple-mobile-web-app-capable': 'yes',
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'black',
+    // Add structured data for the website
+    'application/ld+json': JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Zocratic MMA",
+        "description": "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
+        "url": "https://zocraticmma.com",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://zocraticmma.com/fighters?search={search_term_string}",
+          "query-input": "required name=search_term_string"
+        },
+        "sameAs": [
+          "https://zocraticmma.com"
+        ]
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Zocratic MMA",
+        "url": "https://zocraticmma.com",
+        "logo": "https://zocraticmma.com/icon.png",
+        "description": "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
+        "foundingDate": "2024",
+        "sameAs": [
+          "https://zocraticmma.com"
+        ]
+      }
+    ])
   }
 };
 
