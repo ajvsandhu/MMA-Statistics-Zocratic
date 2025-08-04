@@ -26,7 +26,7 @@ const nextConfig = {
     return config
   },
   env: {
-    NEXT_PUBLIC_SITE_URL: 'https://www.zocraticmma.com',
+    NEXT_PUBLIC_SITE_URL: 'https://zocraticmma.com',
   },
   async headers() {
     return [
@@ -50,6 +50,46 @@ const nextConfig = {
             value: 'on',
           },
         ],
+      },
+    ]
+  },
+  async redirects() {
+    return [
+      // Redirect HTTP to HTTPS
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'zocraticmma.com',
+          },
+        ],
+        destination: 'https://zocraticmma.com/:path*',
+        permanent: true,
+      },
+      // Redirect www to non-www
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.zocraticmma.com',
+          },
+        ],
+        destination: 'https://zocraticmma.com/:path*',
+        permanent: true,
+      },
+      // Redirect HTTP www to HTTPS non-www
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.zocraticmma.com',
+          },
+        ],
+        destination: 'https://zocraticmma.com/:path*',
+        permanent: true,
       },
     ]
   },

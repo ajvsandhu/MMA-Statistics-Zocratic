@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.zocraticmma.com'),
+  metadataBase: new URL('https://zocraticmma.com'),
   title: "Zocratic MMA",
   description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
   keywords: "UFC, MMA, fighter statistics, fight predictions, UFC analysis, fighter profiles, MMA data, UFC rankings, fight analysis, Zocratic MMA",
@@ -49,11 +49,11 @@ export const metadata: Metadata = {
     title: "Zocratic MMA",
     description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
     type: "website",
-    url: 'https://www.zocraticmma.com',
+    url: 'https://zocraticmma.com',
     siteName: "Zocratic MMA",
     locale: "en_US",
     images: [{
-      url: "https://www.zocraticmma.com/og-image.jpg",
+      url: "https://zocraticmma.com/og-image.jpg",
       width: 1200,
       height: 630,
       alt: "Zocratic MMA - Fight Analysis Platform"
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Zocratic MMA",
     description: "Master the art of fight analysis with advanced UFC fighter statistics, predictions, and performance metrics.",
-    images: ["https://www.zocraticmma.com/og-image.jpg"],
+    images: ["https://zocraticmma.com/og-image.jpg"],
   },
   other: {
     'msapplication-TileColor': '#000000',
