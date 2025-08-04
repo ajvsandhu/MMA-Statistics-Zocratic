@@ -53,22 +53,6 @@ const nextConfig = {
       },
     ]
   },
-  async redirects() {
-    return [
-    
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.zocraticmma.com',
-          },
-        ],
-        destination: 'https://zocraticmma.com/:path*',
-        permanent: true,
-      },
-    ]
-  },
   async rewrites() {
     return [
       {
