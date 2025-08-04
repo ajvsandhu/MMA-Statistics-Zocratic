@@ -32,7 +32,7 @@ export function FighterComparisonModal({ isOpen, onClose }: FighterComparisonMod
     {
       title: "Fighter Comparison Tool",
       description: "Compare any two UFC fighters with AI-powered predictions.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Swords className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Swords className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[180px] flex flex-col justify-between">
           <div className="space-y-4">
@@ -56,12 +56,12 @@ export function FighterComparisonModal({ isOpen, onClose }: FighterComparisonMod
     {
       title: "How It Works",
       description: "Three simple steps to get AI predictions.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Target className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Target className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[180px] flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">1</div>
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">1</div>
               <div>
                 <p className="font-medium text-sm">Select Two Fighters</p>
                 <p className="text-xs text-muted-foreground">Search and choose any UFC fighters</p>
@@ -69,7 +69,7 @@ export function FighterComparisonModal({ isOpen, onClose }: FighterComparisonMod
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">2</div>
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">2</div>
               <div>
                 <p className="font-medium text-sm">Compare Stats</p>
                 <p className="text-xs text-muted-foreground">View detailed physical and fighting stats</p>
@@ -94,7 +94,7 @@ export function FighterComparisonModal({ isOpen, onClose }: FighterComparisonMod
     {
       title: "What You'll See",
       description: "Comprehensive fighter analysis and predictions.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><BarChart3 className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><BarChart3 className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[180px] flex flex-col justify-between">
           <div className="space-y-2">
@@ -132,7 +132,7 @@ export function FighterComparisonModal({ isOpen, onClose }: FighterComparisonMod
     {
       title: "Understanding Predictions",
       description: "How our AI analyzes and predicts fight outcomes.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><TrendingUp className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><TrendingUp className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[180px] flex flex-col justify-between">
           <div className="space-y-2">

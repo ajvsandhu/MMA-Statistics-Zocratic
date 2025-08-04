@@ -537,6 +537,20 @@ async def place_prediction_pick(
         if not balance_update_response.data:
             logger.error("Failed to update user balance after placing bet")
             
+        # Create transaction record for bet placement
+        transaction_data = {
+            'user_id': user_id,
+            'amount': -pick_request.stake,  # Negative amount to indicate stake deduction
+            'type': 'bet_placed',
+            'reason': f'Placed bet on {pick_request.fighter_name}',
+            'ref_table': 'bets',
+            'ref_id': bet_response.data[0]['id'],
+            'balance_before': current_balance,
+            'balance_after': new_balance
+        }
+        
+        supabase.table('coin_transactions').insert(transaction_data).execute()
+            
         pick_id = bet_response.data[0]['id']
         
         return JSONResponse(content={

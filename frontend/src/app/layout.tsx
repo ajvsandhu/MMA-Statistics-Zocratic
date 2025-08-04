@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins } from "next/font/google";
+import { Exo } from 'next/font/google'
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { MainNav } from "@/components/main-nav";
@@ -10,11 +10,11 @@ import { FooterVisibility } from "@/components/footer-visibility";
 import { Providers } from "./providers";
 import AntiGamblingModal from "@/components/anti-gambling-modal";
 
-const poppins = Poppins({ 
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  display: "swap"
-});
+const exo = Exo({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  display: "swap",
+})
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -125,7 +125,7 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className={`${poppins.className} min-h-screen flex flex-col overflow-y-auto overflow-x-hidden`}>
+      <body className={`${exo.className} min-h-screen bg-background font-sans antialiased`}>
         <AntiGamblingModal />
         <Providers>
           <ThemeProvider

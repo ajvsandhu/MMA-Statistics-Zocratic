@@ -465,123 +465,93 @@ export default function EventsPage() {
         <AnimatedContainer className="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
           <AnimatedItem variant="fadeIn" className="space-y-2">
             {/* Mobile-optimized header */}
-            <div className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:min-h-[3rem] mb-4">
-              {/* Back button and title - always on top */}
-              <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
                   onClick={() => router.push('/fight-predictions')}
-                  className="gap-1 px-1 sm:px-2 h-8 sm:h-auto"
+                  className="gap-2"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  <span className="sr-only sm:not-sr-only text-sm">Back</span>
+                  Back
                 </Button>
-                <h2 className="text-sm sm:text-lg md:text-xl font-light">Fight Predictions</h2>
+                <h1 className="text-2xl font-light">Fight Predictions</h1>
               </div>
               
-              {/* Action buttons and balance - organized for mobile */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                {/* Action buttons - moved to the left */}
-                <div className="flex items-center justify-center sm:justify-start gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="gap-1 text-sm px-3"
-                    onClick={() => setOnboardingModalOpen(true)}
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                    <span className="hidden sm:inline">How It Works</span>
-                    <span className="sm:hidden">Help</span>
-                  </Button>
-                  {isAuthenticated && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="gap-1 text-sm px-3"
-                      onClick={() => setUserBetsModalOpen(true)}
-                    >
-                      <Target className="h-4 w-4" />
-                      <span className="hidden sm:inline">My Picks</span>
-                      <span className="sm:hidden">Picks</span>
-                    </Button>
-                  )}
-                  <FightHistoryModal />
-                </div>
-                
-                {/* Balance section - moved to the right */}
-                {isAuthenticated ? (
-                  coinBalance !== null ? (
-                    <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-2 bg-primary/10 px-3 py-2 rounded-lg">
-                      <Coins className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-sm">{coinBalance} coins</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-2 bg-muted px-3 py-2 rounded-lg">
-                      <Coins className="h-4 w-4 text-muted-foreground animate-pulse" />
-                      <span className="text-sm text-muted-foreground">Loading...</span>
-                    </div>
-                  )
-                ) : (
-                  <Link href="/auth" className="w-full sm:w-auto">
-                    <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1 text-sm px-3">
-                      <span className="hidden sm:inline">Sign In to Place Picks</span>
-                      <span className="sm:hidden">Sign In</span>
-                    </Button>
-                  </Link>
+              <div className="flex items-center gap-3">
+                {isAuthenticated && coinBalance !== null && (
+                  <div className="flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-lg">
+                    <Coins className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-sm">{coinBalance} coins</span>
+                  </div>
                 )}
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setOnboardingModalOpen(true)}
+                >
+                  <HelpCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">How It Works</span>
+                </Button>
+                {isAuthenticated && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setUserBetsModalOpen(true)}
+                  >
+                    <Target className="h-4 w-4" />
+                    <span className="hidden sm:inline">My Picks</span>
+                  </Button>
+                )}
+                <FightHistoryModal />
               </div>
             </div>
             
             {/* Event title and date - mobile optimized */}
-            <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-thin leading-tight text-center sm:text-left">{eventData.event_name}</h1>
-              <div className="flex items-center justify-center sm:justify-start gap-2 text-muted-foreground text-sm">
-                <Calendar className="h-4 w-4" />
-                <span>{eventData.event_date || 'Date Unknown'}</span>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-light">{eventData.event_name}</h2>
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Calendar className="h-4 w-4" />
+                  <span>{eventData.event_date || 'Date Unknown'}</span>
+                </div>
               </div>
-            </div>
-            {/* Badges and info - mobile optimized */}
-            <div className="space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-              <div className="flex flex-wrap justify-center sm:justify-start gap-2">
-                <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                  <Clock className="h-3 w-3" /> 
-                  <span className="text-xs">Last Updated: {new Date(eventData.scraped_at || eventData.exported_at || Date.now()).toLocaleString()}</span>
-                </Badge>
-                <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                  <Trophy className="h-3 w-3" />
-                  <span className="text-xs">{eventData.completed_fights || 0}/{eventData.total_fights || 0} Fights</span>
-                </Badge>
+              
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Trophy className="h-4 w-4" />
+                  <span>{eventData.completed_fights || 0}/{eventData.total_fights || 0} Fights</span>
+                </div>
                 {eventData.event_url && (
                   <Link 
                     href={eventData.event_url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                    className="flex items-center gap-1 hover:text-primary transition-colors"
                   >
-                    <ExternalLink className="h-3 w-3" /> 
+                    <ExternalLink className="h-4 w-4" /> 
                     UFC Stats
                   </Link>
                 )}
+                {eventData.status !== 'completed' && eventData.event_start_time && isAuthenticated && (
+                  <div className="flex items-center gap-2">
+                    <span>Picks Lock In:</span>
+                    <EventCountdown 
+                      eventStartTime={eventData.event_start_time} 
+                      eventName={eventData.event_name}
+                      compact={true}
+                    />
+                  </div>
+                )}
               </div>
               
-              {/* Countdown section - mobile optimized */}
-              {eventData.status !== 'completed' && eventData.event_start_time && isAuthenticated && (
-                <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2">
-                  <span className="text-xs sm:text-sm text-muted-foreground">Picks Lock In:</span>
-                  <EventCountdown 
-                    eventStartTime={eventData.event_start_time} 
-                    eventName={eventData.event_name}
-                    compact={true}
-                  />
-                </div>
-              )}
+              <p className="text-muted-foreground text-sm">
+                {eventData.status === 'completed' 
+                  ? 'AI-powered fight predictions and results analysis for the completed UFC event.'
+                  : 'AI-powered fight predictions for the upcoming UFC event, based on comprehensive fighter analysis.'
+                }
+              </p>
             </div>
-            <p className="text-muted-foreground text-sm sm:text-base pt-2 leading-relaxed">
-              {eventData.status === 'completed' 
-                ? 'AI-powered fight predictions and results analysis for the completed UFC event.'
-                : 'AI-powered fight predictions for the upcoming UFC event, based on comprehensive fighter analysis.'
-              }
-            </p>
           </AnimatedItem>
 
           <Separator className="my-4 sm:my-6" />
@@ -633,18 +603,34 @@ export default function EventsPage() {
                            <div className="min-h-[2.5rem] sm:min-h-[3rem] flex flex-col items-center justify-center">
                              {fight.fighter1_page_link ? (
                                <div className="text-center">
-                                 <Link 
-                                   href={fight.fighter1_page_link}
+                                 <button 
+                                   onClick={() => {
+                                     const existingFromPage = sessionStorage.getItem('fighterPageFrom');
+                                     if (!existingFromPage) {
+                                       sessionStorage.setItem('fighterPageFrom', window.location.pathname + window.location.search);
+                                     }
+                                     if (fight.fighter1_page_link) {
+                                       router.push(fight.fighter1_page_link);
+                                     }
+                                   }}
                                    className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight hover:text-primary transition-colors"
                                  >
                                    {fight.fighter1_name}
-                                 </Link>
-                                 <Link 
-                                   href={fight.fighter1_page_link}
+                                 </button>
+                                 <button 
+                                   onClick={() => {
+                                     const existingFromPage = sessionStorage.getItem('fighterPageFrom');
+                                     if (!existingFromPage) {
+                                       sessionStorage.setItem('fighterPageFrom', window.location.pathname + window.location.search);
+                                     }
+                                     if (fight.fighter1_page_link) {
+                                       router.push(fight.fighter1_page_link);
+                                     }
+                                   }}
                                    className="text-[8px] sm:text-[10px] text-muted-foreground mt-1 opacity-60 hover:text-primary transition-colors underline"
                                  >
                                    View Profile
-                                 </Link>
+                                 </button>
                                </div>
                              ) : (
                                <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter1_name}</h3>
@@ -742,18 +728,34 @@ export default function EventsPage() {
                            <div className="min-h-[2.5rem] sm:min-h-[3rem] flex flex-col items-center justify-center">
                              {fight.fighter2_page_link ? (
                                <div className="text-center">
-                                 <Link 
-                                   href={fight.fighter2_page_link}
+                                 <button 
+                                   onClick={() => {
+                                     const existingFromPage = sessionStorage.getItem('fighterPageFrom');
+                                     if (!existingFromPage) {
+                                       sessionStorage.setItem('fighterPageFrom', window.location.pathname + window.location.search);
+                                     }
+                                     if (fight.fighter2_page_link) {
+                                       router.push(fight.fighter2_page_link);
+                                     }
+                                   }}
                                    className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight hover:text-primary transition-colors"
                                  >
                                    {fight.fighter2_name}
-                                 </Link>
-                                 <Link 
-                                   href={fight.fighter2_page_link}
+                                 </button>
+                                 <button 
+                                   onClick={() => {
+                                     const existingFromPage = sessionStorage.getItem('fighterPageFrom');
+                                     if (!existingFromPage) {
+                                       sessionStorage.setItem('fighterPageFrom', window.location.pathname + window.location.search);
+                                     }
+                                     if (fight.fighter2_page_link) {
+                                       router.push(fight.fighter2_page_link);
+                                     }
+                                   }}
                                    className="text-[8px] sm:text-[10px] text-muted-foreground mt-1 opacity-60 hover:text-primary transition-colors underline"
                                  >
                                    View Profile
-                                 </Link>
+                                 </button>
                                </div>
                              ) : (
                                <h3 className="text-xs sm:text-sm md:text-xl font-bold line-clamp-2 break-words w-full px-1 leading-tight">{fight.fighter2_name}</h3>

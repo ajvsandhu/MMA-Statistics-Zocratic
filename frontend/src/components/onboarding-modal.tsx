@@ -32,7 +32,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
     {
       title: "Welcome to Zocratic MMA",
       description: "Make predictions on UFC fights and compete with other fans.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Star className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Star className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[200px] flex flex-col justify-between">
           <div className="space-y-4">
@@ -56,12 +56,12 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
     {
       title: "How It Works",
       description: "Four simple steps to start making predictions.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Target className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Target className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[200px] flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">1</div>
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">1</div>
               <div>
                 <p className="font-medium text-sm">Browse Events</p>
                 <p className="text-xs text-muted-foreground">Check upcoming UFC fights</p>
@@ -69,7 +69,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">2</div>
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">2</div>
               <div>
                 <p className="font-medium text-sm">Pick Winners</p>
                 <p className="text-xs text-muted-foreground">Choose who you think will win</p>
@@ -77,7 +77,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">3</div>
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">3</div>
               <div>
                 <p className="font-medium text-sm">Stake Coins</p>
                 <p className="text-xs text-muted-foreground">Bet your virtual coins</p>
@@ -85,7 +85,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">4</div>
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">4</div>
               <div>
                 <p className="font-medium text-sm">Win Rewards</p>
                 <p className="text-xs text-muted-foreground">Earn coins when you're right</p>
@@ -102,7 +102,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
     {
       title: "Understanding Odds",
       description: "Learn how betting odds work in MMA.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Trophy className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Trophy className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[200px] flex flex-col justify-between">
           <div className="space-y-3">
@@ -132,7 +132,7 @@ export function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
     {
       title: "Payouts",
       description: "How your winnings are calculated.",
-      icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Users className="h-4 w-4 text-white" /></div>,
+              icon: <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><Users className="h-4 w-4 text-primary-foreground" /></div>,
       content: (
         <div className="h-[200px] flex flex-col justify-between">
           <div className="space-y-2">

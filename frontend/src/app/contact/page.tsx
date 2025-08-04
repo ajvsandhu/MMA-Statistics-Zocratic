@@ -95,66 +95,31 @@ export default function ContactPage() {
 
           {/* Contact Form */}
           <AnimatedItem variant="fadeUp" delay={0.2}>
-            <Card className="p-4 sm:p-6 bg-card/50 backdrop-blur-sm border-primary/20">
-              <div className="flex flex-col items-center text-center mb-4">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                  <Mail className="h-5 w-5 text-primary" />
+            <Card className="p-4 sm:p-6 bg-card/50 backdrop-blur-sm border-primary/20 hover:border-primary/30 transition-all duration-300">
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
+                  <Mail className="h-6 w-6 text-primary" />
                 </div>
-                <h2 className="text-xl font-semibold mb-1">Send Us a Message</h2>
-                <p className="text-sm text-muted-foreground">Your message will be sent to our team.</p>
+                <h2 className="text-xl font-semibold mb-2">Send us a message</h2>
+                <p className="text-sm text-muted-foreground">
+                  We'll get back to you within 24 hours
+                </p>
               </div>
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Email</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="you@example.com"
-                              {...field}
-                              className="bg-background/50"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="subject"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Subject</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="How can we help you?"
-                              {...field}
-                              className="bg-background/50"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
                   <FormField
                     control={form.control}
-                    name="message"
+                    name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Message</FormLabel>
+                        <FormLabel className="text-sm font-medium">Email</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder="Your message here..."
-                            className="min-h-24 bg-background/50 resize-none"
-                            {...field}
+                          <Input 
+                            placeholder="your@email.com" 
+                            {...field} 
+                            className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                            disabled={isSubmitting}
                           />
                         </FormControl>
                         <FormMessage />
@@ -162,15 +127,61 @@ export default function ContactPage() {
                     )}
                   />
                   
-                  <div className="flex justify-center pt-1">
-                    <Button 
-                      type="submit" 
-                      className="w-full sm:w-auto px-8"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? "Sending..." : "Send Message"}
-                    </Button>
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name="subject"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">Subject</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="What's this about?" 
+                            {...field} 
+                            className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="message"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">Message</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Tell us what's on your mind..." 
+                            className="min-h-[120px] transition-all duration-200 focus:ring-2 focus:ring-primary/20 resize-none"
+                            {...field} 
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4 mr-2" />
+                        Send Message
+                      </>
+                    )}
+                  </Button>
                 </form>
               </Form>
             </Card>

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, Search, History, X, Filter } from "lucide-react"
+import { Check, Search, History, X, Filter, ArrowRight } from "lucide-react"
 import { cn, useIsMobile, createFighterSlug } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { ENDPOINTS } from "@/lib/api-config"
@@ -265,47 +265,45 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
   // Use callback for event handlers
   const handleFighterSelect = React.useCallback((fighter: Fighter) => {
     try {
-      // Validate fighter object
       if (!fighter || typeof fighter !== 'object') {
         console.error('Invalid fighter object', fighter);
         return;
       }
       
-      // Ensure fighter has an id
       if (!fighter.id) {
         console.error('Fighter missing ID', fighter);
         return;
       }
       
-      // Close the suggestions dropdown and reset search
       setShowSuggestions(false);
       setSearchTerm("");
       setSelectedIndex(-1);
       
-      // Add to history
       saveToHistory(fighter);
       
       const isComparisonPage = pathname?.includes('/fight-predictions/compare');
       
       if (isComparisonPage) {
         onSelectFighter(fighter);
-        return; // Stop here for compare page
+        return;
       }
       
-      // Store the current page before navigating to fighter page
-      sessionStorage.setItem('fighterPageFrom', window.location.pathname);
+      const existingFromPage = sessionStorage.getItem('fighterPageFrom');
+      const currentPath = window.location.pathname + window.location.search;
       
-      // Clear any old compare page state to prevent interference
+      if (!existingFromPage && !currentPath.startsWith('/fighters/')) {
+        sessionStorage.setItem('fighterPageFrom', currentPath);
+      }
+      
       sessionStorage.removeItem('comparePageState');
       
-      // Navigate to the fighter page using ID instead of slug
       router.push(`/fighters/${fighter.id}`);
     } catch (err) {
       console.error('Error selecting fighter:', err);
     }
   }, [onSelectFighter, pathname, router, saveToHistory]);
 
-  const handleInputChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Allow only letters, numbers, and spaces
     const sanitizedValue = value.replace(/[^a-zA-Z0-9 ]/g, '');
@@ -417,36 +415,25 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
     setSelectedIndex(-1);
   }, [filters]);
 
-  // Improved Framer Motion animations with variants
   const dropdownVariants = {
-    hidden: { opacity: 0, y: -5 },
+    hidden: { opacity: 0, y: -3 },
     visible: { 
       opacity: 1, 
       y: 0,
-      transition: { 
-        duration: 0.2,
-        ease: "easeOut"
-      } 
+      transition: { duration: 0.15, ease: "easeOut" } 
     },
     exit: { 
       opacity: 0,
-      y: -5,
-      transition: { 
-        duration: 0.15,
-        ease: "easeIn" 
-      }
+      y: -3,
+      transition: { duration: 0.1, ease: "easeIn" }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, x: -5 },
+    hidden: { opacity: 0 },
     visible: { 
-      opacity: 1, 
-      x: 0,
-      transition: { 
-        duration: 0.1,
-        ease: "easeOut"
-      } 
+      opacity: 1,
+      transition: { duration: 0.1, ease: "easeOut" } 
     }
   };
 
@@ -587,40 +574,77 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
   return (
     <div ref={wrapperRef} className="relative w-full max-w-2xl">
       <div className="relative flex items-center gap-2">
-        <div className="relative flex-1">
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder="Search fighters..."
-            value={searchTerm}
-            onChange={handleInputChange}
-            onFocus={handleFocus}
-            onKeyDown={handleKeyDown}
-            autoFocus={autoFocus}
-            className={cn(
-              isMobile 
-                ? "w-full pl-9 pr-4 h-10"
-                : "w-full pl-9 pr-4 h-12", // Taller input for desktop
-              "bg-background/60 backdrop-blur-sm",
-              "border border-white/20 rounded-lg",
-              "placeholder:text-muted-foreground/70",
-              "focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0", // Remove default focus styles
-              "focus:outline-none focus:ring-0", // Remove all focus rings
-              "active:outline-none active:ring-0", // Remove active state highlights
-              "-webkit-tap-highlight-color: transparent", // Remove mobile tap highlights
-              "focus:border-primary/50", // Subtle focus state with border color change
-              "shadow-sm hover:shadow-md focus:shadow-lg", // Add depth on interaction
-              "transition-all duration-200"
+        <div className="relative w-full">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder="Search fighters..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setShowSuggestions(true)}
+              className="w-full pl-9 pr-4 h-11 bg-background/80 border border-border/50 rounded-lg focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all duration-200 hover:border-border/70"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm("")
+                  setFighters([])
+                  setShowSuggestions(false)
+                  setSelectedIndex(-1)
+                }}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/60 hover:text-muted-foreground transition-colors duration-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
-            aria-label="Search for fighters"
-            aria-autocomplete="list"
-            aria-controls="fighter-suggestions"
-            aria-expanded={showSuggestions}
-          />
-          <Search className={cn(
-            "absolute top-1/2 -translate-y-1/2",
-            isMobile ? "left-3 h-4 w-4 text-muted-foreground" : "left-3 h-5 w-5 text-primary/70"
-          )} />
+          </div>
+
+          {showSuggestions && (searchTerm.length > 0 || fighters.length > 0) && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-background/95 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+              {isLoading ? (
+                <div className="p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span className="text-sm">Searching...</span>
+                  </div>
+                </div>
+              ) : fighters.length > 0 ? (
+                <div className="py-2">
+                  {fighters.map((fighter, index) => (
+                    <button
+                      key={fighter.id}
+                      onClick={() => handleFighterSelect(fighter)}
+                      className={`w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors duration-200 flex items-center gap-3 ${
+                        index === selectedIndex ? 'bg-primary/10 border-r-2 border-primary' : ''
+                      }`}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-primary">
+                          {fighter.name.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-foreground truncate">{fighter.name}</div>
+                        <div className="text-xs text-muted-foreground">UFC Fighter</div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <ArrowRight className="h-4 w-4 text-muted-foreground/60" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : searchTerm.length > 0 ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  <div className="text-sm">No fighters found</div>
+                  <div className="text-xs mt-1">Try a different search term</div>
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <Popover open={showFilters} onOpenChange={setShowFilters}>
@@ -629,9 +653,9 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
               variant="outline"
               size="icon"
               className={cn(
-                "relative shrink-0 h-10 w-10",
-                "bg-background/60 backdrop-blur-sm",
-                "border border-white/20 rounded-lg",
+                "h-11 w-11 shrink-0",
+                "bg-background/80 backdrop-blur-sm",
+                "border border-border/50 rounded-lg",
                 "hover:bg-accent/50",
                 "transition-all duration-200",
                 showFilters && "bg-accent/50"
@@ -645,7 +669,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-[280px] p-4 bg-background/95 backdrop-blur-xl border-white/20"
+            className="w-[280px] p-4 bg-background/95 backdrop-blur-xl border-border/50"
           >
             <div className="space-y-4">
               <div className="space-y-2">
@@ -661,7 +685,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
                         value: weight,
                       })),
                     ]}
-                    className="w-full bg-background/50 border-white/20 text-foreground"
+                    className="w-full bg-background/80 border-border/50 text-foreground"
                   />
                 </div>
               </div>
@@ -673,7 +697,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
                     value={filters.rankingType}
                     onValueChange={(value) => handleFilterChange("rankingType", value as RankingType)}
                     options={RANKING_TYPES}
-                    className="w-full bg-background/50 border-white/20 text-foreground"
+                    className="w-full bg-background/80 border-border/50 text-foreground"
                   />
                 </div>
               </div>
@@ -699,7 +723,7 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
             className={cn(
               "absolute top-full left-0 right-0 mt-2 z-[99999]",
               "bg-background/95 backdrop-blur-xl",
-              "border border-white/20 rounded-lg shadow-xl",
+              "border border-border/50 rounded-lg shadow-lg",
               "overflow-hidden"
             )}
             variants={dropdownVariants}
@@ -730,19 +754,12 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
                         <CommandEmpty>No fighters found</CommandEmpty>
                       ) : (
                         validFighters.map((fighter, index) => (
-                          <motion.div
+                          <MemoizedCommandItem 
                             key={`fighter-${fighter.name}-${index}`}
-                            variants={itemVariants}
-                            initial="hidden"
-                            animate="visible"
-                          >
-                            <MemoizedCommandItem 
-                              key={`fighter-${fighter.name}-${index}`}
-                              item={fighter} 
-                              index={index}
-                              isHistory={false} 
-                            />
-                          </motion.div>
+                            item={fighter} 
+                            index={index}
+                            isHistory={false} 
+                          />
                         ))
                       )}
                     </CommandGroup>
@@ -759,19 +776,12 @@ export function FighterSearch({ onSelectFighter, clearSearch, searchBarId, autoF
                       </div>
                       <CommandGroup>
                         {searchHistory.map((fighter, index) => (
-                          <motion.div
+                          <MemoizedCommandItem 
                             key={`history-${fighter.name}-${index}`}
-                            variants={itemVariants}
-                            initial="hidden"
-                            animate="visible"
-                          >
-                            <MemoizedCommandItem 
-                              key={`history-${fighter.name}-${index}`}
-                              item={fighter} 
-                              index={index}
-                              isHistory={true} 
-                            />
-                          </motion.div>
+                            item={fighter} 
+                            index={index}
+                            isHistory={true} 
+                          />
                         ))}
                       </CommandGroup>
                     </>

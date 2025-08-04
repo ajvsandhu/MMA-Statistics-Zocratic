@@ -367,19 +367,12 @@ export default function ComparePage() {
       e.preventDefault();
       e.stopPropagation();
       
-      // Store current comparison state before navigating
-      const comparisonState = {
-        fighter1: fighter1,
-        fighter2: fighter2,
-        timestamp: Date.now()
-      };
+      const existingFromPage = sessionStorage.getItem('fighterPageFrom');
+      if (!existingFromPage) {
+        sessionStorage.setItem('fighterPageFrom', window.location.pathname + window.location.search);
+      }
       
-      // Store in sessionStorage so it persists during the session
-      sessionStorage.setItem('comparePageState', JSON.stringify(comparisonState));
-      
-      // Pass the return URL as a query parameter
-      const returnUrl = encodeURIComponent('/fight-predictions/compare');
-      router.push(`/fighters/${fighter.id}?returnTo=${returnUrl}`);
+      router.push(`/fighters/${fighter.id}`);
     };
 
     const cardContent = (
@@ -548,7 +541,7 @@ export default function ComparePage() {
 
     return (
       <div className="relative group w-full">
-        <div className="grid grid-cols-[1fr_90px_1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg">
+        <div className="grid grid-cols-[1fr_120px_1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg">
           {/* Left value cell */}
           <div className="relative text-center min-w-[80px] min-h-[32px] flex items-center justify-center">
             <div className="absolute inset-0 flex">
@@ -593,7 +586,7 @@ export default function ComparePage() {
 
           {/* Label cell */}
           <div className={cn(
-            "text-muted-foreground font-medium whitespace-nowrap text-center",
+            "text-muted-foreground font-medium text-center",
             isMobile ? "text-xs" : "text-sm"
           )}>
             {label}
@@ -652,7 +645,7 @@ export default function ComparePage() {
     value2: string;
   }) => (
     <div className="relative group w-full">
-      <div className="grid grid-cols-[1fr_90px_1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg">
+      <div className="grid grid-cols-[1fr_120px_1fr] gap-4 py-2 items-center hover:bg-accent/5 rounded-lg">
         <div className="relative text-center min-w-[80px] min-h-[32px] flex items-center justify-center">
           <div className="relative z-10">
             <div className={cn(
@@ -665,7 +658,7 @@ export default function ComparePage() {
         </div>
 
         <div className={cn(
-          "text-muted-foreground font-medium whitespace-nowrap text-center",
+          "text-muted-foreground font-medium text-center",
           isMobile ? "text-xs" : "text-sm"
         )}>
           {label}
@@ -722,16 +715,19 @@ export default function ComparePage() {
             {!isMobile && (
           <div className={cn(
             "flex-1 overflow-visible",
-            "grid md:grid-cols-[2fr_3fr_2fr] gap-6 lg:gap-8 max-w-7xl mx-auto min-w-0",
+            "grid md:grid-cols-[2fr_3fr_2fr] gap-8 lg:gap-12 max-w-7xl mx-auto min-w-0",
             "items-start"
           )}>
                 
                 {/* --- Column 1: Fighter 1 --- */}
                 <div className="flex flex-col min-w-0">
-                   {/* ... Fighter 1 Search + Card ... */}
-                   <div className="bg-primary/10 rounded-lg mb-3 py-2"> <h3 className="text-base font-bold mb-0 text-center">FIGHTER 1</h3> </div>
-                   <div className="relative z-30 fighter-search-1"> <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} searchBarId="fighter1" /> </div>
-                   <div className="mt-4">
+                   <div className="bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 rounded-xl mb-4 py-3 border border-primary/30 shadow-sm"> 
+                     <h3 className="text-lg font-bold mb-0 text-center text-primary">FIGHTER 1</h3> 
+                   </div>
+                   <div className="relative z-30 fighter-search-1 mb-4"> 
+                     <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} searchBarId="fighter1" /> 
+                   </div>
+                   <div className="mt-2">
                      {fighter1 && (
                        <MemoizedFighterCard 
                          key={`fighter1-${activeTab}`} 
@@ -745,15 +741,70 @@ export default function ComparePage() {
                 {/* --- Column 2: Stats Comparison --- */}
                 <div className="flex flex-col min-w-0">
                   {/* VS Badge and Predict Button */}
-                   <div className="flex flex-col items-center mb-4 pt-10">
+                   <div className="flex flex-col items-center mb-6 pt-8">
                      {fighter1 && fighter2 && (
                         <>
-                          <div className="flex items-center justify-center"> <motion.div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/90 shadow-sm border border-background/20" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3, delay: 0.2 }}> <span className="text-xs font-semibold text-primary-foreground">VS</span> </motion.div> </div>
-                          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }} className="w-[250px] mt-4">
-                            <motion.div whileHover={{ scale: 1.02, boxShadow: "0 0 15px 2px rgba(var(--primary), 0.3)" }} whileTap={{ scale: 0.98 }} className="w-full">
-                              <Button size="default" onClick={handlePredictClick} disabled={isPredicting} className={cn( "w-full shadow-xl relative overflow-hidden py-5", "bg-primary", "hover:bg-primary/90", "text-primary-foreground transition-all duration-300 rounded-xl" )}>
-                                <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent" initial={{ x: "-100%" }} animate={isPredicting ? { x: ["100%", "-100%"], transition: { repeat: Infinity, duration: 1.5, ease: "linear" } } : { x: "100%" }} />
-                                <div className="relative z-10 flex items-center justify-center"> {isPredicting ? (<> <span className="font-bold text-base">Predicting</span> <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop", times: [0, 0.5, 1] }}>...</motion.span> <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="ml-2"> <Swords className="h-4 w-4" /> </motion.div> </>) : (<> <span className="font-bold text-base">Get Prediction</span> <Swords className="ml-2 h-4 w-4" /> </>)} </div>
+                          <div className="flex items-center justify-center mb-4"> 
+                            <motion.div 
+                              className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-primary via-primary/90 to-primary/80 shadow-xl border-2 border-primary/30" 
+                              initial={{ scale: 0, opacity: 0 }} 
+                              animate={{ scale: 1, opacity: 1 }} 
+                              transition={{ duration: 0.3, delay: 0.2 }} 
+                            > 
+                              <span className="text-sm font-bold text-primary-foreground">VS</span> 
+                            </motion.div> 
+                          </div>
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            transition={{ duration: 0.3, delay: 0.2 }} 
+                            className="w-[280px]"
+                          >
+                            <motion.div 
+                              whileHover={{ scale: 1.02, boxShadow: "0 0 20px 3px rgba(var(--primary), 0.4)" }} 
+                              whileTap={{ scale: 0.98 }} 
+                              className="w-full"
+                            >
+                              <Button 
+                                size="default" 
+                                onClick={handlePredictClick} 
+                                disabled={isPredicting} 
+                                className={cn( 
+                                  "w-full shadow-2xl relative overflow-hidden py-6", 
+                                  "bg-gradient-to-r from-primary via-primary/95 to-primary/90", 
+                                  "hover:from-primary/95 hover:via-primary/90 hover:to-primary/85", 
+                                  "text-primary-foreground transition-all duration-300 rounded-2xl font-bold text-lg" 
+                                )}
+                              >
+                                <motion.div 
+                                  className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/15 to-transparent" 
+                                  initial={{ x: "-100%" }} 
+                                  animate={isPredicting ? { x: ["100%", "-100%"], transition: { repeat: Infinity, duration: 1.5, ease: "linear" } } : { x: "100%" }} 
+                                />
+                                <div className="relative z-10 flex items-center justify-center"> 
+                                  {isPredicting ? (
+                                    <>
+                                      <span className="font-bold text-lg">Predicting</span>
+                                      <motion.span 
+                                        animate={{ opacity: [0, 1, 0] }} 
+                                        transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop", times: [0, 0.5, 1] }}
+                                      >...</motion.span>
+                                      <motion.div 
+                                        animate={{ rotate: 360 }} 
+                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }} 
+                                        className="ml-3"
+                                      > 
+                                        <Swords className="h-5 w-5" /> 
+                                      </motion.div> 
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="font-bold text-lg">Get Prediction</span>
+                                      <Swords className="ml-3 h-5 w-5" /> 
+                                    </>
+                                  )
+                                } 
+                                </div>
                               </Button>
                             </motion.div>
                           </motion.div>
@@ -764,18 +815,18 @@ export default function ComparePage() {
                    {/* Stats Comparison Card */}
                    <div className="flex-1 w-full">
                       {fighter1 && fighter2 ? (
-                       <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl w-full">
-                         <CardContent className="p-4 sm:p-6">
+                       <Card className="bg-card/95 backdrop-blur-xl border-primary/30 shadow-2xl w-full">
+                         <CardContent className="p-6 sm:p-8">
                            <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
-                             <TabsList className="w-full grid grid-cols-3 h-12 mb-2 bg-primary/5 p-1 rounded-lg sticky top-0 z-10">
-                               <TabsTrigger value="physical" className="text-sm font-medium rounded-md">Physical</TabsTrigger>
-                               <TabsTrigger value="striking" className="text-sm font-medium rounded-md">Striking</TabsTrigger>
-                               <TabsTrigger value="grappling" className="text-sm font-medium rounded-md">Grappling</TabsTrigger>
+                             <TabsList className="w-full grid grid-cols-3 h-14 mb-4 bg-primary/10 p-1 rounded-xl sticky top-0 z-10">
+                               <TabsTrigger value="physical" className="text-sm font-semibold rounded-lg">Physical</TabsTrigger>
+                               <TabsTrigger value="striking" className="text-sm font-semibold rounded-lg">Striking</TabsTrigger>
+                               <TabsTrigger value="grappling" className="text-sm font-semibold rounded-lg">Grappling</TabsTrigger>
                              </TabsList>
                              <div className="w-full" style={{ width: '100%', maxWidth: '100%', minWidth: '300px' }}>
                                <div className="relative w-full" style={{ width: '100%', minHeight: '300px' }}>
                                  <TabsContent value="physical" className="absolute inset-0 pt-2">
-                                   <div className="space-y-2">
+                                   <div className="space-y-3">
                                      <SimpleComparisonRow label="Height" value1={fighter1.height} value2={fighter2.height} />
                                      <SimpleComparisonRow label="Weight" value1={fighter1.weight} value2={fighter2.weight} />
                                      <SimpleComparisonRow label="Reach" value1={fighter1.reach} value2={fighter2.reach} />
@@ -785,7 +836,7 @@ export default function ComparePage() {
                                    </div>
                                  </TabsContent>
                                  <TabsContent value="striking" className="absolute inset-0 pt-2">
-                                   <div className="space-y-2">
+                                   <div className="space-y-3">
                                      <ComparisonRow label="Strikes/Min" value1={fighter1.slpm} value2={fighter2.slpm} unit="" />
                                      <ComparisonRow label="Accuracy" value1={fighter1.str_acc} value2={fighter2.str_acc} unit="%" />
                                      <ComparisonRow label="Defense" value1={fighter1.str_def} value2={fighter2.str_def} unit="%" />
@@ -794,7 +845,7 @@ export default function ComparePage() {
                                    </div>
                                  </TabsContent>
                                  <TabsContent value="grappling" className="absolute inset-0 pt-2">
-                                   <div className="space-y-2">
+                                   <div className="space-y-3">
                                      <ComparisonRow 
                                        label="TD/15 Min" 
                                        value1={fighter1.td_avg} 
@@ -821,8 +872,8 @@ export default function ComparePage() {
                        <div className="flex items-center justify-center h-full min-h-[300px]">
                          <div className="text-center">
                            <div className="text-muted-foreground">
-                             <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                             <p className="text-sm font-medium">
+                             <Swords className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                             <p className="text-base font-medium">
                                Select two fighters to compare
                              </p>
                            </div>
@@ -834,10 +885,13 @@ export default function ComparePage() {
 
                 {/* --- Column 3: Fighter 2 --- */}
                 <div className="flex flex-col min-w-0">
-                   {/* ... Fighter 2 Search + Card ... */}
-                   <div className="bg-primary/10 rounded-lg mb-3 py-2"> <h3 className="text-base font-bold mb-0 text-center">FIGHTER 2</h3> </div>
-                   <div className="relative z-30 fighter-search-2"> <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} searchBarId="fighter2" /> </div>
-                   <div className="mt-4">
+                   <div className="bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 rounded-xl mb-4 py-3 border border-primary/30 shadow-sm"> 
+                     <h3 className="text-lg font-bold mb-0 text-center text-primary">FIGHTER 2</h3> 
+                   </div>
+                   <div className="relative z-30 fighter-search-2 mb-4"> 
+                     <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} searchBarId="fighter2" /> 
+                   </div>
+                   <div className="mt-2">
                      {fighter2 && (
                        <MemoizedFighterCard 
                          key={`fighter2-${activeTab}`} 
@@ -857,13 +911,13 @@ export default function ComparePage() {
                 <div className="space-y-6 pt-4">
                   <div className="grid grid-cols-2 gap-4 relative">
                     <div className="flex flex-col">
-                      <div className="bg-primary/10 rounded-lg mb-3 py-1.5">
-                        <h3 className="text-sm font-bold mb-0 text-center">FIGHTER 1</h3>
+                      <div className="bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 rounded-xl mb-3 py-2 border border-primary/30 shadow-sm">
+                        <h3 className="text-sm font-bold mb-0 text-center text-primary">FIGHTER 1</h3>
                       </div>
-                      <div className="relative z-30 fighter-search-1">
+                      <div className="relative z-30 fighter-search-1 mb-3">
                         <FighterSearch onSelectFighter={handleFighter1Select} clearSearch={!!fighter1} searchBarId="fighter1" />
                       </div>
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <div key={`fighter1-${activeTab}`}>
                           {fighter1 && (
                             <MemoizedFighterCard fighter={fighter1} onRemove={() => setFighter1(null)} />
@@ -873,19 +927,24 @@ export default function ComparePage() {
                     </div>
                     {fighter1 && fighter2 && (
                       <div className="absolute left-1/2 top-[47%] -translate-x-1/2 -translate-y-1/2 z-40">
-                        <motion.div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/90 shadow-sm border border-background/20" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3, delay: 0.2 }}>
-                          <span className="text-[10px] font-semibold text-primary-foreground">VS</span>
+                        <motion.div 
+                          className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-primary via-primary/90 to-primary/80 shadow-xl border-2 border-primary/30" 
+                          initial={{ scale: 0, opacity: 0 }} 
+                          animate={{ scale: 1, opacity: 1 }} 
+                          transition={{ duration: 0.3, delay: 0.2 }}
+                        >
+                          <span className="text-xs font-bold text-primary-foreground">VS</span>
                         </motion.div>
                       </div>
                     )}
                     <div className="flex flex-col">
-                      <div className="bg-primary/10 rounded-lg mb-3 py-1.5">
-                        <h3 className="text-sm font-bold mb-0 text-center">FIGHTER 2</h3>
+                      <div className="bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 rounded-xl mb-3 py-2 border border-primary/30 shadow-sm">
+                        <h3 className="text-sm font-bold mb-0 text-center text-primary">FIGHTER 2</h3>
                       </div>
-                      <div className="relative z-30 fighter-search-2">
+                      <div className="relative z-30 fighter-search-2 mb-3">
                         <FighterSearch onSelectFighter={handleFighter2Select} clearSearch={!!fighter2} searchBarId="fighter2" />
                       </div>
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <div key={`fighter2-${activeTab}`}>
                           {fighter2 && (
                             <MemoizedFighterCard fighter={fighter2} onRemove={() => setFighter2(null)} />
@@ -895,16 +954,46 @@ export default function ComparePage() {
                     </div>
                   </div>
                   {fighter1 && fighter2 && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }} className="w-full mx-auto mt-2">
-                      <motion.div whileHover={{ scale: 1.02, boxShadow: "0 0 15px 2px rgba(var(--primary), 0.3)" }} whileTap={{ scale: 0.98 }} className="w-full">
-                        <Button size="default" onClick={handlePredictClick} disabled={isPredicting} className={cn("w-full shadow-xl relative overflow-hidden py-5", "bg-primary", "hover:bg-primary/90", "text-primary-foreground transition-all duration-300 rounded-xl")}>
-                          <motion.div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent" initial={{ x: "-100%" }} animate={isPredicting ? { x: ["100%", "-100%"], transition: { repeat: Infinity, duration: 1.5, ease: "linear" } } : { x: "100%" }} />
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      transition={{ duration: 0.3, delay: 0.2 }} 
+                      className="w-full mx-auto mt-2"
+                    >
+                      <motion.div 
+                        whileHover={{ scale: 1.02, boxShadow: "0 0 20px 3px rgba(var(--primary), 0.4)" }} 
+                        whileTap={{ scale: 0.98 }} 
+                        className="w-full"
+                      >
+                        <Button 
+                          size="default" 
+                          onClick={handlePredictClick} 
+                          disabled={isPredicting} 
+                          className={cn(
+                            "w-full shadow-2xl relative overflow-hidden py-5", 
+                            "bg-gradient-to-r from-primary via-primary/95 to-primary/90", 
+                            "hover:from-primary/95 hover:via-primary/90 hover:to-primary/85", 
+                            "text-primary-foreground transition-all duration-300 rounded-2xl font-bold text-base"
+                          )}
+                        >
+                          <motion.div 
+                            className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/15 to-transparent" 
+                            initial={{ x: "-100%" }} 
+                            animate={isPredicting ? { x: ["100%", "-100%"], transition: { repeat: Infinity, duration: 1.5, ease: "linear" } } : { x: "100%" }} 
+                          />
                           <div className="relative z-10 flex items-center justify-center">
                             {isPredicting ? (
                               <>
                                 <span className="font-bold text-base">Predicting</span>
-                                <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop", times: [0, 0.5, 1] }}>...</motion.span>
-                                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="ml-2">
+                                <motion.span 
+                                  animate={{ opacity: [0, 1, 0] }} 
+                                  transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop", times: [0, 0.5, 1] }}
+                                >...</motion.span>
+                                <motion.div 
+                                  animate={{ rotate: 360 }} 
+                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }} 
+                                  className="ml-2"
+                                >
                                   <Swords className="h-4 w-4" />
                                 </motion.div>
                               </>
@@ -920,18 +1009,18 @@ export default function ComparePage() {
                     </motion.div>
                   )}
                   {fighter1 && fighter2 ? (
-                    <Card className="bg-card/95 backdrop-blur-xl border-primary/10 shadow-xl w-full">
+                    <Card className="bg-card/95 backdrop-blur-xl border-primary/30 shadow-2xl w-full">
                       <CardContent className="p-4 sm:p-6">
                         <Tabs defaultValue="physical" className="w-full" onValueChange={setActiveTab}>
-                          <TabsList className="w-full grid grid-cols-3 h-12 mb-2 bg-primary/5 p-1 rounded-lg sticky top-0 z-10">
-                            <TabsTrigger value="physical" className="text-sm font-medium rounded-md">Physical</TabsTrigger>
-                            <TabsTrigger value="striking" className="text-sm font-medium rounded-md">Striking</TabsTrigger>
-                            <TabsTrigger value="grappling" className="text-sm font-medium rounded-md">Grappling</TabsTrigger>
+                          <TabsList className="w-full grid grid-cols-3 h-12 mb-3 bg-primary/10 p-1 rounded-xl sticky top-0 z-10">
+                            <TabsTrigger value="physical" className="text-xs font-semibold rounded-lg">Physical</TabsTrigger>
+                            <TabsTrigger value="striking" className="text-xs font-semibold rounded-lg">Striking</TabsTrigger>
+                            <TabsTrigger value="grappling" className="text-xs font-semibold rounded-lg">Grappling</TabsTrigger>
                           </TabsList>
                           <div className="w-full" style={{ width: '100%', maxWidth: '100%', minWidth: '300px' }}>
                             <div className="relative w-full" style={{ width: '100%', minHeight: '300px' }}>
                               <TabsContent value="physical" className="absolute inset-0 pt-2">
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                   <SimpleComparisonRow label="Height" value1={fighter1.height} value2={fighter2.height} />
                                   <SimpleComparisonRow label="Weight" value1={fighter1.weight} value2={fighter2.weight} />
                                   <SimpleComparisonRow label="Reach" value1={fighter1.reach} value2={fighter2.reach} />
@@ -941,7 +1030,7 @@ export default function ComparePage() {
                                 </div>
                               </TabsContent>
                               <TabsContent value="striking" className="absolute inset-0 pt-2">
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                   <ComparisonRow label="Strikes/Min" value1={fighter1.slpm} value2={fighter2.slpm} unit="" />
                                   <ComparisonRow label="Accuracy" value1={fighter1.str_acc} value2={fighter2.str_acc} unit="%" />
                                   <ComparisonRow label="Defense" value1={fighter1.str_def} value2={fighter2.str_def} unit="%" />
@@ -950,7 +1039,7 @@ export default function ComparePage() {
                                 </div>
                               </TabsContent>
                               <TabsContent value="grappling" className="absolute inset-0 pt-2">
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                   <ComparisonRow 
                                     label="TD/15 Min" 
                                     value1={fighter1.td_avg} 
@@ -977,8 +1066,8 @@ export default function ComparePage() {
                     <div className="flex items-center justify-center py-8">
                       <div className="text-center">
                         <div className="text-muted-foreground">
-                          <Swords className="h-8 w-8 mx-auto mb-1 opacity-50" />
-                          <p className="text-sm font-medium">
+                          <Swords className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                          <p className="text-base font-medium">
                             Select two fighters to compare
                           </p>
                         </div>

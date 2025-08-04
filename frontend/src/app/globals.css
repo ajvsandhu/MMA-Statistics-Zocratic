@@ -3,6 +3,32 @@
 @tailwind utilities;
 
 @layer base {
+  /* Mobile performance optimizations */
+  @media (max-width: 768px) {
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Reduce backdrop blur complexity on mobile */
+    .backdrop-blur-xl {
+      backdrop-filter: blur(8px);
+    }
+    
+    .backdrop-blur-2xl {
+      backdrop-filter: blur(12px);
+    }
+    
+    /* Optimize animations for mobile */
+    .transition-all {
+      transition-duration: 0.15s;
+    }
+    
+    /* Reduce transform complexity */
+    .transform {
+      will-change: transform;
+    }
+  }
+
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
@@ -1127,4 +1153,56 @@ body {
 
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Global Custom Scrollbar Styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.6) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary) / 0.4) 0%, 
+    hsl(var(--primary) / 0.6) 50%, 
+    hsl(var(--primary) / 0.8) 100%);
+  border-radius: 4px;
+  border: 1px solid hsl(var(--primary) / 0.2);
+  transition: all 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary) / 0.6) 0%, 
+    hsl(var(--primary) / 0.8) 50%, 
+    hsl(var(--primary) / 1) 100%);
+  border-color: hsl(var(--primary) / 0.4);
+  transform: scaleX(1.1);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(135deg, 
+    hsl(var(--primary) / 0.8) 0%, 
+    hsl(var(--primary) / 1) 50%, 
+    hsl(var(--primary) / 1) 100%);
+  border-color: hsl(var(--primary) / 0.6);
+  transform: scaleX(1.05);
+}
+
+/* Firefox fallback */
+@supports (scrollbar-color: red blue) {
+  * {
+    scrollbar-color: hsl(var(--primary) / 0.6) transparent;
+    scrollbar-width: thin;
+  }
 }

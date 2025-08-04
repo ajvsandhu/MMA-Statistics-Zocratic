@@ -4,30 +4,15 @@ import React, { useState, useEffect } from "react"
 import { FighterDetails } from "@/components/fighter-details"
 import { PageTransition } from "@/components/page-transition"
 import { FighterSearch } from "@/components/fighter-search"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 
 export default function FighterIdPage() {
   const params = useParams();
   const router = useRouter();
-  const fighterId = params?.slug as string; // The route parameter is still called slug but contains the ID
-  
-  // Get the stored "from" page when component mounts
-  React.useEffect(() => {
-    // If we don't have a stored from page, try to get it from the referrer
-    const fromPage = sessionStorage.getItem('fighterPageFrom');
-    if (!fromPage) {
-      const referrer = document.referrer;
-      if (referrer && referrer.includes(window.location.origin)) {
-        const referrerUrl = new URL(referrer);
-        const referrerPath = referrerUrl.pathname;
-        if (referrerPath && referrerPath !== '/' && !referrerPath.startsWith('/fighters/')) {
-          sessionStorage.setItem('fighterPageFrom', referrerPath);
-        }
-      }
-    }
-  }, []);
+  const searchParams = useSearchParams();
+  const fighterId = params?.slug as string;
   
   const handleSelectFighter = () => {
     // Empty function to satisfy the prop requirement
@@ -35,40 +20,41 @@ export default function FighterIdPage() {
   };
 
   const handleBack = () => {
-    // Check if there's a returnTo query parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const returnTo = urlParams.get('returnTo');
-    
+    const returnTo = searchParams.get('returnTo');
     if (returnTo) {
-      // Decode and navigate to the specified return URL
       const decodedReturnUrl = decodeURIComponent(returnTo);
+      sessionStorage.removeItem('fighterPageFrom');
       router.push(decodedReturnUrl);
       return;
     }
     
-    // Get the stored "from" page
     const fromPage = sessionStorage.getItem('fighterPageFrom');
     
-    // If we have a stored from page and it's not the current page, go back there
     if (fromPage && fromPage !== window.location.pathname && !fromPage.startsWith('/fighters/')) {
+      sessionStorage.removeItem('fighterPageFrom');
       router.push(fromPage);
       return;
     }
     
-    // Fallback to referrer logic
     const referrer = document.referrer;
     if (referrer && referrer.includes(window.location.origin)) {
       const referrerUrl = new URL(referrer);
       const referrerPath = referrerUrl.pathname;
       
-      // If we came from a valid page within our app, go back there
       if (referrerPath && referrerPath !== '/' && !referrerPath.startsWith('/fighters/')) {
+        sessionStorage.removeItem('fighterPageFrom');
         router.push(referrerPath);
         return;
       }
     }
     
-    // Default fallback - go to home page
+    if (window.history.length > 1) {
+      sessionStorage.removeItem('fighterPageFrom');
+      router.back();
+      return;
+    }
+    
+    sessionStorage.removeItem('fighterPageFrom');
     router.push('/');
   };
   

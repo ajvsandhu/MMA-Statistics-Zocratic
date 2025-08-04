@@ -170,6 +170,12 @@ export default function DashboardPage() {
 
   // Calculate statistics (excluding refunded bets)
   const validPicks = picks.filter(p => p.status !== 'refunded');
+  
+  // Calculate total lost from picks data as fallback
+  const calculatedTotalLost = validPicks
+    .filter(p => p.status === 'lost')
+    .reduce((sum, p) => sum + p.stake, 0);
+  
   const stats = {
     totalBets: validPicks.length,
     activeBets: validPicks.filter(p => p.status === 'pending').length,
@@ -178,8 +184,8 @@ export default function DashboardPage() {
     winRate: validPicks.length > 0 ? ((validPicks.filter(p => p.status === 'won').length / validPicks.filter(p => p.status !== 'pending').length) * 100) : 0,
     totalPotentialPayout: validPicks.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.potential_payout, 0),
     avgStake: validPicks.length > 0 ? validPicks.reduce((sum, p) => sum + p.stake, 0) / validPicks.length : 0,
-    profitLoss: (balance?.total_won || 0) - (balance?.total_lost || 0),
-    roi: (balance?.total_wagered || 0) > 0 ? (((balance?.total_won || 0) - (balance?.total_lost || 0)) / (balance?.total_wagered || 0)) * 100 : 0
+    profitLoss: (balance?.total_won || 0) - (balance?.total_lost || calculatedTotalLost),
+    roi: (balance?.total_wagered || 0) > 0 ? (((balance?.total_won || 0) - (balance?.total_lost || calculatedTotalLost)) / (balance?.total_wagered || 0)) * 100 : 0
   };
 
   const formatCurrency = (amount: number) => `${amount.toLocaleString()} coins`;
@@ -228,41 +234,65 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center space-y-4 mb-8">
+            <div className="animate-pulse">
+              <div className="h-8 bg-muted rounded-lg w-48 mx-auto mb-2"></div>
+              <div className="h-4 bg-muted rounded w-64 mx-auto"></div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+              <div key={i} className="animate-pulse">
+                <div className="h-32 bg-muted rounded-lg"></div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-96 bg-muted rounded-lg"></div>
+              </div>
             ))}
           </div>
         </div>
       </div>
-    );
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6">
+            <div className="text-destructive text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-semibold text-destructive mb-2">Error Loading Dashboard</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="container mx-auto px-4 py-12 space-y-8">
       {/* Header */}
-      <div className="text-center space-y-4 mb-8">
-        <h1 className="text-4xl md:text-5xl font-thin text-foreground">
-          Performance Dashboard
-        </h1>
-        <div className="w-24 h-1 bg-gradient-to-r from-primary to-secondary rounded-full mx-auto"></div>
-        <p className="text-xl text-muted-foreground max-w-3xl mx-auto">Track your prediction performance and portfolio statistics</p>
-        <Button onClick={fetchDashboardData} className="mt-4 bg-primary hover:bg-primary/90 text-white shadow-lg hover:shadow-xl transition-all duration-300">
-          <Activity className="w-4 h-4 mr-2" />
-          Refresh Data
-        </Button>
+      <div className="space-y-4 mb-8">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground">Track your prediction performance and portfolio statistics</p>
       </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-lg">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
-            <div className="p-2 rounded-lg bg-yellow-500/20">
-              <Coins className="h-4 w-4 text-yellow-600" />
-            </div>
+            <Coins className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(balance?.balance || 0)}</div>
@@ -272,12 +302,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-lg">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Leaderboard Rank</CardTitle>
-            <div className="p-2 rounded-lg bg-orange-500/20">
-              {getRankIcon(userRank?.current_rank || null)}
-            </div>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -289,12 +317,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-lg">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
-            <div className="p-2 rounded-lg bg-green-500/20">
-              <Trophy className="h-4 w-4 text-green-600" />
-            </div>
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatPercentage(stats.winRate)}</div>
@@ -304,12 +330,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-card/60 to-card/30 backdrop-blur-sm border border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-lg">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Picks</CardTitle>
-            <div className="p-2 rounded-lg bg-blue-500/20">
-              <Target className="h-4 w-4 text-blue-600" />
-            </div>
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.activeBets}</div>
@@ -353,7 +377,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Total Lost</span>
-                  <span className="font-semibold text-red-600">{formatCurrency(balance?.total_lost || 0)}</span>
+                  <span className="font-semibold text-red-600">{formatCurrency(balance?.total_lost || calculatedTotalLost)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Net Profit</span>
@@ -427,7 +451,7 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription>Your latest prediction activity and results</CardDescription>
             </CardHeader>
-            <CardContent className="max-h-[400px] overflow-y-auto">
+            <CardContent className="max-h-[400px] overflow-y-auto overscroll-contain">
               {picks.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Target className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -442,6 +466,9 @@ export default function DashboardPage() {
                         <div className="font-medium">{pick.fighter_name}</div>
                         <div className="text-sm text-muted-foreground">
                           {formatDistanceToNow(new Date(pick.created_at), { addSuffix: true })}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Stake: {formatCurrency(pick.stake)} • Odds: {formatOdds(pick.odds_american)}
                         </div>
                       </div>
                       <div className="text-right space-y-1">
@@ -458,10 +485,17 @@ export default function DashboardPage() {
                              pick.status === 'refunded' ? 'Voided' : 
                              'Unknown'}
                           </Badge>
-                          <span className="font-medium">{formatCurrency(pick.stake)}</span>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Odds: {formatOdds(pick.odds_american)}
+                        <div className="text-sm font-medium">
+                          {pick.status === 'won' && pick.payout ? (
+                            <span className="text-green-600">+{formatCurrency(pick.payout)}</span>
+                          ) : pick.status === 'lost' ? (
+                            <span className="text-red-600">-{formatCurrency(pick.stake)}</span>
+                          ) : pick.status === 'pending' ? (
+                            <span className="text-muted-foreground">Potential: {formatCurrency(pick.potential_payout)}</span>
+                          ) : (
+                            <span className="text-muted-foreground">{formatCurrency(pick.stake)}</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -492,14 +526,24 @@ export default function DashboardPage() {
                 <div className="space-y-3">
                   {transactions.map((transaction) => (
                     <div key={transaction.id} className="flex items-center justify-between p-4 rounded-xl bg-background/50 backdrop-blur-sm border border-primary/10 hover:border-primary/20 transition-all duration-200">
-                      <div>
-                        <div className="font-medium capitalize">Transaction</div>
+                      <div className="flex-1">
+                        <div className="font-medium capitalize">
+                          {transaction.reason || transaction.type.replace('_', ' ')}
+                        </div>
                         <div className="text-sm text-muted-foreground">
                           {formatDistanceToNow(new Date(transaction.created_at), { addSuffix: true })}
                         </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Type: {transaction.type.replace('_', ' ')}
+                        </div>
                       </div>
-                      <div className={`font-bold text-lg ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {transaction.amount >= 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                      <div className="text-right space-y-1">
+                        <div className={`font-bold text-lg ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {transaction.amount >= 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Balance: {formatCurrency(transaction.balance_after)}
+                        </div>
                       </div>
                     </div>
                   ))}

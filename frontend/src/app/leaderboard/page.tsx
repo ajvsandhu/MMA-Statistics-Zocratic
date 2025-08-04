@@ -331,15 +331,24 @@ export default function P4PLeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
   const [previousRanks, setPreviousRanks] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false); // Separate state for background refresh
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isMobile, setIsMobile] = useState(false);
   
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const usersPerPage = 5;
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -445,13 +454,25 @@ export default function P4PLeaderboardPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="animate-pulse space-y-8">
-          <div className="h-12 bg-muted rounded-2xl w-1/2 mx-auto"></div>
-          <div className="h-80 bg-muted rounded-2xl"></div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center space-y-4 mb-8">
+            <div className="animate-pulse">
+              <div className="h-8 bg-muted rounded-lg w-48 mx-auto mb-2"></div>
+              <div className="h-4 bg-muted rounded w-64 mx-auto"></div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            {[...Array(10)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-20 bg-muted rounded-lg"></div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    );
+    )
   }
 
   const topThree = leaderboard.slice(0, 3);
@@ -521,35 +542,34 @@ export default function P4PLeaderboardPage() {
             {/* Left Column - 2nd Place */}
             <div className="flex justify-center items-end">
               {topThree.find(user => user.rank === 2) ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 100, scale: 0.8 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", bounce: 0.4, duration: 0.8 }}
-                  className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
-                  onClick={() => openUserProfile(topThree.find(user => user.rank === 2)!)}
-                >
-                  {/* Climbing Effect */}
-                  <motion.div
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    className="text-center mb-3 sm:mb-4 relative"
-                  >
+                                 <motion.div
+                   initial={{ opacity: 0, y: isMobile ? 30 : 100, scale: isMobile ? 0.95 : 0.8 }}
+                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                   transition={{ delay: 0.2, duration: isMobile ? 0.3 : 0.8 }}
+                   className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
+                   onClick={() => openUserProfile(topThree.find(user => user.rank === 2)!)}
+                 >
+                   <motion.div
+                     animate={isMobile ? {} : { y: [0, -3, 0] }}
+                     transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                     className="text-center mb-3 sm:mb-4 relative"
+                   >
                     {/* Silver Glow - NO SCALING TO PREVENT BLUR */}
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-gray-300/20 to-gray-500/20 blur-lg opacity-100 group-hover:opacity-100"></div>
                     
-                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 flex items-center justify-center text-lg sm:text-xl font-bold text-black mb-2 shadow-xl ring-2 ring-gray-400/30 group-hover:ring-4 group-hover:ring-gray-400/60 group-hover:shadow-2xl transition-all duration-300">
-                      {getUserInitials(topThree.find(user => user.rank === 2)!.email, topThree.find(user => user.rank === 2)!.display_name, topThree.find(user => user.rank === 2)!.username)}
-                      
-                      {/* Sparkling Effects */}
-                      <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-gray-300 animate-pulse" />
-                    </div>
+                                         <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 flex items-center justify-center text-lg sm:text-xl font-bold text-black mb-2 shadow-xl ring-2 ring-gray-400/30 group-hover:ring-4 group-hover:ring-gray-400/60 group-hover:shadow-2xl transition-all duration-300">
+                       {getUserInitials(topThree.find(user => user.rank === 2)!.email, topThree.find(user => user.rank === 2)!.display_name, topThree.find(user => user.rank === 2)!.username)}
+                       
+                       {/* Sparkling Effects */}
+                       <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-gray-300 animate-pulse" />
+                     </div>
 
-                    <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors truncate max-w-[80px] sm:max-w-none">
-                      {getDisplayName(topThree.find(user => user.rank === 2)!)}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {formatCurrency(topThree.find(user => user.rank === 2)!.portfolio_value)}
-                    </p>
+                                         <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors text-center w-full">
+                       {getDisplayName(topThree.find(user => user.rank === 2)!)}
+                     </h3>
+                                         <p className="text-xs sm:text-sm text-muted-foreground text-center w-full">
+                       {formatCurrency(topThree.find(user => user.rank === 2)!.portfolio_value)}
+                     </p>
                   </motion.div>
 
                   {/* Silver Podium Platform - Medium Height */}
@@ -582,19 +602,18 @@ export default function P4PLeaderboardPage() {
             {/* Center Column - 1st Place */}
             <div className="flex justify-center items-end">
               {topThree.find(user => user.rank === 1) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 150, scale: 0.7 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: 0.2, type: "spring", bounce: 0.5, duration: 1 }}
-                  className="flex flex-col items-center cursor-pointer group relative z-10 w-full max-w-[240px]"
-                  onClick={() => openUserProfile(topThree.find(user => user.rank === 1)!)}
-                >
-                  {/* Champion Floating Effect */}
-                  <motion.div
-                    animate={{ y: [0, -8, 0], rotate: [0, 1, -1, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    className="text-center mb-3 sm:mb-4 relative"
-                  >
+                                 <motion.div
+                   initial={{ opacity: 0, y: isMobile ? 50 : 150, scale: isMobile ? 0.9 : 0.7 }}
+                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                   transition={{ delay: 0.1, duration: isMobile ? 0.4 : 1 }}
+                   className="flex flex-col items-center cursor-pointer group relative z-10 w-full max-w-[240px]"
+                   onClick={() => openUserProfile(topThree.find(user => user.rank === 1)!)}
+                 >
+                   <motion.div
+                     animate={isMobile ? {} : { y: [0, -5, 0], rotate: [0, 1, -1, 0] }}
+                     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                     className="text-center mb-3 sm:mb-4 relative"
+                   >
                     {/* Royal Aura - NO SCALING TO PREVENT BLUR */}
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-yellow-400/30 via-yellow-500/40 to-yellow-600/30 blur-2xl opacity-100 group-hover:opacity-100 animate-pulse"></div>
                     
@@ -669,35 +688,34 @@ export default function P4PLeaderboardPage() {
             {/* Right Column - 3rd Place */}
             <div className="flex justify-center items-end">
               {topThree.find(user => user.rank === 3) ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 80, scale: 0.9 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: 0.6, type: "spring", bounce: 0.3, duration: 0.7 }}
-                  className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
-                  onClick={() => openUserProfile(topThree.find(user => user.rank === 3)!)}
-                >
-                  {/* Bronze Climbing Effect */}
-                  <motion.div
-                    animate={{ y: [0, -3, 0] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                    className="text-center mb-3 sm:mb-4 relative"
-                  >
+                                 <motion.div
+                   initial={{ opacity: 0, y: isMobile ? 40 : 80, scale: isMobile ? 0.95 : 0.9 }}
+                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                   transition={{ delay: 0.3, duration: isMobile ? 0.3 : 0.7 }}
+                   className="flex flex-col items-center cursor-pointer group relative w-full max-w-[200px]"
+                   onClick={() => openUserProfile(topThree.find(user => user.rank === 3)!)}
+                 >
+                   <motion.div
+                     animate={isMobile ? {} : { y: [0, -2, 0] }}
+                     transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                     className="text-center mb-3 sm:mb-4 relative"
+                   >
                     {/* Bronze Glow - NO SCALING TO PREVENT BLUR */}
                     <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400/20 to-amber-600/20 blur-lg opacity-100 group-hover:opacity-100"></div>
                     
-                    <div className="relative mx-auto w-14 h-14 sm:w-18 sm:h-18 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center text-sm sm:text-lg font-bold text-black mb-2 shadow-lg ring-2 ring-amber-500/30 group-hover:ring-4 group-hover:ring-amber-500/60 group-hover:shadow-2xl transition-all duration-300">
-                      {getUserInitials(topThree.find(user => user.rank === 3)!.email, topThree.find(user => user.rank === 3)!.display_name, topThree.find(user => user.rank === 3)!.username)}
-                      
-                      {/* Bronze Effects */}
-                      <Star className="pointer-events-none absolute -top-1 -right-1 w-3 h-3 text-amber-300 animate-pulse" />
-                   </div>
+                                         <div className="relative mx-auto w-14 h-14 sm:w-18 sm:h-18 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center text-sm sm:text-lg font-bold text-black mb-2 shadow-lg ring-2 ring-amber-500/30 group-hover:ring-4 group-hover:ring-amber-500/60 group-hover:shadow-2xl transition-all duration-300">
+                       {getUserInitials(topThree.find(user => user.rank === 3)!.email, topThree.find(user => user.rank === 3)!.display_name, topThree.find(user => user.rank === 3)!.username)}
+                       
+                       {/* Bronze Effects */}
+                       <Star className="pointer-events-none absolute -top-1 -right-1 w-3 h-3 text-amber-300 animate-pulse" />
+                     </div>
 
-                    <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors truncate max-w-[70px] sm:max-w-none">
-                      {getDisplayName(topThree.find(user => user.rank === 3)!)}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {formatCurrency(topThree.find(user => user.rank === 3)!.portfolio_value)}
-                    </p>
+                                         <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors text-center w-full">
+                       {getDisplayName(topThree.find(user => user.rank === 3)!)}
+                     </h3>
+                                         <p className="text-xs sm:text-sm text-muted-foreground text-center w-full">
+                       {formatCurrency(topThree.find(user => user.rank === 3)!.portfolio_value)}
+                     </p>
                   </motion.div>
 
                   {/* Bronze Podium Platform - Shortest */}
@@ -767,23 +785,23 @@ export default function P4PLeaderboardPage() {
             
             <div className="h-[400px] sm:h-[480px] overflow-hidden">
               <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentPage}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                  className="h-full"
-                >
-                  {currentUsers.map((user, index) => (
-                <motion.div 
-                    key={user.user_id} 
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between p-4 sm:p-5 border-b last:border-b-0 hover:bg-muted/30 transition-all cursor-pointer group min-h-[64px]"
-                  onClick={() => openUserProfile(user)}
-                >
+                                 <motion.div
+                   key={currentPage}
+                   initial={{ opacity: 0, y: isMobile ? 10 : 20 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   exit={{ opacity: 0, y: isMobile ? -10 : -20 }}
+                   transition={{ duration: isMobile ? 0.2 : 0.3, ease: "easeInOut" }}
+                   className="h-full"
+                 >
+                   {currentUsers.map((user, index) => (
+                   <motion.div 
+                       key={user.user_id} 
+                     initial={{ opacity: 0, x: isMobile ? -10 : -20 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     transition={{ delay: index * (isMobile ? 0.02 : 0.05) }}
+                     className="flex items-center justify-between p-4 sm:p-5 border-b last:border-b-0 hover:bg-muted/30 transition-all cursor-pointer group min-h-[64px]"
+                     onClick={() => openUserProfile(user)}
+                   >
                   <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                     {/* Rank with climbing indicator */}
                     <div className="flex items-center gap-2 shrink-0">
@@ -910,8 +928,8 @@ export default function P4PLeaderboardPage() {
       <div className="text-center mt-8">
         <Button 
           onClick={() => fetchLeaderboard(false)} 
-          variant="default"
-          className="gap-2 px-6 py-3 !bg-primary !hover:bg-primary/90 !text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          variant="outline"
+          className="gap-2 px-6 py-3 border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
           disabled={loading}
         >
           <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

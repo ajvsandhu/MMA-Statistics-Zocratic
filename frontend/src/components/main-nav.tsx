@@ -174,9 +174,12 @@ export function MainNav() {
   }
 
   const handleFighterSelect = (fighter: Fighter) => {
-    // Navigate to the fighter details page
+    const existingFromPage = sessionStorage.getItem('fighterPageFrom');
+    if (!existingFromPage) {
+      sessionStorage.setItem('fighterPageFrom', window.location.pathname + window.location.search);
+    }
+    
     router.push(`/fighters/${fighter.id}`)
-    // Close the mobile search only, keep menu open
     setMobileSearchExpanded(false)
   }
   
@@ -212,55 +215,41 @@ export function MainNav() {
     collapsed: { 
       width: 40,
       x: 0,
-      transition: { 
-        duration: 0.3, 
-        ease: "easeInOut"
-      }
+      transition: { duration: 0.25, ease: "easeInOut" }
     },
     expanded: { 
       width: "calc(100vw - 170px)", 
       x: -60, 
-      transition: { 
-        duration: 0.3, 
-        ease: "easeInOut"
-      }
+      transition: { duration: 0.25, ease: "easeInOut" }
     }
   }
 
-  // Logo fade animation variants with improved timing
   const logoVariants = {
     visible: { 
       opacity: 1,
-      transition: { 
-        duration: 0.3, 
-        ease: "easeInOut"
-      }
+      transition: { duration: 0.2, ease: "easeInOut" }
     },
     hidden: { 
       opacity: 0,
-      transition: { 
-        duration: 0.2, 
-        ease: "easeInOut"
-      }
+      transition: { duration: 0.15, ease: "easeInOut" }
     }
   }
 
-  // Content animation variants
   const contentVariants = {
     icon: {
       opacity: 1,
       scale: 1,
-      transition: { duration: 0.15 }
+      transition: { duration: 0.1 }
     },
     input: {
       opacity: 1,
       scale: 1,
-      transition: { duration: 0.2, delay: 0.1 }
+      transition: { duration: 0.15 }
     },
     exit: {
       opacity: 0,
       scale: 0.95,
-      transition: { duration: 0.15 }
+      transition: { duration: 0.1 }
     }
   }
 
@@ -285,38 +274,24 @@ export function MainNav() {
               animate={mobileSearchExpanded ? "expanded" : "collapsed"}
               className="relative"
             >
-              <AnimatePresence mode="wait">
-                {mobileSearchExpanded ? (
-                  <motion.div
-                    key="search-input"
-                    variants={contentVariants}
-                    initial="exit"
-                    animate="input"
-                    exit="exit"
-                    className="w-full"
-                  >
-                    <FighterSearch 
-                      onSelectFighter={handleFighterSelect}
-                      clearSearch={false}
-                      autoFocus={true}
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.button
-                    key="search-icon"
-                    variants={contentVariants}
-                    initial="exit"
-                    animate="icon"
-                    exit="exit"
-                    onClick={() => setMobileSearchExpanded(true)}
-                    className="flex items-center justify-center w-10 h-10 transition-all duration-200 focus:outline-none focus:ring-0"
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                    aria-label="Search fighters"
-                  >
-                    <Search className="h-5 w-5 text-white" />
-                  </motion.button>
-                )}
-              </AnimatePresence>
+              {mobileSearchExpanded ? (
+                <div className="w-full">
+                  <FighterSearch 
+                    onSelectFighter={handleFighterSelect}
+                    clearSearch={false}
+                    autoFocus={true}
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => setMobileSearchExpanded(true)}
+                  className="flex items-center justify-center w-10 h-10 transition-all duration-200 focus:outline-none focus:ring-0"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                  aria-label="Search fighters"
+                >
+                  <Search className="h-5 w-5 text-white" />
+                </button>
+              )}
             </motion.div>
           </div>
         )}
@@ -359,12 +334,12 @@ export function MainNav() {
           <AnimatePresence>
             {mobileMenuOpen && (
               <>
-                {/* Backdrop with strong blur - excludes navbar area */}
+                {/* Backdrop with optimized blur for mobile - excludes navbar area */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/80 backdrop-blur-2xl z-[20000]"
+                  className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[20000]"
                   style={{ 
                     clipPath: 'polygon(0 80px, 100% 80px, 100% 100%, 0 100%)'
                   }}
@@ -405,7 +380,7 @@ export function MainNav() {
                             >
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                                  <User className="h-5 w-5 text-white" />
+                                  <User className="h-5 w-5 text-primary-foreground" />
                                 </div>
                                 <div className="flex-1 min-w-0 text-left">
                                   <p className="text-sm font-semibold text-[var(--nav-text)] truncate">

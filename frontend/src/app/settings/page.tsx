@@ -91,13 +91,42 @@ export default function SettingsPage() {
 
   if (isLoading || loadingSettings) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading settings...</p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center space-y-4">
+            <div className="animate-pulse">
+              <div className="h-8 bg-muted rounded-lg w-48 mx-auto mb-2"></div>
+              <div className="h-4 bg-muted rounded w-64 mx-auto"></div>
+            </div>
+          </div>
+          
+          <div className="mt-8 space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-20 bg-muted rounded-lg"></div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    );
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6">
+            <div className="text-destructive text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-semibold text-destructive mb-2">Error Loading Settings</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()} variant="outline">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!isAuthenticated) {

@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { Send, Bot, User, Loader2, AlertCircle, Sparkles, MessageCircle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { ENDPOINTS } from "@/lib/api-config"
+import { motion } from "framer-motion"
 
 // Dynamic imports to avoid hydration issues
 const PageTransition = dynamic(
@@ -61,7 +62,10 @@ function ZobotChatContent() {
   }
 
   useEffect(() => {
-    scrollToBottom()
+    // Only scroll to bottom on initial load, not on every message
+    if (messages.length === 1) {
+      scrollToBottom()
+    }
   }, [messages])
 
   useEffect(() => {
@@ -236,26 +240,149 @@ function ZobotChatContent() {
 
   return (
     <PageTransition variant="slide-up">
-      <div className="container relative mx-auto px-4 py-4">
+      <div className="container relative mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <AnimatedItem variant="fadeDown" className="text-center space-y-3 mb-6">
-            <div className="flex items-center justify-center gap-3">
+          {/* Chat Container */}
+          <div className="relative mb-8">
+            <Card className="border border-border/50 bg-card/80 backdrop-blur-sm shadow-xl">
+              <div className="flex flex-col h-[calc(100vh-400px)] min-h-[400px] max-h-[600px]">
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 overscroll-contain">
+                  {messages.map((message, index) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                      className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm transition-all duration-200 ${
+                          message.isUser
+                            ? 'bg-primary text-primary-foreground rounded-br-md'
+                            : 'bg-muted/50 backdrop-blur-sm border border-border/50 rounded-bl-md hover:bg-muted/70'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {!message.isUser && (
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-sm">
+                              <Bot className="h-4 w-4 text-white" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-medium opacity-70">
+                                {message.isUser ? 'You' : 'Zobot'}
+                              </span>
+                              <span className="text-xs opacity-50">
+                                {formatTime(message.timestamp)}
+                              </span>
+                            </div>
+                            <div className="prose prose-sm max-w-none">
+                              <div
+                                className={`whitespace-pre-wrap break-words ${
+                                  message.isUser ? 'text-primary-foreground' : 'text-foreground'
+                                }`}
+                              >
+                                {formatMessageText(message.text)}
+                              </div>
+                            </div>
+                          </div>
+                          {message.isUser && (
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {isLoading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-start"
+                    >
+                      <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-muted/50 backdrop-blur-sm border border-border/50 rounded-bl-md">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-sm">
+                            <Bot className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                            <span className="text-sm text-muted-foreground">Zobot is thinking...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+                <div ref={messagesEndRef} />
+              </div>
+              
+              {/* Input Area */}
+              <div className="border-t border-border/50 bg-background/50 backdrop-blur-sm p-6">
+                <AnimatedItem variant="fadeUp" delay={0.1}>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <Textarea
+                        ref={textareaRef}
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        placeholder="Ask me about UFC fighters, techniques, or anything MMA..."
+                        className="min-h-[52px] max-h-[120px] resize-none border-2 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-xl text-[15px] leading-relaxed transition-all duration-200"
+                        disabled={isLoading || aiStatus !== "available"}
+                        rows={1}
+                      />
+                    </div>
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!inputText.trim() || isLoading || aiStatus !== "available"}
+                      size="lg"
+                      className="h-[52px] w-[52px] p-0 rounded-xl shadow-sm transition-all duration-200 hover:scale-105 active:scale-95"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Send className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Info Text */}
+                  <div className="text-center text-xs text-muted-foreground mt-4 flex items-center justify-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    <span>Zobot uses real UFC data and ML predictions. Results may vary.</span>
+                  </div>
+                </AnimatedItem>
+              </div>
+            </Card>
+          </div>
+
+          {/* Header - Now below the chat */}
+          <AnimatedItem variant="fadeUp" className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-4">
               <div className="relative">
-                <div className="absolute inset-0 bg-primary rounded-xl blur opacity-50 animate-pulse"></div>
-                <div className="relative bg-primary p-2.5 rounded-xl">
-                  <Bot className="h-5 w-5 text-primary-foreground" />
+                <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/60 rounded-2xl blur-lg opacity-30 animate-pulse"></div>
+                <div className="relative bg-gradient-to-br from-primary to-primary/80 p-3 rounded-2xl shadow-lg">
+                  <Bot className="h-6 w-6 text-primary-foreground" />
                 </div>
               </div>
               <div>
-                <h1 className="text-3xl font-thin">Zobot AI</h1>
-                <div className="flex items-center justify-center gap-1 mt-0.5">
-                  <Sparkles className="h-3 w-3 text-primary" />
-                  <span className="text-xs text-muted-foreground font-medium">Powered by Advanced ML</span>
+                <h1 className="text-4xl font-light tracking-tight">Zobot AI</h1>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-muted-foreground font-medium">Powered by Advanced ML</span>
                 </div>
               </div>
             </div>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto text-base">
               Your intelligent MMA companion with access to 4,305+ fighters and real-time predictions
             </p>
             
@@ -263,232 +390,30 @@ function ZobotChatContent() {
             <div className="flex justify-center">
               <Badge 
                 variant={aiStatus === "available" ? "default" : "destructive"}
-                className="py-1.5 px-3"
+                className="py-2 px-4 text-sm font-medium"
               >
                 {aiStatus === "checking" && (
                   <>
-                    <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Initializing...
                   </>
                 )}
                 {aiStatus === "available" && (
                   <>
-                    <div className="h-2 w-2 bg-green-500 rounded-full mr-2 animate-pulse" />
+                    <div className="h-2.5 w-2.5 bg-green-500 rounded-full mr-2 animate-pulse" />
                     Online & Ready
                   </>
                 )}
                 {aiStatus === "unavailable" && (
                   <>
-                    <AlertCircle className="h-3 w-3 mr-2" />
+                    <AlertCircle className="h-4 w-4 mr-2" />
                     Offline
                   </>
                 )}
               </Badge>
             </div>
           </AnimatedItem>
-
-          {/* Chat Container */}
-          <div className="relative">
-            <Card className="border-2 bg-card/50 backdrop-blur-sm shadow-lg">
-              <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px] max-h-[650px]">
-                {/* Messages Area */}
-                <CardContent className="flex-1 overflow-hidden p-0">
-                  <div className="h-full overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                    <AnimatedContainer className="space-y-6" delay={0.05}>
-                      {messages.map((message, index) => (
-                        <AnimatedItem 
-                          key={message.id} 
-                          variant="fadeUp" 
-                          delay={index * 0.05}
-                          className={`flex gap-4 ${message.isUser ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div className={`flex gap-3 max-w-[85%] lg:max-w-[75%] ${message.isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                            {/* Avatar */}
-                            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm border-2 ${
-                              message.isUser 
-                                ? 'bg-primary text-primary-foreground border-primary/20' 
-                                : 'bg-muted border-border'
-                            }`}>
-                              {message.isUser ? (
-                                <User className="h-5 w-5" />
-                              ) : (
-                                <Bot className="h-5 w-5" />
-                              )}
-                            </div>
-                            
-                            <div className={`space-y-2 ${message.isUser ? 'text-right' : 'text-left'}`}>
-                              {/* Message Bubble */}
-                              <div className={`inline-block p-4 rounded-2xl shadow-sm border ${
-                                message.isUser
-                                  ? 'bg-primary text-primary-foreground border-primary/20 rounded-br-sm'
-                                  : 'bg-card text-card-foreground border-border rounded-bl-sm'
-                              }`}>
-                                <div className="text-[15px] leading-relaxed">
-                                  {formatMessageText(message.text)}
-                                </div>
-                              </div>
-                              
-                              {/* Timestamp */}
-                              <p className="text-xs text-muted-foreground px-3">
-                                {formatTime(message.timestamp)}
-                              </p>
-                            </div>
-                          </div>
-                        </AnimatedItem>
-                      ))}
-                      
-                      {/* Loading State */}
-                      {isLoading && (
-                        <AnimatedItem variant="fadeUp" className="flex gap-4 justify-start">
-                          <div className="flex gap-3 max-w-[85%] lg:max-w-[75%]">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted border-2 border-border flex items-center justify-center shadow-sm">
-                              <Bot className="h-5 w-5" />
-                            </div>
-                            <div className="bg-card border border-border p-4 rounded-2xl rounded-bl-sm shadow-sm">
-                              <div className="flex items-center gap-3 text-muted-foreground">
-                                <div className="flex space-x-1">
-                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100"></div>
-                                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200"></div>
-                                </div>
-                                <span className="text-sm">Zobot is analyzing...</span>
-                              </div>
-                            </div>
-                          </div>
-                        </AnimatedItem>
-                      )}
-                    </AnimatedContainer>
-                    <div ref={messagesEndRef} />
-                  </div>
-                </CardContent>
-                
-                {/* Input Area */}
-                <div className="border-t bg-background/50 backdrop-blur-sm p-4">
-                  <AnimatedItem variant="fadeUp" delay={0.1}>
-                    <div className="flex gap-3 items-end">
-                      <div className="flex-1">
-                        <Textarea
-                          ref={textareaRef}
-                          value={inputText}
-                          onChange={(e) => setInputText(e.target.value)}
-                          onKeyDown={handleKeyPress}
-                          placeholder="Ask me about UFC fighters, techniques, or anything MMA..."
-                          className="min-h-[52px] max-h-[120px] resize-none border-2 focus:border-primary/50 rounded-xl text-[15px] leading-relaxed"
-                          disabled={isLoading || aiStatus !== "available"}
-                          rows={1}
-                        />
-                      </div>
-                      <Button
-                        onClick={handleSendMessage}
-                        disabled={!inputText.trim() || isLoading || aiStatus !== "available"}
-                        size="lg"
-                        className="h-[52px] w-[52px] p-0 rounded-xl shadow-sm"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Send className="h-5 w-5" />
-                        )}
-                      </Button>
-                    </div>
-                    
-                    {/* Info Text */}
-                    <div className="text-center text-xs text-muted-foreground mt-3 flex items-center justify-center gap-2">
-                      <MessageCircle className="h-4 w-4" />
-                      <span>Zobot uses real UFC data and ML predictions. Results may vary.</span>
-                    </div>
-                  </AnimatedItem>
-                </div>
-              </div>
-            </Card>
-          </div>
         </div>
-
-        {/* Custom Scrollbar Styles */}
-        <style jsx global>{`
-          .custom-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: transparent transparent;
-          }
-          
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-          }
-          
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.02);
-            border-radius: 12px;
-            margin: 8px 0;
-          }
-          
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, 
-              hsl(var(--primary) / 0.6) 0%, 
-              hsl(var(--primary) / 0.8) 50%, 
-              hsl(var(--primary) / 0.9) 100%);
-            border-radius: 12px;
-            border: 2px solid transparent;
-            background-clip: content-box;
-            box-shadow: 
-              0 0 0 1px hsl(var(--primary) / 0.1),
-              0 0 8px hsl(var(--primary) / 0.3),
-              inset 0 1px 0 hsl(var(--primary) / 0.2);
-            position: relative;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-          
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(135deg, 
-              hsl(var(--primary) / 0.8) 0%, 
-              hsl(var(--primary) / 1) 50%, 
-              hsl(var(--primary) / 1) 100%);
-            box-shadow: 
-              0 0 0 1px hsl(var(--primary) / 0.2),
-              0 0 12px hsl(var(--primary) / 0.5),
-              inset 0 1px 0 hsl(var(--primary) / 0.3);
-            transform: scaleY(1.1);
-          }
-          
-          .custom-scrollbar::-webkit-scrollbar-thumb:active {
-            background: linear-gradient(135deg, 
-              hsl(var(--primary) / 0.9) 0%, 
-              hsl(var(--primary) / 1) 50%, 
-              hsl(var(--primary) / 1) 100%);
-            box-shadow: 
-              0 0 0 1px hsl(var(--primary) / 0.3),
-              0 0 16px hsl(var(--primary) / 0.7),
-              inset 0 1px 0 hsl(var(--primary) / 0.4);
-            transform: scaleY(1.05);
-          }
-
-          /* Cool animated gradient border effect */
-          @keyframes scrollbar-glow {
-            0%, 100% {
-              box-shadow: 
-                0 0 0 1px hsl(var(--primary) / 0.1),
-                0 0 8px hsl(var(--primary) / 0.3),
-                inset 0 1px 0 hsl(var(--primary) / 0.2);
-            }
-            50% {
-              box-shadow: 
-                0 0 0 1px hsl(var(--primary) / 0.2),
-                0 0 12px hsl(var(--primary) / 0.5),
-                inset 0 1px 0 hsl(var(--primary) / 0.3);
-            }
-          }
-          
-          .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-            animation: scrollbar-glow 2s ease-in-out infinite;
-          }
-
-          /* Firefox fallback with gradient */
-          @supports (scrollbar-color: red blue) {
-            .custom-scrollbar {
-              scrollbar-color: hsl(var(--primary) / 0.7) transparent;
-              scrollbar-width: thin;
-            }
-          }
-        `}</style>
       </div>
     </PageTransition>
   )
