@@ -299,8 +299,30 @@ export function useAuth() {
 
   const callPostSignupEndpoint = async (userData: { email: string; preferred_username: string; emailNotifications?: boolean }, acceptedTos: boolean = false): Promise<void> => {
     try {
-      // Wait for token to be available
-      const token = await waitForToken();
+      // Get token directly from current user instead of waiting
+      const currentUser = userPool.getCurrentUser();
+      
+      if (!currentUser) {
+        console.error('No current user found');
+        return;
+      }
+      
+      // Get session directly
+      const token = await new Promise<string | null>((resolve) => {
+        currentUser.getSession((err: any, session: any) => {
+          if (err) {
+            console.error('Error getting session:', err);
+            resolve(null);
+          } else if (session && session.isValid()) {
+            const token = session.getIdToken().getJwtToken();
+            resolve(token);
+          } else {
+            console.error('Session invalid or not available');
+            resolve(null);
+          }
+        });
+      });
+      
       if (!token) {
         console.error('No ID token available for post-signup call');
         return;
@@ -308,6 +330,7 @@ export function useAuth() {
 
       // Extract user_id from token for validation
       const userId = getUserIdFromToken(token);
+      
       if (!userId) {
         console.error('Could not extract user ID from token');
         return;
@@ -320,24 +343,24 @@ export function useAuth() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          user_id: userId,
           email: userData.email,
           preferred_username: userData.preferred_username,
           email_notifications: userData.emailNotifications ?? true,
-          accepted_tos: acceptedTos
+          accepted_tos: acceptedTos,
+          user_id: userId
         })
       });
-
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Post-signup failed:', errorData);
+        const errorText = await response.text();
+        console.error('Post-signup failed:', response.status, errorText);
         return;
       }
 
       const result = await response.json();
-      console.log('Post-signup successful:', result);
+      
     } catch (error) {
-      console.error('Error calling post-signup endpoint:', error);
+      console.error('Post-signup error:', error);
     }
   };
 

@@ -155,6 +155,9 @@ export default function AuthPage() {
       // Automatically sign in after confirmation
       await signInWithCredentials(confirmationEmail, signupFormData.password || formData.password);
       
+      // Wait a moment for the session to be established
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       // Use preserved signup data to ensure we have the correct preferences
       const userData = {
         email: confirmationEmail,
