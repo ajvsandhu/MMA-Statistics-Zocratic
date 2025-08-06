@@ -56,6 +56,7 @@ export default function AuthPage() {
   const [confirmSuccess, setConfirmSuccess] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [signupFormData, setSignupFormData] = useState<Partial<FormData>>({}); // Preserve signup data
 
   // Animation variants
   const cardVariants = {
@@ -121,6 +122,9 @@ export default function AuthPage() {
         await signInWithCredentials(formData.email, formData.password);
         // The signInWithCredentials will handle the redirect
       } else {
+        // Preserve the signup form data before confirmation
+        setSignupFormData(formData);
+        
         await signUpWithCredentials({
           email: formData.email,
           password: formData.password,
@@ -148,25 +152,31 @@ export default function AuthPage() {
     try {
       await confirmSignUpWithCode(confirmationEmail, confirmationCode);
       // Automatically sign in after confirmation
-      await signInWithCredentials(confirmationEmail, formData.password);
+      await signInWithCredentials(confirmationEmail, signupFormData.password || formData.password);
       
       // Call post-signup endpoint to handle group assignment and user settings
       // Note: We need to wait a moment for the signin to complete and tokens to be available
+      // Use longer timeout for production environments where network timing differs
+      const timeoutMs = window.location.hostname === 'localhost' ? 1000 : 2000;
+      
       setTimeout(async () => {
         try {
-          // Pass the email and username directly since userProfile state might not be ready  
-          // Note: formData gets reset when switching to confirmation mode, so use email prefix as fallback
+          // Use preserved signup data to ensure we have the correct preferences
           const userData = {
             email: confirmationEmail,
-            preferred_username: confirmationEmail.split('@')[0], // Use email prefix as username
-            emailNotifications: formData.emailNotifications // Pass email preferences
+            preferred_username: signupFormData.username || confirmationEmail.split('@')[0],
+            emailNotifications: signupFormData.emailNotifications ?? true // Use preserved preference
           };
+          
+          console.log('Post-signup call with preserved data:', userData);
+          console.log('Environment:', window.location.hostname, 'Timeout:', timeoutMs);
           await callPostSignupEndpoint(userData, true); // Auto-accept TOS
         } catch (error) {
           console.error('Post-signup processing failed:', error);
+          console.error('Full error details:', error);
           // Don't show error to user - this is handled gracefully in the backend
         }
-      }, 1000);
+      }, timeoutMs);
       
       // The signInWithCredentials will redirect to home
     } catch (err: any) {
