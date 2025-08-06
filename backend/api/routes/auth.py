@@ -47,6 +47,7 @@ class PostSignupResponse(BaseModel):
     message: str
     group_added: bool = False
     settings_created: bool = False
+    coin_wallet_created: bool = False
 
 @router.post("/check-username", response_model=UsernameCheckResponse)
 async def check_username_availability(request: UsernameCheckRequest):
@@ -145,6 +146,7 @@ async def handle_post_signup(
     
     group_added = False
     settings_created = False
+    coin_wallet_created = False
     errors = []
     
     # Verify the user_id from token matches the request
@@ -256,6 +258,25 @@ async def handle_post_signup(
                 settings_created = True
                 logger.info(f"Created user_settings for user {user_id}")
                 
+                # Create coin wallet for new user
+                try:
+                    coin_wallet_result = supabase.table('coin_accounts').insert({
+                        'user_id': user_id,
+                        'balance': 1000,
+                        'total_wagered': 0,
+                        'total_won': 0,
+                        'total_lost': 0
+                    }).execute()
+                    
+                    if coin_wallet_result.data:
+                        logger.info(f"Created coin wallet for user {user_id}")
+                        coin_wallet_created = True
+                    else:
+                        logger.warning(f"Coin wallet creation returned no data for user {user_id}")
+                        
+                except Exception as e:
+                    logger.warning(f"Coin wallet might already exist for user {user_id}: {str(e)}")
+                
                 # Send welcome email if user opted in for notifications
                 if signup_request.email_notifications:
                     try:
@@ -286,17 +307,21 @@ async def handle_post_signup(
         errors.append(error_msg)
     
     # Determine overall success
-    success = group_added and settings_created
+    success = group_added and settings_created and coin_wallet_created
     message = "Post-signup processing completed successfully"
     
     if errors:
         message = f"Post-signup completed with errors: {'; '.join(errors)}"
     
+    logger.info(f"Post-signup result for user {user_id}: success={success}, group_added={group_added}, settings_created={settings_created}, coin_wallet_created={coin_wallet_created}")
+    logger.info(f"Final message: {message}")
+    
     return PostSignupResponse(
         success=success,
         message=message,
         group_added=group_added,
-        settings_created=settings_created
+        settings_created=settings_created,
+        coin_wallet_created=coin_wallet_created
     )
 
 @router.get("/health")

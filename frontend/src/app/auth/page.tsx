@@ -151,34 +151,43 @@ export default function AuthPage() {
     setConfirmError(null);
     try {
       await confirmSignUpWithCode(confirmationEmail, confirmationCode);
+      
       // Automatically sign in after confirmation
       await signInWithCredentials(confirmationEmail, signupFormData.password || formData.password);
       
-      // Call post-signup endpoint to handle group assignment and user settings
-      // Note: We need to wait a moment for the signin to complete and tokens to be available
-      // Use longer timeout for production environments where network timing differs
-      const timeoutMs = window.location.hostname === 'localhost' ? 1000 : 2000;
+      // Use preserved signup data to ensure we have the correct preferences
+      const userData = {
+        email: confirmationEmail,
+        preferred_username: signupFormData.username || confirmationEmail.split('@')[0],
+        emailNotifications: signupFormData.emailNotifications ?? true // Use preserved preference
+      };
       
-      setTimeout(async () => {
+      console.log('Post-signup call with preserved data:', userData);
+      
+      // Call post-signup endpoint with retry logic
+      let postSignupSuccess = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          // Use preserved signup data to ensure we have the correct preferences
-          const userData = {
-            email: confirmationEmail,
-            preferred_username: signupFormData.username || confirmationEmail.split('@')[0],
-            emailNotifications: signupFormData.emailNotifications ?? true // Use preserved preference
-          };
-          
-          console.log('Post-signup call with preserved data:', userData);
-          console.log('Environment:', window.location.hostname, 'Timeout:', timeoutMs);
+          console.log(`Post-signup attempt ${attempt}/3`);
           await callPostSignupEndpoint(userData, true); // Auto-accept TOS
+          postSignupSuccess = true;
+          console.log('Post-signup completed successfully');
+          break;
         } catch (error) {
-          console.error('Post-signup processing failed:', error);
-          console.error('Full error details:', error);
-          // Don't show error to user - this is handled gracefully in the backend
+          console.error(`Post-signup attempt ${attempt} failed:`, error);
+          if (attempt === 3) {
+            console.error('All post-signup attempts failed');
+            // Don't show error to user - this is handled gracefully in the backend
+          } else {
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
         }
-      }, timeoutMs);
+      }
       
-      // The signInWithCredentials will redirect to home
+      // Redirect to home after all processing is complete
+      window.location.href = '/';
+      
     } catch (err: any) {
       setConfirmError(err.message || 'Failed to confirm account.');
     } finally {

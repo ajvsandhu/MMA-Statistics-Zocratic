@@ -127,56 +127,46 @@ export function useAuth() {
       
       cognitoUser.authenticateUser(authenticationDetails, {
         onSuccess: (result) => {
-          console.log('Authentication successful');
           // Update local state
           setCognitoUser(cognitoUser);
           
-          // Get user attributes
-          cognitoUser.getUserAttributes((err, attributes) => {
-            if (!err && attributes) {
-              const profile: UserProfile = {};
-              attributes.forEach((attr) => {
-                if (attr.Name === 'email') profile.email = attr.Value;
-                if (attr.Name === 'given_name') profile.preferred_username = attr.Value;
-                if (attr.Name === 'sub') profile.id = attr.Value;
-              });
-              setCognitoProfile(profile);
-            }
-          });
-          
-          // Just redirect to home - no more Cognito hosted UI
-          window.location.href = '/';
-          resolve();
+          // Small delay to ensure state is updated
+          setTimeout(() => {
+            resolve();
+          }, 100);
         },
         onFailure: (err) => {
           console.error('Authentication failed:', err);
-          let errorMessage = 'Authentication failed. Please try again.';
-          
-          const errorCode = (err as any)?.code;
-          if (errorCode === 'NotAuthorizedException') {
-            errorMessage = 'Incorrect email or password.';
-          } else if (errorCode === 'UserNotConfirmedException') {
-            errorMessage = 'Please verify your email address first.';
-          } else if (errorCode === 'PasswordResetRequiredException') {
-            errorMessage = 'Password reset required. Please reset your password.';
-          } else if (errorCode === 'UserNotFoundException') {
-            errorMessage = 'No account found with this email address.';
-          } else if (errorCode === 'TooManyRequestsException') {
-            errorMessage = 'Too many failed attempts. Please try again later.';
-          }
-          
-          reject(new Error(errorMessage));
+          reject(err);
         },
         newPasswordRequired: (userAttributes, requiredAttributes) => {
-          // Handle new password required
-          reject(new Error('New password required. Please contact support.'));
-        },
-        mfaRequired: (challengeName, challengeParameters) => {
-          // Handle MFA if enabled
-          reject(new Error('MFA required. Please contact support.'));
+          console.error('New password required');
+          reject(new Error('New password required'));
         }
       });
     });
+  };
+
+  // New function to wait for token availability
+  const waitForToken = async (maxAttempts = 10, delayMs = 500): Promise<string | null> => {
+    // Wait a bit longer for the first attempt to allow state to settle
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const token = getIdToken();
+      
+      if (token) {
+        // Validate token by checking if we can extract user ID
+        const userId = getUserIdFromToken(token);
+        if (userId) {
+          return token;
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    
+    return null;
   };
 
   const signUpWithCredentials = async (data: SignUpData): Promise<void> => {
@@ -271,7 +261,7 @@ export function useAuth() {
           return session.getIdToken().getJwtToken();
         }
       } catch (error) {
-        console.error('Error getting Cognito ID token:', error);
+        console.warn('Error getting Cognito session token:', error);
       }
     }
     
@@ -309,47 +299,45 @@ export function useAuth() {
 
   const callPostSignupEndpoint = async (userData: { email: string; preferred_username: string; emailNotifications?: boolean }, acceptedTos: boolean = false): Promise<void> => {
     try {
-      const token = getIdToken();
+      // Wait for token to be available
+      const token = await waitForToken();
       if (!token) {
         console.error('No ID token available for post-signup call');
         return;
       }
 
+      // Extract user_id from token for validation
       const userId = getUserIdFromToken(token);
       if (!userId) {
         console.error('Could not extract user ID from token');
         return;
       }
 
-      console.log('Calling post-signup endpoint with:', { userId, email: userData.email, preferred_username: userData.preferred_username, emailNotifications: userData.emailNotifications });
-
-      const response = await fetch(ENDPOINTS.POST_SIGNUP, {
+      const response = await fetch(`${ENDPOINTS.POST_SIGNUP}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           user_id: userId,
           email: userData.email,
           preferred_username: userData.preferred_username,
-          accepted_tos: acceptedTos,
-          email_notifications: userData.emailNotifications ?? true
-        }),
+          email_notifications: userData.emailNotifications ?? true,
+          accepted_tos: acceptedTos
+        })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Post-signup API call failed:', errorData);
-        throw new Error(errorData.message || 'Failed to complete signup process');
+        console.error('Post-signup failed:', errorData);
+        return;
       }
 
-      const data = await response.json();
-      console.log('Post-signup processing completed:', data);
+      const result = await response.json();
+      console.log('Post-signup successful:', result);
     } catch (error) {
-      console.error('Post-signup endpoint call failed:', error);
-      // Don't reject here - we don't want to block the user if this fails
-      // The Lambda fallback might still handle it
+      console.error('Error calling post-signup endpoint:', error);
     }
   };
 
@@ -402,6 +390,7 @@ export function useAuth() {
     getAuthHeaders,
     confirmSignUpWithCode,
     resendConfirmationCode,
-    callPostSignupEndpoint
+    callPostSignupEndpoint,
+    waitForToken
   };
 } 
