@@ -9,6 +9,7 @@ import {
   CognitoUserAttribute 
 } from 'amazon-cognito-identity-js';
 import { useState, useEffect } from 'react';
+import { ENDPOINTS } from '@/lib/api-config';
 
 export interface UserProfile {
   id?: string;
@@ -290,6 +291,68 @@ export function useAuth() {
     });
   };
 
+  const getUserIdFromToken = (token: string): string | null => {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      
+      const payload = parts[1];
+      const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
+      const decoded = atob(paddedPayload);
+      const parsed = JSON.parse(decoded);
+      
+      return parsed.sub || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const callPostSignupEndpoint = async (userData: { email: string; preferred_username: string; emailNotifications?: boolean }, acceptedTos: boolean = false): Promise<void> => {
+    try {
+      const token = getIdToken();
+      if (!token) {
+        console.error('No ID token available for post-signup call');
+        return;
+      }
+
+      const userId = getUserIdFromToken(token);
+      if (!userId) {
+        console.error('Could not extract user ID from token');
+        return;
+      }
+
+      console.log('Calling post-signup endpoint with:', { userId, email: userData.email, preferred_username: userData.preferred_username, emailNotifications: userData.emailNotifications });
+
+      const response = await fetch(ENDPOINTS.POST_SIGNUP, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          email: userData.email,
+          preferred_username: userData.preferred_username,
+          accepted_tos: acceptedTos,
+          email_notifications: userData.emailNotifications ?? true
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Post-signup API call failed:', errorData);
+        throw new Error(errorData.message || 'Failed to complete signup process');
+      }
+
+      const data = await response.json();
+      console.log('Post-signup processing completed:', data);
+    } catch (error) {
+      console.error('Post-signup endpoint call failed:', error);
+      // Don't reject here - we don't want to block the user if this fails
+      // The Lambda fallback might still handle it
+    }
+  };
+
   const resendConfirmationCode = async (email: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       const cognitoUser = new CognitoUser({ Username: email, Pool: userPool });
@@ -338,6 +401,7 @@ export function useAuth() {
     getToken, // Add backward compatibility
     getAuthHeaders,
     confirmSignUpWithCode,
-    resendConfirmationCode
+    resendConfirmationCode,
+    callPostSignupEndpoint
   };
 } 

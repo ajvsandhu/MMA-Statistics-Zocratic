@@ -33,6 +33,7 @@ export const ENDPOINTS = {
   ZOBOT_STATUS: `${API_URL}${API_PREFIX}/zobot/status`,
   PREDICTION: `${API_URL}${API_PREFIX}/prediction/predict`,
   CHECK_USERNAME: `${API_URL}${API_PREFIX}/auth/check-username`,
+  POST_SIGNUP: `${API_URL}${API_PREFIX}/auth/post-signup`,
 };
 
 // Utility function for API calls with retries

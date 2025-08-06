@@ -269,19 +269,12 @@ def get_user_id_from_auth_header(authorization: str = Header(None)) -> str:
                         _user_settings_cache[cache_key] = current_time
                         
                 else:
-                    # Create new user entry
-                    logger.info(f"Creating new user settings for {user_id[:8]}... with email: {email}")
-                    insert_result = supabase.table('user_settings').insert({
-                        'user_id': user_id,
-                        'settings': settings
-                    }).execute()
-                    
-                    if insert_result.data:
-                        logger.info(f"Successfully created user settings for {user_id[:8]}... with email: {email}")
-                        # Cache the successful creation
-                        _user_settings_cache[cache_key] = current_time
-                    else:
-                        logger.error(f"Insert failed for user {user_id[:8]}...: {insert_result}")
+                    # User settings don't exist - this should only happen during signup
+                    # The post-signup endpoint should create user settings, not the auth helper
+                    logger.warning(f"User settings not found for {user_id[:8]}... (email: {email})")
+                    logger.warning("This indicates the user was not properly processed during signup")
+                    logger.warning("User settings should be created via /api/v1/auth/post-signup endpoint")
+                    # Do not create settings here - let the post-signup endpoint handle it
                         
             else:
                 logger.error("Failed to get database connection for user settings update")

@@ -297,6 +297,10 @@ app.include_router(predictions_game.router)
 from backend.api.routes import auth
 app.include_router(auth.router, prefix="/api/v1/auth")
 
+# Import and include Email Admin router
+from backend.api.routes import email_admin
+app.include_router(email_admin.router, prefix="/api/v1/email-admin")
+
 @app.get("/")
 def read_root():
     """Root endpoint that checks database connection."""

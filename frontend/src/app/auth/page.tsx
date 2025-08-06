@@ -20,6 +20,7 @@ interface FormData {
   username: string;
   password: string;
   confirmPassword: string;
+  emailNotifications: boolean;
 }
 
 interface FormErrors {
@@ -27,6 +28,7 @@ interface FormErrors {
   username?: string;
   password?: string;
   confirmPassword?: string;
+  emailNotifications?: string;
   general?: string;
 }
 
@@ -36,14 +38,15 @@ export default function AuthPage() {
     email: '',
     username: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    emailNotifications: true // Default to true for better engagement
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const { signInWithCredentials, signUpWithCredentials, confirmSignUpWithCode, resendConfirmationCode } = useAuth();
+  const { signInWithCredentials, signUpWithCredentials, confirmSignUpWithCode, resendConfirmationCode, callPostSignupEndpoint, userProfile } = useAuth();
   const router = useRouter();
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState('');
@@ -97,6 +100,8 @@ export default function AuthPage() {
       } else if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords do not match';
       }
+
+      // TOS is automatically accepted on signup - no validation needed
     }
 
     setErrors(newErrors);
@@ -144,6 +149,25 @@ export default function AuthPage() {
       await confirmSignUpWithCode(confirmationEmail, confirmationCode);
       // Automatically sign in after confirmation
       await signInWithCredentials(confirmationEmail, formData.password);
+      
+      // Call post-signup endpoint to handle group assignment and user settings
+      // Note: We need to wait a moment for the signin to complete and tokens to be available
+      setTimeout(async () => {
+        try {
+          // Pass the email and username directly since userProfile state might not be ready  
+          // Note: formData gets reset when switching to confirmation mode, so use email prefix as fallback
+          const userData = {
+            email: confirmationEmail,
+            preferred_username: confirmationEmail.split('@')[0], // Use email prefix as username
+            emailNotifications: formData.emailNotifications // Pass email preferences
+          };
+          await callPostSignupEndpoint(userData, true); // Auto-accept TOS
+        } catch (error) {
+          console.error('Post-signup processing failed:', error);
+          // Don't show error to user - this is handled gracefully in the backend
+        }
+      }, 1000);
+      
       // The signInWithCredentials will redirect to home
     } catch (err: any) {
       setConfirmError(err.message || 'Failed to confirm account.');
@@ -165,7 +189,7 @@ export default function AuthPage() {
     }
   };
 
-  const handleInputChange = (field: keyof FormData, value: string) => {
+  const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
@@ -180,7 +204,8 @@ export default function AuthPage() {
       email: '',
       username: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      emailNotifications: true
     });
   };
 
@@ -272,7 +297,7 @@ export default function AuthPage() {
 
   // Main Auth Card
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative z-0 -mt-32">
+    <div className="min-h-screen flex items-center justify-center px-4 py-16 sm:py-20 md:-mt-32 relative z-0">
       <PageBackground />
       <LayoutGroup>
         <motion.div
@@ -282,12 +307,12 @@ export default function AuthPage() {
           animate="visible"
           transition={{ layout: { type: 'spring', stiffness: 100, damping: 18 } }}
                      className={cn(
-             "w-full max-w-md sm:max-w-lg md:max-w-xl relative z-10",
+             "w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl relative z-10",
              "bg-card/60 backdrop-blur-xl rounded-2xl border border-border/60 overflow-hidden shadow-2xl",
              "ring-1 ring-inset ring-[var(--primary)/20]",
              "transition-all duration-300",
              "hover:ring-2 hover:ring-[var(--primary)/40]",
-             "p-3 sm:p-5 md:p-6"
+             "p-4 sm:p-5 md:p-6"
            )}
           style={{ boxShadow: '0 8px 32px 0 rgba(0,0,0,0.25), 0 1.5px 8px 0 hsl(var(--primary) / 0.10)' }}
         >
@@ -301,12 +326,12 @@ export default function AuthPage() {
           </Link>
           {/* Main Auth Card Content */}
           <div className="pt-0">
-            <div className="text-center mb-3 sm:mb-4">
+            <div className="text-center mb-2 sm:mb-3 md:mb-4">
               <motion.h1
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1, duration: 0.5 }}
-                className="text-xl sm:text-2xl font-bold text-foreground mb-1"
+                className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-1"
               >
                 Welcome to Zocratic MMA
               </motion.h1>
@@ -314,7 +339,7 @@ export default function AuthPage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.18, duration: 0.5 }}
-                className="text-muted-foreground text-sm sm:text-base"
+                className="text-muted-foreground text-xs sm:text-sm md:text-base"
               >
                 {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
               </motion.p>
@@ -332,7 +357,7 @@ export default function AuthPage() {
               exit="exit"
               transition={{ duration: 0.4 }}
               onSubmit={handleSubmit}
-              className="pt-0 flex flex-col gap-1.5 sm:gap-2"
+              className="pt-0 flex flex-col gap-1 sm:gap-1.5 md:gap-2"
             >
               <AnimatePresence>
                 {errors.general && (
@@ -349,7 +374,7 @@ export default function AuthPage() {
               </AnimatePresence>
 
               {/* Email */}
-              <div className="space-y-1">
+              <div className="space-y-0.5 md:space-y-1">
                 <Label htmlFor="email" className="text-xs font-medium text-foreground">
                   Email Address <span className="text-red-500">*</span>
                 </Label>
@@ -360,9 +385,9 @@ export default function AuthPage() {
                      type="email"
                      value={formData.email}
                      onChange={(e) => handleInputChange('email', e.target.value)}
-                     className={`pl-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
-                       errors.email ? 'border-destructive' : ''
-                     }`}
+                                         className={`pl-10 h-8 sm:h-9 md:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                      errors.email ? 'border-destructive' : ''
+                    }`}
                      placeholder="john@example.com"
                      disabled={isLoading}
                    />
@@ -374,7 +399,7 @@ export default function AuthPage() {
 
               {/* Username (only for signup) */}
               {mode === 'signup' && (
-                <div className="space-y-1">
+                <div className="space-y-0.5 md:space-y-1">
                   <Label htmlFor="username" className="text-xs font-medium text-foreground">
                     Username <span className="text-red-500">*</span>
                   </Label>
@@ -389,18 +414,18 @@ export default function AuthPage() {
               )}
 
               {/* Password */}
-              <div className="space-y-1">
+              <div className="space-y-0.5 md:space-y-1">
                 <Label htmlFor="password" className="text-xs font-medium text-foreground">
                   Password <span className="text-red-500">*</span>
                 </Label>
                                  <div className="relative">
-                   <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground z-10" />
+                   <Lock className="absolute left-3 top-2 md:top-2.5 h-4 w-4 text-muted-foreground z-10" />
                    <Input
                      id="password"
                      type={showPassword ? "text" : "password"}
                      value={formData.password}
                      onChange={(e) => handleInputChange('password', e.target.value)}
-                     className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                     className={`pl-10 pr-10 h-8 sm:h-9 md:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
                        errors.password ? 'border-destructive' : ''
                      }`}
                                           placeholder={mode === 'signup' ? '••••••••' : '••••••••'}
@@ -410,7 +435,7 @@ export default function AuthPage() {
                    <button
                      type="button"
                      onClick={() => setShowPassword(!showPassword)}
-                     className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90 z-10"
+                     className="absolute right-3 top-2 md:top-2.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90 z-10"
                      aria-label="Toggle password visibility"
                    >
                     <motion.span
@@ -423,7 +448,7 @@ export default function AuthPage() {
                     </motion.span>
                   </button>
                                                           {mode === 'signup' && (
-                       <p className="text-xs text-muted-foreground mt-1">
+                       <p className="text-xs text-muted-foreground mt-0.5">
                          Must be at least 8 characters with uppercase, lowercase, number, and special character
                        </p>
                      )}
@@ -435,18 +460,18 @@ export default function AuthPage() {
 
               {/* Confirm Password (only for signup) */}
               {mode === 'signup' && (
-                <div className="space-y-1">
+                <div className="space-y-0.5 md:space-y-1">
                   <Label htmlFor="confirmPassword" className="text-xs font-medium text-foreground">
                     Confirm Password <span className="text-red-500">*</span>
                   </Label>
                                      <div className="relative">
-                     <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground z-10" />
+                     <Lock className="absolute left-3 top-2 md:top-2.5 h-4 w-4 text-muted-foreground z-10" />
                      <Input
                        id="confirmPassword"
                        type={showConfirmPassword ? "text" : "password"}
                        value={formData.confirmPassword}
                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                       className={`pl-10 pr-10 h-9 sm:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
+                       className={`pl-10 pr-10 h-8 sm:h-9 md:h-10 bg-background/60 border-border/60 rounded-xl text-foreground placeholder-muted-foreground focus:bg-background/80 focus:border-primary transition-all ${
                          errors.confirmPassword ? 'border-destructive' : ''
                        }`}
                        placeholder="••••••••"
@@ -456,7 +481,7 @@ export default function AuthPage() {
                      <button
                        type="button"
                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                       className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90 z-10"
+                       className="absolute right-3 top-2 md:top-2.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90 z-10"
                        aria-label="Toggle confirm password visibility"
                      >
                       <motion.span
@@ -475,12 +500,58 @@ export default function AuthPage() {
                 </div>
               )}
 
+              {/* Email Notifications Checkbox (only for signup) */}
+              {mode === 'signup' && (
+                <div className="space-y-2 md:space-y-3">
+                  <div className="flex items-start space-x-2 md:space-x-3">
+                    <input
+                      id="emailNotifications"
+                      type="checkbox"
+                      checked={formData.emailNotifications}
+                      onChange={(e) => handleInputChange('emailNotifications', e.target.checked)}
+                      className="mt-0.5 md:mt-1 h-3.5 w-3.5 md:h-4 md:w-4 rounded border-border/60 bg-background/60 text-primary focus:ring-1 md:focus:ring-2 focus:ring-primary focus:ring-offset-0 transition-all"
+                      disabled={isLoading}
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="emailNotifications" className="text-xs md:text-sm font-medium text-foreground cursor-pointer">
+                        📧 Email Notifications
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-0.5 md:mt-1 leading-tight">
+                        Get weekly fight reminders, results updates, and exclusive MMA insights. You can unsubscribe anytime.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Terms of Service Notice */}
+                  <p className="text-xs text-muted-foreground text-center pt-1.5 border-t border-border/30">
+                    By creating an account, you agree to our{' '}
+                    <a 
+                      href="/terms-of-service" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80 underline"
+                    >
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a 
+                      href="/privacy-policy" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80 underline"
+                    >
+                      Privacy Policy
+                    </a>
+                  </p>
+                </div>
+              )}
+
               {/* Submit Button */}
-              <div className="pt-1">
+              <div className="pt-0.5 md:pt-1">
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-9 sm:h-10 text-sm font-medium shadow-xl hover:shadow-2xl transition-all duration-200 active:scale-95"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-8 sm:h-9 md:h-10 text-sm font-medium shadow-xl hover:shadow-2xl transition-all duration-200 active:scale-95"
                 >
                   {isLoading ? (
                     <div className="flex items-center gap-2">
@@ -498,7 +569,7 @@ export default function AuthPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.32, duration: 0.4 }}
-                className="text-center pt-1"
+                className="text-center pt-0.5 md:pt-1"
               >
                 <p className="text-xs text-muted-foreground">
                   {mode === 'login' 
@@ -518,7 +589,7 @@ export default function AuthPage() {
             </motion.form>
           </AnimatePresence>
           {/* Footer */}
-          <div className="text-center mt-4 sm:mt-6">
+          <div className="text-center mt-2 sm:mt-3 md:mt-4 lg:mt-6">
             <p className="text-muted-foreground text-xs">
               Master the art of fight analysis with advanced UFC statistics
             </p>
