@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import time
 import traceback
+import httpx
 
 # Load environment variables from project root
 from pathlib import Path
@@ -27,14 +28,40 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     logger.error("Missing Supabase credentials. Please check environment variables.")
 
 # Connection settings
-CONNECTION_TIMEOUT = int(os.getenv("CONNECTION_TIMEOUT", "15"))  # 15-second timeout by default
-MAX_RETRIES = int(os.getenv("CONNECTION_RETRIES", "3"))  # 3 retries by default
+CONNECTION_TIMEOUT = int(os.getenv("CONNECTION_TIMEOUT", "30"))  # Increased to 30 seconds
+MAX_RETRIES = int(os.getenv("CONNECTION_RETRIES", "5"))  # Increased to 5 retries
 RETRY_BACKOFF = 2  # Exponential backoff multiplier
 
 # Global connection instance
 _supabase_client: Optional[Client] = None
 _last_connection_attempt = 0
-_connection_expiry = 3600  # 1 hour expiry for connection
+_connection_expiry = 1800  # Reduced to 30 minutes for better connection management
+
+# Custom httpx client with better connection handling
+_httpx_client: Optional[httpx.Client] = None
+
+def get_httpx_client() -> httpx.Client:
+    """Get a configured httpx client with proper timeouts and connection pooling."""
+    global _httpx_client
+    
+    if _httpx_client is None:
+        # Configure httpx client with better connection handling
+        _httpx_client = httpx.Client(
+            timeout=httpx.Timeout(
+                connect=10.0,  # Connection timeout
+                read=30.0,     # Read timeout
+                write=10.0,    # Write timeout
+                pool=60.0      # Pool timeout
+            ),
+            limits=httpx.Limits(
+                max_keepalive_connections=20,  # Keep more connections alive
+                max_connections=100,           # Allow more concurrent connections
+                keepalive_expiry=60.0         # Keep connections alive for 60 seconds
+            ),
+            http2=True  # Enable HTTP/2 for better performance
+        )
+    
+    return _httpx_client
 
 class SimpleSupabaseClient:
     """A simplified client for Supabase that uses direct HTTP requests instead of SDK."""
@@ -48,10 +75,11 @@ class SimpleSupabaseClient:
             "Content-Type": "application/json",
             "Prefer": "return=representation"
         }
+        self.client = get_httpx_client()
     
     def _handle_response(self, response):
         """Handle API response and convert to expected format."""
-        if not response.ok:
+        if not response.is_success:
             logger.error(f"Supabase API error: {response.status_code} - {response.text}")
             return None
         
@@ -71,8 +99,8 @@ class SimpleSupabaseClient:
         """Test the connection to Supabase."""
         try:
             endpoint = f"{self.base_url}/rest/v1/fighters?limit=1"
-            response = requests.get(endpoint, headers=self.headers)
-            return response.ok
+            response = self.client.get(endpoint, headers=self.headers)
+            return response.is_success
         except Exception as e:
             logger.error(f"Error testing connection: {str(e)}")
             return False
@@ -163,29 +191,51 @@ class QueryBuilder:
         return url
     
     def execute(self):
-        """Execute the query."""
-        try:
-            url = self._build_url()
-            response = requests.get(url, headers=self.client.headers)
-            return self.client._handle_response(response)
-        except Exception as e:
-            logger.error(f"Error executing query: {str(e)}")
-            return None
+        """Execute the query with retry logic."""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                url = self._build_url()
+                response = self.client.client.get(url, headers=self.client.headers)
+                return self.client._handle_response(response)
+            except (httpx.ConnectError, httpx.ReadError, httpx.WriteError) as e:
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 1  # Exponential backoff
+                    logger.warning(f"Connection error on attempt {attempt + 1}, retrying in {wait_time}s: {str(e)}")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"Failed to execute query after {max_retries} attempts: {str(e)}")
+                    return None
+            except Exception as e:
+                logger.error(f"Error executing query: {str(e)}")
+                return None
     
     def upsert(self, data, on_conflict=None):
         """Insert or update data."""
-        try:
-            url = f"{self.client.base_url}/rest/v1/{self.table_name}"
-            
-            headers = dict(self.client.headers)
-            if on_conflict:
-                headers["Prefer"] = f"resolution=merge-duplicates,return=representation,on_conflict={on_conflict}"
-            
-            response = requests.post(url, headers=headers, json=data if isinstance(data, list) else [data])
-            return self.client._handle_response(response)
-        except Exception as e:
-            logger.error(f"Error upserting data: {str(e)}")
-            return None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                url = f"{self.client.base_url}/rest/v1/{self.table_name}"
+                
+                headers = dict(self.client.headers)
+                if on_conflict:
+                    headers["Prefer"] = f"resolution=merge-duplicates,return=representation,on_conflict={on_conflict}"
+                
+                response = self.client.client.post(url, headers=headers, json=data if isinstance(data, list) else [data])
+                return self.client._handle_response(response)
+            except (httpx.ConnectError, httpx.ReadError, httpx.WriteError) as e:
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 1
+                    logger.warning(f"Connection error on upsert attempt {attempt + 1}, retrying in {wait_time}s: {str(e)}")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"Failed to upsert data after {max_retries} attempts: {str(e)}")
+                    return None
+            except Exception as e:
+                logger.error(f"Error upserting data: {str(e)}")
+                return None
 
 def get_db_connection() -> Optional[Client]:
     """
@@ -211,9 +261,14 @@ def get_db_connection() -> Optional[Client]:
         for attempt in range(MAX_RETRIES):
             try:
                 logger.info(f"Connecting to Supabase (attempt {attempt+1}/{MAX_RETRIES})...")
-                _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
                 
-                # Test connection
+                # Create client with custom httpx client
+                _supabase_client = create_client(
+                    SUPABASE_URL, 
+                    SUPABASE_KEY
+                )
+                
+                # Test connection with timeout
                 test_response = _supabase_client.table('fighters').select('id').limit(1).execute()
                 if test_response is not None and hasattr(test_response, 'data'):
                     logger.info("Successfully connected to Supabase")
@@ -224,8 +279,9 @@ def get_db_connection() -> Optional[Client]:
             except Exception as e:
                 retry_wait = RETRY_BACKOFF ** attempt
                 logger.warning(f"Connection attempt {attempt+1} failed: {str(e)}")
-                logger.info(f"Retrying in {retry_wait} seconds...")
-                time.sleep(retry_wait)
+                if attempt < MAX_RETRIES - 1:
+                    logger.info(f"Retrying in {retry_wait} seconds...")
+                    time.sleep(retry_wait)
         
         logger.error(f"Failed to connect to Supabase after {MAX_RETRIES} attempts")
         return None

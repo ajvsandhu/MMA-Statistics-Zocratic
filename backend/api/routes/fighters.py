@@ -287,16 +287,25 @@ def get_fighter(fighter_id: str) -> Dict:
             
         logger.info(f"Fighter lookup requested for ID: {fighter_id}")
         
+        # Get database connection with retry logic
         supabase = get_db_connection()
         if not supabase:
             logger.error("No database connection available")
-            raise HTTPException(status_code=500, detail="Database connection error")
+            raise HTTPException(status_code=503, detail="Database temporarily unavailable. Please try again in a few moments.")
         
-        # Try to get fighter by ID
-        response = supabase.table('fighters')\
-            .select('*')\
-            .eq('id', fighter_id)\
-            .execute()
+        # Try to get fighter by ID with better error handling
+        try:
+            response = supabase.table('fighters')\
+                .select('*')\
+                .eq('id', fighter_id)\
+                .execute()
+        except Exception as db_error:
+            logger.error(f"Database error fetching fighter {fighter_id}: {str(db_error)}")
+            # Check if it's a connection error
+            if "Resource temporarily unavailable" in str(db_error) or "connection" in str(db_error).lower():
+                raise HTTPException(status_code=503, detail="Database connection temporarily unavailable. Please try again.")
+            else:
+                raise HTTPException(status_code=500, detail="Database error occurred. Please try again later.")
             
         if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
             fighter_data = response.data[0]
@@ -311,7 +320,11 @@ def get_fighter(fighter_id: str) -> Dict:
     except Exception as e:
         logger.error(f"Error in get_fighter: {str(e)}")
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Internal server error")
+        # Provide more specific error messages based on the error type
+        if "connection" in str(e).lower() or "timeout" in str(e).lower():
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable. Please try again in a few moments.")
+        else:
+            raise HTTPException(status_code=500, detail="Internal server error. Please try again later.")
 
 def _process_fighter_data(fighter_data: Dict) -> Dict:
     """Process fighter data and fetch last 5 fights."""
@@ -322,7 +335,9 @@ def _process_fighter_data(fighter_data: Dict) -> Dict:
         
         supabase = get_db_connection()
         if not supabase:
-            logger.error("No database connection available")
+            logger.error("No database connection available for fetching fights")
+            # Return fighter data without fights rather than failing completely
+            fighter_data['last_5_fights'] = []
             return fighter_data
         
         last_5_fights = []
@@ -346,14 +361,23 @@ def _process_fighter_data(fighter_data: Dict) -> Dict:
                     for fight in last_5_fights:
                         if fighter_id and 'fighter_id' not in fight:
                             fight['fighter_id'] = fighter_id
+                else:
+                    logger.info(f"No fights found for fighter '{fighter_name}'")
             except Exception as e:
                 logger.error(f"Error fetching fights by fighter_name: {str(e)}")
+                # Don't fail the entire request, just return fighter data without fights
+                if "Resource temporarily unavailable" in str(e) or "connection" in str(e).lower():
+                    logger.warning("Connection issue when fetching fights, returning fighter data without fights")
+                else:
+                    logger.warning("Database error when fetching fights, returning fighter data without fights")
         
         fighter_data['last_5_fights'] = last_5_fights
         return fighter_data
     except Exception as e:
         logger.error(f"Error processing fighter data: {str(e)}")
         logger.error(traceback.format_exc())
+        # Return fighter data without fights rather than failing completely
+        fighter_data['last_5_fights'] = []
         return fighter_data
 
 def _get_default_fighter(fighter_id: str, name: str = "") -> Dict:
@@ -569,6 +593,51 @@ def get_fighters_count():
     except Exception as e:
         logger.error(f"Error getting fighters count: {str(e)}")
         return {"count": 0}
+
+@router.get("/database-health")
+def database_health_check():
+    """Check database connection health."""
+    try:
+        start_time = time.time()
+        
+        # Test connection
+        supabase = get_db_connection()
+        if not supabase:
+            return {
+                "status": "unhealthy",
+                "service": "database",
+                "error": "Failed to establish database connection",
+                "response_time_ms": 0
+            }
+        
+        # Test a simple query
+        response = supabase.table('fighters').select('id').limit(1).execute()
+        
+        elapsed_ms = (time.time() - start_time) * 1000
+        
+        if response and hasattr(response, 'data'):
+            return {
+                "status": "healthy",
+                "service": "database",
+                "response_time_ms": round(elapsed_ms, 2),
+                "connection_test": "successful"
+            }
+        else:
+            return {
+                "status": "degraded",
+                "service": "database",
+                "error": "Connection established but query failed",
+                "response_time_ms": round(elapsed_ms, 2)
+            }
+            
+    except Exception as e:
+        logger.error(f"Database health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "service": "database",
+            "error": str(e),
+            "response_time_ms": 0
+        }
 
 @router.get("/update-rankings")
 def update_rankings():
