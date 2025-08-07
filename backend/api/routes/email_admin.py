@@ -73,7 +73,7 @@ async def send_test_email(
         email_service = get_email_service()
         
         if request.email_type == "welcome":
-            result = await email_service.send_welcome_email(
+            result = email_service.send_welcome_email(
                 to=request.email,
                 username="Test User"
             )
@@ -86,7 +86,7 @@ async def send_test_email(
                     "main_event": "Fighter A vs Fighter B"
                 }
             ]
-            result = await email_service.send_weekly_picks_reminder(
+            result = email_service.send_weekly_picks_reminder(
                 to=request.email,
                 username="Test User",
                 upcoming_events=mock_events
@@ -162,7 +162,7 @@ async def send_weekly_reminders_manual(
         
         for user in eligible_users:
             try:
-                result = await email_service.send_weekly_picks_reminder(
+                result = email_service.send_weekly_picks_reminder(
                     to=user['email'],
                     username=user['username'],
                     upcoming_events=upcoming_events

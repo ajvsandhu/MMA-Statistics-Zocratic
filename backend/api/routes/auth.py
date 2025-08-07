@@ -52,7 +52,7 @@ class PostSignupResponse(BaseModel):
 @router.post("/check-username", response_model=UsernameCheckResponse)
 async def check_username_availability(request: UsernameCheckRequest):
     """
-    Check if a username is available in the Cognito user pool
+    Check if a username is available in the database
     """
     try:
         username = request.username.strip()
@@ -83,44 +83,50 @@ async def check_username_availability(request: UsernameCheckRequest):
                 message="This username is reserved"
             )
         
-        # Check Cognito user pool if configured and boto3 is available
-        if BOTO3_AVAILABLE and COGNITO_REGION and COGNITO_USER_POOL_ID:
-            try:
-                cognito_client = boto3.client('cognito-idp', region_name=COGNITO_REGION)
+        # Check database for existing username
+        try:
+            supabase = get_db_connection()
+            if supabase:
+                # Query user_settings table for existing username
+                result = supabase.table('user_settings')\
+                    .select('user_id, settings')\
+                    .execute()
                 
-                # Try to get user by username
-                response = cognito_client.admin_get_user(
-                    UserPoolId=COGNITO_USER_POOL_ID,
-                    Username=username
-                )
+                # Check if username exists in any settings
+                username_exists = False
+                if result.data:
+                    for record in result.data:
+                        settings = record.get('settings', {})
+                        if settings.get('preferred_username') == username:
+                            username_exists = True
+                            break
                 
-                # If we get here, user exists
-                return UsernameCheckResponse(
-                    available=False,
-                    message="Username is already taken"
-                )
-                
-            except ClientError as e:
-                error_code = e.response['Error']['Code']
-                
-                if error_code == 'UserNotFoundException':
-                    # User doesn't exist, username is available
+                if username_exists:
+                    # Username is already taken
+                    return UsernameCheckResponse(
+                        available=False,
+                        message="Username is already taken"
+                    )
+                else:
+                    # Username is available
                     return UsernameCheckResponse(
                         available=True,
                         message="Username is available"
                     )
-                else:
-                    # Other error, log it but don't block user
-                    logger.error(f"Cognito error checking username: {error_code}")
-                    return UsernameCheckResponse(
-                        available=True,
-                        message="Username appears to be available"
-                    )
-        else:
-            # No Cognito configuration or boto3 not available, just check reserved names
+            else:
+                # Database connection failed, but don't block user
+                logger.warning("Database connection failed, assuming username is available")
+                return UsernameCheckResponse(
+                    available=True,
+                    message="Username appears to be available"
+                )
+                
+        except Exception as db_error:
+            logger.error(f"Database error checking username availability: {str(db_error)}")
+            # On database error, assume available to not block users
             return UsernameCheckResponse(
                 available=True,
-                message="Username appears to be available"
+                message="Unable to verify availability, but username appears to be available"
             )
             
     except Exception as e:
@@ -283,13 +289,12 @@ async def handle_post_signup(
                         from backend.api.email.services.resend_service import get_email_service
                         email_service = get_email_service()
                         
-                        # Send welcome email asynchronously
-                        import asyncio
-                        asyncio.create_task(email_service.send_welcome_email(
+                        # Send welcome email
+                        email_service.send_welcome_email(
                             to=signup_request.email,
                             username=signup_request.preferred_username,
                             email_preferences=signup_request.email_notifications
-                        ))
+                        )
                         
                         logger.info(f"Welcome email queued for {signup_request.email}")
                     except Exception as e:

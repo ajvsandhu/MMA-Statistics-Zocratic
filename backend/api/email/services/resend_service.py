@@ -1,3 +1,4 @@
+
 import os
 import logging
 from typing import Optional, Dict, Any, List
@@ -10,17 +11,19 @@ class ResendEmailService:
     """Email service using Resend API for Zocratic MMA"""
     
     def __init__(self):
+        # Get Resend API key
         self.api_key = os.getenv("RESEND_API_KEY")
         if not self.api_key:
             logger.error("RESEND_API_KEY environment variable not set")
             raise ValueError("RESEND_API_KEY environment variable is required")
         
+        # Set the API key for the resend library
         resend.api_key = self.api_key
         self.from_email = os.getenv("RESEND_FROM_EMAIL", "noreply@zocraticmma.com")
         
-        logger.info("ResendEmailService initialized successfully")
+        logger.info(f"ResendEmailService initialized successfully with from_email: {self.from_email}")
     
-    async def send_email(
+    def send_email(
         self,
         to: str | List[str],
         subject: str,
@@ -65,30 +68,37 @@ class ResendEmailService:
             
         except Exception as e:
             logger.error(f"Failed to send email to {to}: {str(e)}")
+            logger.error(f"Email data: {email_data}")
             return {
                 "success": False,
                 "error": str(e)
             }
     
-    async def send_welcome_email(self, to: str, username: str, email_preferences: bool = True) -> Dict[str, Any]:
+    def send_welcome_email(self, to: str, username: str, email_preferences: bool = True) -> Dict[str, Any]:
         """Send welcome email to new users"""
+        logger.info(f"Sending welcome email to {to} for user {username}")
+        
         from backend.api.email.templates.welcome_template import get_welcome_email_html
         
         html_content = get_welcome_email_html(username)
+        logger.info(f"Generated welcome email HTML for {username}")
         
         tags = [
             {"name": "category", "value": "welcome"},
             {"name": "user_type", "value": "new_signup"}
         ]
         
-        return await self.send_email(
+        result = self.send_email(
             to=to,
             subject="Welcome to Zocratic MMA - Your Fight Prediction Journey Begins! 🥊",
             html_content=html_content,
             tags=tags
         )
+        
+        logger.info(f"Welcome email result for {to}: {result}")
+        return result
     
-    async def send_weekly_picks_reminder(self, to: str, username: str, upcoming_events: List[Dict]) -> Dict[str, Any]:
+    def send_weekly_picks_reminder(self, to: str, username: str, upcoming_events: List[Dict]) -> Dict[str, Any]:
         """Send weekly Thursday reminder to place picks"""
         from backend.api.email.templates.weekly_reminder_template import get_weekly_reminder_html
         
@@ -99,14 +109,14 @@ class ResendEmailService:
             {"name": "day", "value": "thursday"}
         ]
         
-        return await self.send_email(
+        return self.send_email(
             to=to,
             subject="🥊 Weekly Picks Reminder - Don't Miss This Week's Fights!",
             html_content=html_content,
             tags=tags
         )
     
-    async def send_fight_results_notification(self, to: str, username: str, results: List[Dict]) -> Dict[str, Any]:
+    def send_fight_results_notification(self, to: str, username: str, results: List[Dict]) -> Dict[str, Any]:
         """Send fight results to users who placed picks"""
         from backend.api.email.templates.results_template import get_results_email_html
         
@@ -117,14 +127,14 @@ class ResendEmailService:
             {"name": "notification_type", "value": "results"}
         ]
         
-        return await self.send_email(
+        return self.send_email(
             to=to,
             subject="🏆 Fight Results - See How Your Picks Performed!",
             html_content=html_content,
             tags=tags
         )
     
-    async def send_picks_deadline_reminder(self, to: str, username: str, event_name: str, hours_left: int) -> Dict[str, Any]:
+    def send_picks_deadline_reminder(self, to: str, username: str, event_name: str, hours_left: int) -> Dict[str, Any]:
         """Send deadline reminder for upcoming event"""
         from backend.api.email.templates.deadline_reminder_template import get_deadline_reminder_html
         
@@ -135,7 +145,7 @@ class ResendEmailService:
             {"name": "urgency", "value": "high" if hours_left <= 2 else "medium"}
         ]
         
-        return await self.send_email(
+        return self.send_email(
             to=to,
             subject=f"⏰ Last Chance - {event_name} Picks Close in {hours_left} Hours!",
             html_content=html_content,

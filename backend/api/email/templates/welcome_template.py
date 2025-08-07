@@ -16,20 +16,21 @@ def get_welcome_email_html(username: str) -> str:
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
+            color: #e5e7eb;
+            background-color: #111827;
         }}
         .container {{
             max-width: 600px;
             margin: 0 auto;
-            background-color: #ffffff;
+            background-color: #1f2937;
             padding: 0;
             border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             overflow: hidden;
+            border: 1px solid #374151;
         }}
         .header {{
-            background: linear-gradient(135deg, #d32f2f 0%, #f44336 100%);
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
             color: white;
             padding: 40px 30px;
             text-align: center;
@@ -45,11 +46,12 @@ def get_welcome_email_html(username: str) -> str:
         }}
         .content {{
             padding: 40px 30px;
+            background-color: #1f2937;
         }}
         .welcome-message {{
             font-size: 18px;
             margin-bottom: 30px;
-            color: #2c3e50;
+            color: #e5e7eb;
         }}
         .features {{
             margin: 30px 0;
@@ -59,9 +61,9 @@ def get_welcome_email_html(username: str) -> str:
             align-items: center;
             margin-bottom: 20px;
             padding: 15px;
-            background-color: #f8f9fa;
+            background-color: #374151;
             border-radius: 8px;
-            border-left: 4px solid #d32f2f;
+            border-left: 4px solid #dc2626;
         }}
         .feature-icon {{
             font-size: 24px;
@@ -74,16 +76,16 @@ def get_welcome_email_html(username: str) -> str:
         }}
         .feature-title {{
             font-weight: 600;
-            color: #2c3e50;
+            color: #f9fafb;
             margin-bottom: 5px;
         }}
         .feature-desc {{
-            color: #6c757d;
+            color: #d1d5db;
             font-size: 14px;
         }}
         .cta-button {{
             display: inline-block;
-            background: linear-gradient(135deg, #d32f2f 0%, #f44336 100%);
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
             color: white;
             padding: 15px 30px;
             text-decoration: none;
@@ -97,10 +99,11 @@ def get_welcome_email_html(username: str) -> str:
             transform: translateY(-2px);
         }}
         .footer {{
-            background-color: #2c3e50;
+            background-color: #111827;
             color: white;
             padding: 30px;
             text-align: center;
+            border-top: 1px solid #374151;
         }}
         .footer p {{
             margin-bottom: 10px;
@@ -117,6 +120,23 @@ def get_welcome_email_html(username: str) -> str:
         }}
         .social-links a:hover {{
             opacity: 1;
+        }}
+        .pro-tip {{
+            background-color: #374151;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+        }}
+        .pro-tip h3 {{
+            color: #fbbf24;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }}
+        .pro-tip p {{
+            color: #d1d5db;
+            margin: 0;
+            font-size: 14px;
         }}
         @media (max-width: 600px) {{
             .container {{
@@ -150,7 +170,7 @@ def get_welcome_email_html(username: str) -> str:
             <div class="welcome-message">
                 <strong>Hey {username}!</strong> 👋
                 <br><br>
-                Welcome to the most exciting MMA prediction community! You've just joined thousands of fight fans who love to test their MMA knowledge and compete for glory.
+                Welcome to the most exciting MMA prediction community! You've just joined a growing community of fight fans who love to test their MMA knowledge and compete for glory.
             </div>
 
             <div class="features">
@@ -193,14 +213,10 @@ def get_welcome_email_html(username: str) -> str:
                 </a>
             </div>
 
-            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 30px 0;">
-                <h3 style="color: #856404; margin-bottom: 10px;">🎁 Welcome Bonus!</h3>
-                <p style="color: #856404; margin: 0;">You've received <strong>100 free coins</strong> to start making predictions. Use them wisely!</p>
+            <div class="pro-tip">
+                <h3>💡 Pro Tip</h3>
+                <p>Check back every Thursday for our weekly picks reminder email. We'll keep you updated on all the upcoming fights so you never miss a prediction opportunity!</p>
             </div>
-
-            <p style="color: #6c757d; font-size: 14px; margin-top: 30px;">
-                <strong>Pro Tip:</strong> Check back every Thursday for our weekly picks reminder email. We'll keep you updated on all the upcoming fights so you never miss a prediction opportunity!
-            </p>
         </div>
 
         <!-- Footer -->
